@@ -32,3 +32,11 @@ Newest entries at the bottom. Format: `### <UTC timestamp> — S<n> — <title>`
 - Problems solved: FedAvg drops meta after round 1 (re-attach train_config in send_model); server app without custom code -> ComponentNotAuthorized (ship workflow as BYOC server code); `python -m` builder serialized `__main__` class path (build from package import).
 - S1-core milestone 894f7b7 received (bus #129). sysmon started via `deploy/nvflare-vm/sysmon.sh` (per-site client/job components, island grouped apart).
 - Next: purge.sh, island payload check (128-512 MB), data provisioning on nvf-h1/h2, ONE deploy-request.
+
+### 2026-10-13T15:06Z — S2 — rollout prepared and rehearsed; data provisioned; E5 path tested
+- Real hospitals: data variants provisioned (9 files/base site + iid12 for h7/h8, manifest-verified, 12.9 s, no restart; ledger row). sysmon running.
+- Island payload check (relay path, default NVFlare 2.9.0 knobs): payload-128 5-6 s/round, 256 9-10 s, 512 16-17 s (VM peak +5.3 GB), 1024 32.8 s (peak 17.6 GB used): no server-side knob needed for E4a; memory is the thing to watch on central.
+- Shadowing confirmed empirically: island clients whose venv has flhub_core 0.1 ran 0.1.0+9c6b064c1e96 although the job shipped 0.2.
+- `switch_s2.sh` rehearsed on the island in the real hospitals' state (editable 0.1, then pinned copy, stale path in the running clients): data check 12 s, uninstall, stop/start, both sites run the job's 0.2.0+fe357a1dbec1 after 87.5 s; downtime 59 s per site.
+- E5: `provision_extra.sh` (nvflare provision --add-client; same root CA; prod_01/prod_02; no server restart) + `extra.sh install|start|stop|status`; island: 4 sites incl. nvf-h7/h8 run organamnist-iid12 rounds (3 s); `extra.sh stop` leaves the base sites' watchdog on. `purge.sh` deletes finished jobs via the FLARE API (island: 10 jobs) and stale server workspaces.
+- Note: an exception in client.py makes NVFlare abort the whole relay job ("ask to abort job"); the keeper resubmits it.
