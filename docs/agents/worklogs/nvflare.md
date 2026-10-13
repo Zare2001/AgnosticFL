@@ -50,3 +50,10 @@ Newest entries at the bottom. Format: `### <UTC timestamp> — <phase> — <titl
 - Final runs (central, bus #66): nvflare-only pavr8q6u acc 0.8173 / AUC 0.9224 (30 rounds, 80 s); mixed-6sites iehjnc44 acc 0.8654 / AUC 0.9247, 30/30 rounds, 6/6 sites, == sim-fedavg-reference (diff 0.0, rounds 0-30).
 - Client logs: 70 rounds per site in P2+P3, 0 warnings/errors in job logs; relay job 9e4f07a2 served all runs without restart. Island evidence pushed (811cd39).
 - Next: on final-call push docs/report/nvflare.md + report-ready; before DONE remove ~/venvs/hub (island-only).
+
+### 2026-10-13T13:18Z — P4 — all-done: nvflare DoD items verified, DONE
+- all-done received (bus #84, REPORT.md 1b66a28). Report section docs/report/nvflare.md pushed (873781e, report-ready bus #75); REPORT.md §5/§9/§12 statements on NVFlare checked against it and the evidence: accurate.
+- DoD 1: deploy/nvflare-vm/status.sh -> "status: HEALTHY" (exit 0); central's deploy/central/nvflare/status.sh healthy in REPORT.md §12.
+- DoD 2: hospital venv = nvflare 2.9.0, torch 2.14.1+cpu, numpy 2.4.4, safetensors 0.8.0, flhub_core (hub package not importable); hub-specific items only: startup kit (flhub-central:8002 + mTLS certs), /etc/hosts alias, data path; job code custom/client.py byte-identical to b656577.
+- DoD 3: conformance 7/7 vs central :8811 (docs/report/evidence/conformance-nvflare-central.json). DoD 7: all commits Zare2001, no attribution (git log check: 0 matches); tests/unit/test_nvflare_adapter.py 7 passed (central, ~/venvs/nvflare).
+- VM state left running: nvf-h1/nvf-h2 clients (cron watchdog on), relay job 9e4f07a2; island leftovers and ~/venvs/hub removed. ~/.flhub/DONE created.
