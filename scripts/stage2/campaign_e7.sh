@@ -17,7 +17,7 @@ for fw in ${fws[@]}; do
       || echo "FAILED native $fw $c"
     "$PY" scripts/stage2/run_final.py real "$cfg" || echo "FAILED hub $fw $c"
     if [ "$fw" = vantage6 ] && [ "$c" = payload ]; then bash deploy/central/vantage6/purge.sh --vacuum || true; fi
-    [ "$c" = payload ] && [ -x "deploy/central/$fw/purge.sh" ] && [ "$fw" != vantage6 ] && bash "deploy/central/$fw/purge.sh" || true
+    [ "$c" = payload ] && [ -f "deploy/central/$fw/purge.sh" ] && [ "$fw" != vantage6 ] && bash "deploy/central/$fw/purge.sh" || true
   done
 done
 echo "campaign_e7 done $(date -u +%FT%TZ)"
