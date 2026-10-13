@@ -67,7 +67,13 @@ Evidence: vantage6 4.15.2 source (server/node wheels, client, algorithm tools) a
 - E4a mixed scope (bus file #73): vantage6 sets the round time (`adapter/vantage6/fanout_s` = round duration): 1 MB 6.5 s, 8 MB 13.3 s, 32 MB 58.9 s, 64 MB 116.2 s; 128 MB testbed disk limit (needs 6 GB free on central; #381).
 - E4b: `netem.sh` (egress to central 7601/5050 only; tested under RUNLOCK: connect time 0.73 -> 20.8 ms, bus untouched, cleared to fq_codel): _(results)_.
 - E5: `extra.sh` for v6-h9/v6-h10 (configs installed, keys from central's `add_sites.sh`): _(results)_.
-- E6 (island-tested; final results to be filled):
+- E6 final runs (vantage6 side; central's E6 table from the 'E6 inject' messages has the round-level outcome):
+  - s2-e6a-strict: v6-h3 round-10 training start 21:27:58.939Z, SIGKILL of its training container 21:27:59.431Z (exit 137, run crashed); the strict retry's task reached v6-h3 at 21:28:01; 20 rounds finished; node up throughout.
+  - s2-e6a-minsites: same injection at 21:33:17.648Z; the round went on with the other five sites.
+  - s2-e6b-straggler: v6-h4 at 10 % CPU for rounds 7-13 (window opened by the round-7 task 21:40:50Z, closed by the round-14 task 21:43:26Z); each of the 7 throttled runs was cancelled at the 20 s deadline (adapter `task.kill` -> node 'Killing containers for run_id=...'); rounds 14-20 normal.
+  - s2-e6d-resume: the vantage6 adapter was SIGKILLed with the orchestrator (22:08:01Z) and restarted by `start.sh`; the run resumed after round 20 and finished.
+  - s2-e6e-server-restart: vantage6 server restarted after round 9 and in the middle of round 12: the nodes reconnected within 1-5 s; the running round-12 run was kept ('Not starting task 371 ... already running') and its result delivered after the reconnect; round 13 overlapped the end of the restart (client retries); no vantage6 round failed or was retried.
+- E6 tools (island tests):
   - `kill` (SIGKILL the training container at round N + S s): run `crashed`, adapter reports the site failed ~3 s later; the node stays up.
   - `restart` mid-round: the node re-runs the open run after reconnecting; the round completes without a retry (19.6 s vs 8 s).
   - `straggle:10` rounds N..M-1 (`docker update --cpus 0.10` per training container): 44 s vs 11.5 s per round.
