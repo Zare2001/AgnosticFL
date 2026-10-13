@@ -267,8 +267,8 @@ def fig_e4a_time(out: Path) -> None:
         if not good:
             continue
         ax.plot([g[0] for g in good], [g[1] for g in good], "o-", color=FW_COLOR[scope], ms=5)
-        ax.annotate(scope, good[-1], xytext=(6, 0), textcoords="offset points", va="center", fontsize=8,
-                    color=TEXT)
+        ax.annotate(scope, good[-1], xytext=(-5, 8), textcoords="offset points", ha="right", va="bottom",
+                    fontsize=8, color=TEXT)
         for size, result in e4a_limits(scope):
             ax.plot([size], [good[-1][1]], marker="v" if "disk" in result else "x", color=FW_COLOR[scope],
                     ms=8, mfc="none", mew=1.5)
@@ -312,11 +312,13 @@ def fig_e4a_rss(out: Path) -> None:
         if pts[c]:
             ax.plot([p[0] for p in pts[c]], [p[1] for p in pts[c]], "o-", color=SERIES[i], label=label, ms=4)
     ax.set_xscale("log", base=2)
+    sizes = sorted({x for line in ax.get_lines() for x in line.get_xdata()})
+    ax.set_xticks(sizes, [f"{x:g}" for x in sizes])
     ax.set_yscale("log")
     ax.set_xlabel("payload (MiB)")
     ax.set_ylabel("peak RSS on central (MB)")
     ax.set_title("E4a (mixed scope): peak memory of the central components", loc="left")
-    ax.legend(fontsize=8)
+    ax.legend(fontsize=8, loc="center left", bbox_to_anchor=(1.01, 0.5), frameon=False)
     save(fig, "e4a_peak_rss_vs_payload", out)
 
 
