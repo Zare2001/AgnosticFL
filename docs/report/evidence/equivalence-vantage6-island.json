@@ -1,0 +1,15 @@
+{
+ "note": "vantage6 island 3-round run vs hub.sim reference (W&B offline), transcribed from the scripts/equivalence_check.py output.",
+ "run_a": "vantage6-island-3r-20261013T123356Z (python -m hub.orchestrator run --config deploy/central/vantage6/island-3r.yaml --wandb offline; 3 rounds, 8.0 s/round, 27.7 s)",
+ "run_b": "sim-fedavg-reference-20261013T123430Z (python -m hub.sim --config deploy/central/vantage6/island-3r.yaml --wandb offline)",
+ "rounds": [
+  {"round": 0, "max_abs_diff": 0.0, "test_acc_a": 0.625, "test_acc_b": 0.625},
+  {"round": 1, "max_abs_diff": 0.0, "test_acc_a": 0.625, "test_acc_b": 0.625},
+  {"round": 2, "max_abs_diff": 0.0, "test_acc_a": 0.625, "test_acc_b": 0.625},
+  {"round": 3, "max_abs_diff": 0.0, "test_acc_a": 0.625, "test_acc_b": 0.625}
+ ],
+ "max_abs_weight_diff": 0.0,
+ "final_test_acc_diff_pp": 0.0,
+ "final_global_ref": "sha256:64089be3e844354a352688b2a059b48461c3ed014a467f5974791c43c859492f",
+ "verdict": "EQUIVALENCE: PASS"
+}
