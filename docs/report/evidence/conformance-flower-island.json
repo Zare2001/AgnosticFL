@@ -1,0 +1,64 @@
+{
+ "tests": {
+  "round_1": {
+   "seconds": 7.5,
+   "sites": {
+    "flw-h5": {
+     "max_abs_diff": 0.0,
+     "num_examples": 784,
+     "train_loss": 0.6011811117736661,
+     "client_code_version": "0.1.0+9c6b064c1e96"
+    },
+    "flw-h6": {
+     "max_abs_diff": 0.0,
+     "num_examples": 784,
+     "train_loss": 0.6013880688316968,
+     "client_code_version": "0.1.0+9c6b064c1e96"
+    }
+   }
+  },
+  "round_2": {
+   "sites": {
+    "flw-h5": {
+     "max_abs_diff": 0.0,
+     "num_examples": 784,
+     "train_loss": 0.5972103963092882,
+     "client_code_version": "0.1.0+9c6b064c1e96"
+    },
+    "flw-h6": {
+     "max_abs_diff": 0.0,
+     "num_examples": 784,
+     "train_loss": 0.6006995792291603,
+     "client_code_version": "0.1.0+9c6b064c1e96"
+    }
+   }
+  },
+  "round_4_after_cancel": {
+   "sites": {
+    "flw-h5": {
+     "max_abs_diff": 0.0,
+     "num_examples": 784,
+     "train_loss": 0.5995481671119223,
+     "client_code_version": "0.1.0+9c6b064c1e96"
+    },
+    "flw-h6": {
+     "max_abs_diff": 0.0,
+     "num_examples": 784,
+     "train_loss": 0.6008431053891474,
+     "client_code_version": "0.1.0+9c6b064c1e96"
+    }
+   }
+  }
+ },
+ "adapter": {
+  "adapter": "flower",
+  "framework": "flower",
+  "framework_version": "1.39.0",
+  "protocol": "flhub/0.1"
+ },
+ "sites": [
+  "flw-h5",
+  "flw-h6"
+ ],
+ "exitstatus": 0
+}
