@@ -128,7 +128,7 @@ The full specification is `docs/agents/PROTOCOL.md`, frozen at 12:17 UTC with no
 | num_examples | `FLModel.meta["num_examples"]` | result dict | `MetricRecord["num-examples"]` |
 | weights back | `FLModel.params` (FULL, numpy) | base64 safetensors in the JSON result | `ArrayRecord` |
 | sites online | relay view + FLARE API client job status | `client.node.list()` status | `Grid.get_node_ids()` + site-info QUERY |
-| cancel | relay job continues; late result ignored | `client.task.kill` | late reply ignored (404) |
+| cancel | relay watcher calls `cancel_all_tasks()`; a late result (404) is ignored | `client.task.kill` | relay notices via `/relay/status`; a late reply (404) is ignored |
 
 Changes during the build: none to the protocol. The only adjustment was in the plan: the Flower port map (ADR-007).
 
@@ -216,3 +216,119 @@ The W&B runs also log per round: `global/test_{loss,acc,auc}`, `round/duration_s
 - **FedAvg over 6 sites ≈ centralized training.** Accuracy is 0.865 vs 0.861 and AUC 0.925 vs 0.928 after the same number of passes over the data. The federated runs plateau at the majority class (0.625) for about 13 rounds before accuracy rises, while AUC rises from round 1. Centralized training escapes earlier (more SGD steps per pass at the same lr), but both reach the same level.
 - **Single-framework runs** use 2 sites and one third of the data. They reach a similar AUC (0.915–0.925), but accuracy at the 0.5 threshold fluctuates strongly from round to round (e.g. vantage6-only 0.53 at round 20, 0.86 at round 30). Their final accuracies (0.76–0.86) reflect this noise, not framework quality: the training code is identical everywhere.
 - **Round latency comes from the framework, not the hub.** NVFlare takes 2.5 s/round (persistent job). vantage6 takes 7.8 s (one algorithm container and image check per task). Flower takes 7.3 s (one ClientApp process per message, torch import). Mixed takes 8.0 s, because rounds run in parallel and wait for the slowest framework.
+
+## 8. How the agents built it
+
+Four Claude agents (Opus 5.5 orchestrators with Haiku subagents), one per VM. They coordinated over the agent bus (`tools/agentbus`, port 7700) and committed to one GitHub repository as Zare2001. The full bus transcript is `docs/report/bus_transcript.md`.
+
+**Timeline (UTC, 2026-10-13; `#n` = bus message):**
+
+| Time | Event |
+|---|---|
+| 11:59–12:00 | all four agents up, bus up (#1–#4) |
+| 12:00–12:08 | pins proposed by nvflare and vantage6; Flower 1.39 port change reported; API questions (#5–#8) |
+| 12:10 | `flhub_core` pushed (c703faf, #9); API answers (#10) |
+| 12:11–12:15 | `flhub_core.selfcheck` bit-exact on the flower, nvflare and vantage6 VMs and inside the vantage6 image (#11, #12, #14) |
+| 12:17 | **M0-core**: adapters/common, hub core, protocol frozen (#15) |
+| 12:19 / 12:25 | conformance suite (#18); orchestrator, sim, equivalence check (#19) |
+| 12:28 | **M1-hub** (#20) |
+| 12:31 / 12:35 / 12:44 | **M1-nvflare** (#24), **M1-vantage6** (#31), **M1-flower** (#45), each followed by a deploy-request |
+| 12:34 / 12:42 / 12:46 | deploy-result PASS for nvflare (#29), vantage6 (#39), flower (#49); credentials as encrypted bus files #1–#3 |
+| 12:38 / 12:46 / 12:50 | **M2-nvflare** (#36), **M2-vantage6** (#50), **M2-flower** (#54) |
+| 12:51 | **M2-mixed** (#55); P3 freeze at b656577 (#56) |
+| 12:52 | freeze confirmed by flower, nvflare, vantage6 (#59–#61) |
+| 12:53–13:08 | six final runs online (`scripts/run_final.sh all`) |
+| 13:09 | **M3-final** (#66); final-call (#67) |
+| 13:11–13:13 | report-ready from vantage6, flower, nvflare (#71, #73, #75) |
+
+**Per-agent sections** (full text in `docs/report/`):
+- [`central.md`](docs/report/central.md): `flhub_core`, protocol, `adapters/common` (BaseAdapter, RelayAdapter), hub core, orchestrator, sim, conformance suite, scripts, central deployment, final runs.
+- [`nvflare.md`](docs/report/nvflare.md): one long-running relay job (`HubRelayController(ModelController)`) kept alive by the adapter's FLARE API keeper (ADR-006); standard Client API script shipped as job custom code; mTLS provisioning with server name `flhub-central`.
+- [`vantage6.md`](docs/report/vantage6.md): the adapter as a vantage6 user creating one task per round; the algorithm image on Python 3.11 (ADR-004); CLI workarounds (ADR-005); node policy and registry setup.
+- [`flower.md`](docs/report/flower.md): relay ServerApp in a long-lived run; node-id → site-id mapping through a standard QUERY; persistent SuperLink and supervised SuperNodes (ADR-007).
+
+**Collaboration statistics** (at the time of writing):
+- 79+ commits, all authored and committed by Zare2001, each ≤ 400 changed lines. By scope: docs 17, deploy 15, flower 8, tests 7, report 7+, proto 5, orch 4, nvflare 4, core 3, v6 2, hub 2, scripts 1, chore 1.
+- Bus messages up to final-call: 67+ — push 26, info 15, milestone 10, reply 7, deploy-request 3, deploy-result 3, secret 3, request 2, final-call 1, report-ready 3. By sender: central 24, flower 17, nvflare 15, vantage6 15.
+- Deploy requests: 3, all PASS on the first attempt. Time from request to PASS: nvflare 2 min, vantage6 6 min (algorithm image build), flower 2 min.
+- Every adapter passed the conformance suite against the central deployment on the first attempt.
+
+**How subagents were used** (examples):
+- central: a `runner` built the three framework venvs on the central VM with the pins (PASS, no resolver conflicts). `scribe` wrote the central worklog entries from facts supplied after each milestone.
+- Framework agents used `scout` for API studies of the installed versions, `runner` for island test runs and `gitops` for commits. Their examples are in §8a.
+
+## 9. Problems encountered and how they were solved
+
+The full tables are in the per-agent sections. These were the most instructive:
+
+| Problem | Component | Symptom | Root cause | Fix | Commit | Time lost |
+|---|---|---|---|---|---|---|
+| Package shadowed | flhub_core | `cannot import name … (unknown location)` from the repo root | setuptools editable finder runs after PathFinder; outer dir = namespace package | src layout → `.pth` path entry | 635a31b | 5 min |
+| Plan ports did not exist | Flower SuperLink | no ServerAppIo / ClientAppIo flags | Flower 1.39: one HTTP API per SuperLink/SuperNode | 9093 = HTTP API, 9091 unused, SuperNode `--port 9094/9095` (ADR-007) | 7f5adec | — |
+| SuperNodes vanish after SuperLink restart | Flower | "SuperNode terminated gracefully" | in-memory SuperLink forgets node ids → UNAUTHENTICATED → SuperNode exits | `--database` + `supernode.sh` restart loop | 7f5adec | — |
+| Stale node id after a SuperNode restart | Flower relay | old id still listed online | heartbeat-based offline tagging | non-blocking site-info QUERY; newest node per site wins | ccc26dc | — |
+| `v6 server import` loses its DB | vantage6 CLI on py3.11 | "No root user found" | str-Enum f-string gives the env var `ServerGlobals.DB_URI_ENV_VAR` | run the image's `vserver-local import` with `VANTAGE6_DB_URI` (ADR-005) | 31b5f3d | 15 min |
+| Server not stoppable | vantage6 CLI | "flhub is not running!" | same Enum bug in the container name | stop by Docker label | 31b5f3d | 5 min |
+| Python 3.10 base image | vantage6 algorithm | plan pins py3.11 + identical torch | official base is `python:3.10-slim` | own image FROM `python:3.11.17-slim-bookworm` (ADR-004) | 30eccd3 | 5 min |
+| Wrong client code path | NVFlare job | clients ran the build machine's absolute path | `ScriptRunner` keeps absolute paths | build the job with a relative script path | 13a1650 | 10 min |
+| Stopped hospital shown online | NVFlare adapter | online 90 s after the client stopped | long heartbeat timeout | `get_client_job_status` probe | 4c697bf | 15 min |
+| Restarted hospital never trains | NVFlare | site stays offline | clients do not rejoin a running job | keeper restarts the relay job gracefully (ADR-006) | 4c697bf | 15 min |
+| Own relay protocol (dead end) | NVFlare, Flower | duplicate of `adapters.common` relay | relays prototyped before M0-core landed | ported to `RelayAdapter`/`RelayClient` | 97cc459, 7f5adec | 20 min (nvflare) |
+| `pkill -f` killed the calling shell | ops (3 agents) | exit 144 | the pattern also matched the shell's own command line | kill by pid file / process name only | — | minutes |
+| Status exit codes inconsistent | deploy | status 0 with sites offline | different conventions | every `status.sh` exits 1 unless all sites are online | 9c88bca, 8b19ca5 | 5 min |
+| Root pytest failed on collection | tests | `No module named 'flwr'` in the hub venv | Flower test imported flwr unconditionally | `pytest.importorskip("flwr")` | 6626cb3 | 2 min |
+
+## 10. Decisions (docs/DECISIONS.md)
+
+| ADR | Decision | Outcome |
+|---|---|---|
+| ADR-001 | PneumoniaMNIST, 6 IID CSV partitions with pinned sha256, small CNN | 0.865 acc / 0.925 AUC federated, 0.861 / 0.928 centralized |
+| ADR-002 | Version pins: py3.11.17, torch 2.14.1+cpu, numpy 2.4.4, NVFlare 2.9.0, vantage6 4.15.2, flwr 1.39.0 | identical stack on every VM and in the image |
+| ADR-003 | Data order seeded by (seed, round, data fingerprint); 1 thread; deterministic algorithms | bit-exact training across all VMs and frameworks; no hospital config |
+| ADR-004 | vantage6 algorithm image on `python:3.11.17-slim` with the same vantage6 tools as the official base | standard algorithm; same selfcheck hash as the VMs |
+| ADR-005 | vantage6 4.15.2 CLI workarounds on Python 3.11 (import, stop, root user, log dir) | no patched vantage6 code |
+| ADR-006 | NVFlare relay = one long-running job kept alive by the adapter; restart on client reconnect | one job served every P2/P3 run |
+| ADR-007 | Flower 1.39: HTTP API on 9093, persistent SuperLink DB, supervised SuperNodes, no TLS (firewall) | stable SuperNode ids across restarts |
+
+## 11. Reproduce from scratch
+
+Versions (`deploy/versions.env`): Python 3.11.17, torch 2.14.1+cpu (CPU index), numpy 2.4.4, safetensors 0.8.0, NVFlare 2.9.0, vantage6 4.15.2 (server/node images `ghcr.io/vantage6/infrastructure/{server,node}:4.15.2`), flwr 1.39.0, wandb 0.30.0, `registry:2`, algorithm base `python:3.11.17-slim-bookworm`. Ports and IPs: `deploy/topology.env` and §3.
+
+1. **Owner, once:**
+   - Four Ubuntu 24.04 VMs; `/etc/hosts` maps `flhub-central` to 145.38.205.58 (127.0.0.1 on central).
+   - Cloud firewall: open 7700 (all three VMs), 8002 (NVFlare VM), 7601 + 5050 (vantage6 VM) and 9092 (Flower VM) on the central VM, from those IPs only.
+   - Run `bootstrap_vm.sh <role>` from the agent kit (`docs/agents/README_SETUP.md`). It installs git, uv, Docker and the agent bus, and fills `~/.flhub/secrets.env`.
+2. **Central VM:**
+   ```bash
+   cd ~/AgnosticFL
+   bash deploy/central/install.sh && bash deploy/central/start.sh          # hub venv, dataset, registry :5050, hub core :8800
+   bash deploy/central/nvflare/install.sh && bash deploy/central/nvflare/start.sh
+   tools/bus put ~/flhub-runtime/nvflare/server/kits/nvf-h1.tgz --to nvflare --secret   # same for nvf-h2
+   bash deploy/central/vantage6/install.sh && bash deploy/central/vantage6/start.sh   # builds + pushes the algorithm image
+   tools/bus put ~/flhub-runtime/vantage6/v6-nodes.env --to vantage6 --secret
+   bash deploy/central/flower/install.sh && bash deploy/central/flower/start.sh
+   ```
+3. **NVFlare VM:**
+   ```bash
+   bash deploy/nvflare-vm/install.sh
+   tools/bus get <id> -o ~/flhub-runtime/nvflare/incoming/nvf-h1.tgz   # same for nvf-h2
+   bash deploy/nvflare-vm/install.sh && bash deploy/nvflare-vm/start.sh && bash deploy/nvflare-vm/status.sh
+   ```
+4. **vantage6 VM:**
+   ```bash
+   tools/bus get <id> -o /tmp/v6-nodes.env
+   bash deploy/vantage6-vm/install.sh --keys /tmp/v6-nodes.env   # adds insecure-registries, restarts Docker
+   bash deploy/vantage6-vm/start.sh && bash deploy/vantage6-vm/status.sh
+   ```
+5. **Flower VM** (no credentials):
+   ```bash
+   bash deploy/flower-vm/install.sh && bash deploy/flower-vm/start.sh && bash deploy/flower-vm/status.sh
+   ```
+6. **Central VM, check and run:**
+   ```bash
+   bash deploy/central/status.sh                     # HEALTHY = bus, hub core, registry and all 6 sites online
+   for p in 8811 8812 8813; do ~/venvs/hub/bin/python -m pytest tests/conformance --adapter http://127.0.0.1:$p -v -s; done
+   bash scripts/run_final.sh all                     # 6 runs online to W&B (tag final) + equivalence check
+   ~/venvs/hub/bin/python scripts/wandb_cleanup.py --dedupe && ~/venvs/hub/bin/python scripts/wandb_cleanup.py --dedupe --apply
+   ```
+   Rough estimate from this build: about 30 minutes of script time from fresh VMs. That covers venv installs, the ~2-minute vantage6 image build, and ~15 minutes for the six final runs.
