@@ -83,6 +83,19 @@ E4a on the real system (central runs `s2-e4a-flower-<S>mb`, 3 rounds, `purge.sh`
 | 256 MB | 20.61 s | 4.9 GB (16 %) | finished |
 | 512 MB | — | — | testbed disk limit on central (7.0 GB free needed, 6.0 GB available); passed on the island |
 
+Where the time goes (`deploy/flower-vm/analysis/e4a_breakdown.py` on the run dirs central sent, bus files #74/#75; medians over rounds 2–3 and both sites; relay timings from 66e806e):
+
+| MB | round | t_result | relay prep | push to SuperLink | Flower transport (reply − train − load) | store in hub core | train |
+|---|---|---|---|---|---|---|---|
+| 1 | 5.79 s | 5.28 s | 0.00 s | 0.07 s | 5.11 s | 0.01 s | 0.00 s |
+| 8 | 6.07 | 5.04 | 0.02 | 0.14 | 4.69 | 0.03 | 0.00 |
+| 32 | 7.69 | 6.29 | 0.09 | 0.47 | 5.47 | 0.14 | 0.01 |
+| 64 | 9.08 | 7.93 | 0.17 | 0.82 | 6.46 | 0.27 | 0.03 |
+| 128 | 13.51 | 12.58 | 0.24 | 1.61 | 10.03 | 0.53 | 0.05 |
+| 256 | 20.61 | 17.75 | 0.37 | 3.35 | 12.75 | 1.06 | 0.10 |
+
+Flower's own path costs about 5 s per round at any size (a fresh `flwr-clientapp` process per message plus pull intervals) and about 0.03 s per MB on top (SuperLink → SuperNode download, upload, relay pull; 5 MiB chunks, 2 concurrent transfers, SQLite object store). The hub side (relay prep, push, store, adapter) adds 0.1 s at 1 MB and 4.9 s at 256 MB. In the mixed scope Flower's fan-out stays at 5.3–8.6 s (1–64 MB) while the round is set by the slowest framework.
+
 No server-side knob was needed. The SuperNodes logged a few `Connection attempt failed, retrying` lines at the start of the 64 MB and 256 MB runs: reconnects after `purge.sh` restarted the SuperLink just before the run (same node ids, all rounds finished).
 
 E4b on the real system: (S4 results).
