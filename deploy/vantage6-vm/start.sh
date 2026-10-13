@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
 # Start the vantage6 nodes v6-h3 and v6-h4 (standard `v6 node start`) and wait until both are
 # connected to the server. Idempotent: running nodes are left alone. Needs install.sh first.
+# Also marks the nodes as enabled for the watchdog cron entry (install.sh) that re-runs this
+# script every minute, so a node that exits (Docker restart, crash) comes back; stop.sh clears it.
 set -euo pipefail
 SITES="v6-h3 v6-h4"
 VENV="$HOME/venvs/v6"
+touch "$HOME/flhub-runtime/vantage6/nodes.enabled"
 for s in $SITES; do
   [ -f "$HOME/.config/vantage6/node/$s.yaml" ] || { echo "no node config for $s: run deploy/vantage6-vm/install.sh" >&2; exit 1; }
   if [ -z "$(docker ps -q --filter "name=^vantage6-$s-user$")" ]; then

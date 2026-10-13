@@ -95,4 +95,10 @@ for s in $SITES; do
   log "node config ~/.config/vantage6/node/$s.yaml -> $SERVER_URL:$V6_SERVER_PORT"
 done
 echo "$([ "$ISLAND" = 1 ] && echo island || echo central)" > "$RT/node-mode"
+
+# --- 6. watchdog: re-run start.sh every minute while the nodes are enabled (start.sh/stop.sh) ---
+CRON="* * * * * [ -f $RT/nodes.enabled ] && flock -n $RT/watchdog.lock bash $REPO/deploy/vantage6-vm/start.sh >> $RT/watchdog.log 2>&1"
+others="$(crontab -l 2>/dev/null | grep -v 'deploy/vantage6-vm/start.sh' || true)"
+printf '%s\n%s\n' "$others" "$CRON" | sed '/^$/d' | crontab -
+log "watchdog cron entry installed (log $RT/watchdog.log)"
 log "done; allowed algorithm images: $ALLOWED"

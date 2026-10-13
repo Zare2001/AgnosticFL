@@ -15,7 +15,7 @@ for s in v6-h3 v6-h4; do
     *Disconnected*|"") echo "$s  DISCONNECTED  $image -> $server"; ok=1 ;;
     *) echo "$s  OK    connected  $image -> $server ($mode)" ;;
   esac
-  task="$(docker logs "vantage6-$s-user" 2>&1 | grep -E 'New task has been added' | tail -1 | sed 's/.*task_id=/last task_id=/')"
+  task="$(docker logs "vantage6-$s-user" 2>&1 | grep -E 'New task has been added' | tail -1 | sed 's/.*task_id=/last task_id=/; s/\x1b\[[0-9;]*m//g' | tr -d '\r')"
   [ -n "$task" ] && echo "      $task"
 done
 exit $ok
