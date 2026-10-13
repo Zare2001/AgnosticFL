@@ -31,3 +31,5 @@ adapter-url = "http://127.0.0.1:8813"
 hub-url = "http://127.0.0.1:8800"
 poll-timeout-s = 5.0
 query-timeout-s = 60.0
+# Content id of the staged FAB source (set by the adapter, echoed in the relay heartbeat).
+fab-id = ""
