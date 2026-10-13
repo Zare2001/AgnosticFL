@@ -29,5 +29,5 @@ clientapp = "flhub_flower.client_app:app"
 # Used only by the relay ServerApp on the central VM.
 adapter-url = "http://127.0.0.1:8813"
 hub-url = "http://127.0.0.1:8800"
-poll-timeout-s = 10.0
+poll-timeout-s = 5.0
 query-timeout-s = 60.0
