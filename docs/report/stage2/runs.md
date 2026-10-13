@@ -95,3 +95,5 @@ Rows are appended by `scripts/stage2/finalize_run.py` (or by hand for native run
 | s2-e2-dir0.1-fedprox-seed2027 | E2 | sim | [run](https://wandb.ai/hpml_surf-surf/AgnosticFL-stage2/runs/vl3rvifn) | 50 | 0.7603 | 0.7497 | 0.9655 | 1.49 | sim-counterpart:s2-e2-dir0.1-fedprox | 0.000 |  |
 | s2-e2-dir0.1-fedprox-seed2028 | E2 | sim | [run](https://wandb.ai/hpml_surf-surf/AgnosticFL-stage2/runs/2ytrzpd3) | 50 | 0.7485 | 0.7326 | 0.9607 | 2.29 | sim-counterpart:s2-e2-dir0.1-fedprox | 0.000 |  |
 | s2-e6a-strict | E6 | real | [run](https://wandb.ai/hpml_surf-surf/AgnosticFL-stage2/runs/p1rwqly5) | 20 | 0.7002 | 0.6979 | 0.9451 | 8.87 | full-sim | 0.000 |  |
+| s2-e6a-minsites | E6 | real | [run](https://wandb.ai/hpml_surf-surf/AgnosticFL-stage2/runs/6e3dctcv) | 20 | 0.7054 | 0.7011 | 0.9466 | 8.67 | participants-sim | 0.000 |  |
+| s2-e6b-straggler | E6 | real | [run](https://wandb.ai/hpml_surf-surf/AgnosticFL-stage2/runs/3ubh2t67) | 20 | 0.6662 | 0.6258 | 0.9336 | 20.18 | participants-sim | 0.000 |  |
