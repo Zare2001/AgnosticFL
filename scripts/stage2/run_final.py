@@ -65,7 +65,17 @@ def sysmon_central(run_dir: Path, start: str, end: str, name: str) -> None:
                     "--run", name, "-o", str(out / "central.json")], capture_output=True, timeout=300)
 
 
+def wait_pause() -> None:
+    """Operator hold between runs (e.g. a store purge): wait while <runs>/PAUSE exists."""
+    pause = RUNS / "PAUSE"
+    if pause.exists():
+        print(f"PAUSE present ({pause.read_text().strip()}); waiting", flush=True)
+        while pause.exists():
+            time.sleep(5)
+
+
 def real(args) -> int:
+    wait_pause()
     cfg = load_config(args.config)
     ok, msg = frozen_check()
     print(msg)
@@ -120,6 +130,7 @@ def real(args) -> int:
 
 def native(args) -> int:
     """E7: the framework agent's native FedAvg script, run like a real run; finalize is queued."""
+    wait_pause()
     cfg = load_config(args.config)
     ok, msg = frozen_check()
     print(msg)
