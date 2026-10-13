@@ -203,3 +203,4 @@ Follow `docs/agents/REPORT_TEMPLATE.md`. It must be complete enough that a reade
 - Flower version API mismatch: pin the Flower version that the relay was written against on both central and flower VMs.
 - A public port cannot be opened: report to `human` and continue with all other work; never tunnel around the firewall.
 - Large model payloads hit a framework limit: shrink the model; do not change the protocol.
+- **No hairpin NAT on the central VM**: from the central VM itself, never connect to 145.38.205.58 (its own public IP is unreachable from inside). Use 127.0.0.1 / localhost; `flhub-central` resolves to 127.0.0.1 there and the bus uses `AGENTBUS_URL=http://127.0.0.1:7700`. Push the vantage6 image as `localhost:5050/flhub/...`; nodes pull `145.38.205.58:5050/flhub/...` (same registry).
