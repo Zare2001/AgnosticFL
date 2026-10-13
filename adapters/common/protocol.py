@@ -1,4 +1,8 @@
-"""flhub/0.1 constants and small helpers shared by adapters and the orchestrator."""
+"""flhub/0.2 constants and small helpers shared by adapters and the orchestrator.
+
+flhub/0.2 (ADR-008) only adds optional fields to flhub/0.1, so a 0.2 adapter also serves
+0.1 callers: it accepts both versions and echoes the request's version in its envelopes.
+"""
 
 from __future__ import annotations
 
@@ -7,7 +11,9 @@ import json
 from collections.abc import Mapping
 from datetime import datetime, timezone
 
-PROTOCOL = "flhub/0.1"
+PROTOCOL = "flhub/0.2"
+PROTOCOL_V1 = "flhub/0.1"
+SUPPORTED_PROTOCOLS = (PROTOCOL_V1, PROTOCOL)
 
 # JSON-RPC 2.0 standard codes
 PARSE_ERROR = -32700
@@ -26,6 +32,9 @@ ADAPTER_BUSY = -32015
 TASK_STATES = ("queued", "running", "completed", "failed", "cancelled")
 TERMINAL_STATES = frozenset({"completed", "failed", "cancelled"})
 SITE_STATES = ("online", "offline", "unknown")
+# flhub/0.2 per-site task progress (tasks/get "sites")
+SITE_TASK_STATES = ("queued", "running", "done", "failed", "cancelled")
+SITE_ACTIVE_STATES = frozenset({"queued", "running"})
 TRAIN_CONFIG_KEYS = ("local_epochs", "batch_size", "lr", "momentum", "seed")
 
 
@@ -61,10 +70,13 @@ def utc_now() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def check_protocol(params: Mapping) -> None:
+def check_protocol(params: Mapping) -> str:
+    """The request's protocol version; -32010 unless it is one this adapter speaks."""
     got = params.get("protocol") if isinstance(params, Mapping) else None
-    if got != PROTOCOL:
-        raise RpcError(UNSUPPORTED_PROTOCOL, f"unsupported protocol {got!r}; this adapter speaks {PROTOCOL}")
+    if got not in SUPPORTED_PROTOCOLS:
+        raise RpcError(UNSUPPORTED_PROTOCOL,
+                       f"unsupported protocol {got!r}; this adapter speaks {', '.join(SUPPORTED_PROTOCOLS)}")
+    return got
 
 
 def is_ref(value) -> bool:

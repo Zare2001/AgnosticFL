@@ -9,7 +9,7 @@ from dataclasses import asdict, dataclass, field
 import numpy as np
 from flhub_core.weights import spec_problems
 
-from .protocol import PROTOCOL, is_ref, utc_now
+from .protocol import PROTOCOL, SUPPORTED_PROTOCOLS, is_ref, utc_now
 
 
 @dataclass
@@ -49,11 +49,17 @@ def envelope_problems(
     base_model: str,
     expected_sites: Iterable[str],
     train_config_hash: str | None = None,
+    protocol: str | None = None,
 ) -> list[str]:
-    """Metadata checks the orchestrator applies before FedAvg (weights are checked separately)."""
+    """Metadata checks the orchestrator applies before FedAvg (weights are checked separately).
+
+    protocol: the version the round was dispatched with (default: any supported version).
+    """
     p = []
-    if env.protocol != PROTOCOL:
-        p.append(f"protocol {env.protocol!r} != {PROTOCOL}")
+    if protocol is not None and env.protocol != protocol:
+        p.append(f"protocol {env.protocol!r} != {protocol}")
+    elif env.protocol not in SUPPORTED_PROTOCOLS:
+        p.append(f"protocol {env.protocol!r} not in {SUPPORTED_PROTOCOLS}")
     if env.round != round:
         p.append(f"round {env.round} != {round}")
     if env.base_model != base_model:
