@@ -71,7 +71,19 @@ E4b on the real system: (S4 results).
 
 - E6 tools and their island behaviour: `docs/report/stage2/evidence/nvflare/e6-tools-island.md`. NVFlare semantics that shape E6: a crashed training process makes the server fail the **whole** relay job (`fed_server.py:944-951`, no knob); a killed client is only failed by our adapter (30 s offline) and re-enters a job after a relay-job restart (~60 s); a cancelled task cannot be stopped at the client.
 - E7 native baseline design and island dry runs: `docs/report/stage2/evidence/nvflare/e7-native-island.md`.
-- Final-run results (E4a, E4b, E5, E6, E7): (S4 results).
+- E6 on the real system (final runs; central's table `docs/report/stage2/e6.md`, injection logs on the nvflare VM
+  `~/flhub-runtime/nvflare/inject/`):
+
+  | run | NVFlare injection | NVFlare outcome |
+  |---|---|---|
+  | s2-e6a-strict | `nvf-h1` killed (client + job process) 0.5 s into round 5 (fired 21:25:58.181Z) | round 5 failed for nvf-h1 after 33.1 s (adapter: 30 s offline), strict retry ok; client up 3.0 s, registered 5.0 s, back in a relay job 55.6 s after the kill (the keeper's relay-job restart also took nvf-h2 out briefly); recovered 74.0 s |
+  | s2-e6a-minsites | same (fired 21:31:58.569Z) | round 5 finished 5/6 after 34.0 s; nvf-h1 stayed out for rounds 6–9: readmission needs a relay-job restart, which the keeper starts only when no round is in flight, and the hub dispatched back-to-back; nvf-h1 back 97.2 s after the kill, when the failed round-10 attempt made the hub wait |
+  | s2-e6b-straggler | `nvf-h2` at 10 % CPU for rounds 1–6 (CPU-quota scope, no restart; off at its round-7 task, 21:40:52Z) | always within the 20 s deadline (training 8.0 s vs 0.7 s), never dropped |
+  | s2-e6d-resume | (central: SIGKILL hub + adapters in round 21) | relay job kept running and re-attached to the restarted adapter; 51 rounds per site (round 21 redone) |
+  | s2-e6e-server-restart | (central: NVFlare server restarted after round 3 and mid round 6) | clients reconnected by themselves (~20 s); new relay jobs ~70 s and ~90 s after the restarts (keeper; stale job-store entries replaced); 21 rounds per site |
+
+  No manual action in any run; INV-1 0.0 for all seven E6 runs (central).
+- Final-run results (E4b, E5, E7): (S4 results).
 
 ## 6. Problems and fixes
 
