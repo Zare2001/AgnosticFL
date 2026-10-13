@@ -57,8 +57,20 @@ class FlareAdmin:
             self._drop_session()
 
     def connected_clients(self) -> list:
-        """Names of the NVFlare clients currently connected to the server."""
+        """Names of the NVFlare clients registered with the server (can lag behind a dead client)."""
         return sorted(c.name for c in self._call(lambda s: s.get_system_info()).client_info)
+
+    def client_jobs(self) -> dict:
+        """{client: set of job ids it runs}; probes the clients, so a dead client is missing."""
+        rows = self._call(lambda s: s.get_client_job_status()) or []
+        jobs = {}
+        for row in rows:
+            name = row.get("client_name")
+            if name and row.get("status") not in ("no_reply",):
+                jobs.setdefault(name, set())
+                if row.get("job_id"):
+                    jobs[name].add(row["job_id"])
+        return jobs
 
     def active_jobs(self, name: str) -> list:
         """Jobs with this name that are queued or running, newest first."""
