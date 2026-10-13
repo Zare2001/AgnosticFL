@@ -19,6 +19,7 @@ import pytest
 
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "clients" / "flower"))
+pytest.importorskip("flwr")
 
 from flwr.app import Context, RecordDict  # noqa: E402
 from flwr.supercore.task_identity import TaskIdentity  # noqa: E402
