@@ -64,6 +64,7 @@ class Relay:
         self.fab_id = fab_id
         self.run_id = run_id
         self.job_id: str | None = None  # round in progress, for the beat
+        self._leave = threading.Event()  # the adapter serves another FAB: this relay must exit
         self.sites: dict[int, dict[str, Any]] = {}  # node_id -> site info
         self._pending: dict[str, tuple[int, float]] = {}  # query msg id -> (node_id, sent)
         self._query_failed: dict[int, float] = {}  # node_id -> retry-after time
@@ -308,20 +309,39 @@ class Relay:
             body = {"fab_id": self.fab_id, "run_id": self.run_id, "job_id": self.job_id,
                     "code_version": code_version()}
             try:
-                http_request(url, "POST", json.dumps(body).encode(), "application/json", timeout=10)
+                status, reply = http_request(url, "POST", json.dumps(body).encode(), "application/json", timeout=10)
+                if status == 200 and json.loads(reply).get("leave"):
+                    self._leave.set()
+                    return
                 self.report_sites()
             except Exception:  # adapter briefly unreachable, or an adapter without /relay/beat
                 pass
             time.sleep(BEAT_S)
+
+    def next_job(self) -> dict:
+        """RelayClient.next_job plus this relay's fab id, so a superseded relay is told to leave."""
+        url = f"{self.client.base}/relay/next?timeout={self.poll_timeout_s}&fab={self.fab_id}"
+        try:
+            status, body = http_request(url, "GET", timeout=self.poll_timeout_s + 30)
+        except HubError as exc:
+            time.sleep(2)
+            return {"type": "idle", "error": str(exc)}
+        if status != 200:
+            time.sleep(2)
+            return {"type": "idle", "error": f"HTTP {status}"}
+        return json.loads(body)
 
     def serve(self) -> None:
         log.info("relay polling %s (fab %s)", self.client.base, self.fab_id or "-")
         threading.Thread(target=self.beat_forever, name="relay-beat", daemon=True).start()
         last_ok = time.monotonic()
         while True:
+            if self._leave.is_set():
+                log.info("relay: the adapter serves another FAB, this relay (fab %s) exits", self.fab_id)
+                return
             self.refresh_nodes()
             self.drop_orphans()
-            job = self.client.next_job(timeout=self.poll_timeout_s)
+            job = self.next_job()
             if job.get("error"):
                 if time.monotonic() - last_ok > ADAPTER_LOST_S:
                     log.error("adapter unreachable for %.0f s, relay exits", ADAPTER_LOST_S)

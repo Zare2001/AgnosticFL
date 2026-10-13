@@ -8,8 +8,8 @@ local SuperLink. This service keeps exactly one relay run alive:
   directory and submits that with ``flwr run <dir> <connection>`` (SuperLink HTTP API on
   127.0.0.1:9093, per ADR-007). The FAB thus carries the training code to the hospital
   SuperNodes, Flower's own code-distribution channel (ADR-016). The staged content id
-  (``fab-id``) goes to the relay as run config and comes back in its heartbeats; a relay that
-  reports another fab id is asked to shut down and replaced.
+  (``fab-id``) goes to the relay as run config and comes back with its polls and beats; a relay
+  with another fab id (left from a rollout) is told to leave and is never handed a job.
 - Liveness: the relay posts /relay/beat from a thread every few seconds. When no poll,
   progress or beat arrived for RELAY_STALE_S (e.g. the SuperLink restarted and took the relay
   run with it), the rounds that relay had taken fail at once and a new relay run is submitted.
@@ -66,7 +66,15 @@ class FlowerAdapter(RelayAdapter):
         super().extra_routes(server)
         server.route("POST", "/relay/beat", self._route_beat)
 
+    def stale(self, fab: str | None) -> bool:
+        """A relay that carries another FAB than this adapter staged (e.g. left from a rollout)."""
+        return bool(fab and self.fab_id and fab != self.fab_id)
+
     def _route_next(self, req):
+        fab = req.query.get("fab")
+        if self.stale(fab):  # only that relay leaves; it gets no job and no liveness credit
+            log.warning("relay with fab %s polled, this adapter serves fab %s: told it to leave", fab, self.fab_id)
+            return 200, {"type": "shutdown"}
         status, body = super()._route_next(req)
         if body.get("type") == "train":
             with self._lock:
@@ -80,13 +88,12 @@ class FlowerAdapter(RelayAdapter):
 
     def _route_beat(self, req):
         body = req.json() or {}
+        if self.stale(body.get("fab_id")):
+            log.warning("relay run %s carries fab %s, this adapter serves fab %s: telling it to leave",
+                        body.get("run_id"), body.get("fab_id"), self.fab_id)
+            return 200, {"ok": True, "fab_id": self.fab_id, "leave": True}
         self._last_beat = time.monotonic()
         self.relay_info = {k: body.get(k) for k in ("fab_id", "run_id", "job_id", "code_version")}
-        fab = body.get("fab_id")
-        if self.fab_id and fab != self.fab_id and not self._shutdown.is_set():
-            log.warning("relay run %s carries fab %s, expected %s: asking it to shut down",
-                        body.get("run_id"), fab, self.fab_id)
-            self.request_relay_shutdown()
         return 200, {"ok": True, "fab_id": self.fab_id}
 
     def _route_status(self, req):

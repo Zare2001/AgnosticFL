@@ -108,6 +108,7 @@ def env(tmp_path, monkeypatch):
         t = threading.Thread(target=relay.serve, daemon=True)
         t.start()
         relays.append(t)
+        return t
 
     yield {"adapter": adapter, "client": AdapterClient(srv.url), "hub": hub, "start_relay": start_relay,
            "tmp": tmp_path}
@@ -251,14 +252,25 @@ def test_lost_relay_fails_its_round_at_once(env):
 def test_relay_with_another_fab_is_asked_to_leave(env):
     adapter = env["adapter"]
     adapter.fab_id = "fab-new"
-    env["start_relay"](FakeGrid({}), fab_id="fab-old")
-    end = time.monotonic() + 10
-    while adapter.relay_info.get("fab_id") != "fab-old" and time.monotonic() < end:
-        time.sleep(0.05)
-    assert adapter.relay_info["fab_id"] == "fab-old"
-    while not adapter.shutdown_delivered() and time.monotonic() < end:
-        time.sleep(0.05)
-    assert adapter.shutdown_delivered()  # the stale relay took its shutdown
+    stale = env["start_relay"](FakeGrid({}), fab_id="fab-old")
+    stale.join(timeout=10)
+    assert not stale.is_alive()  # told to leave at its first poll
+    assert not adapter.relay_alive() and adapter.relay_info.get("fab_id") != "fab-old"
+
+
+def test_only_the_stale_relay_leaves(env):
+    """A rollout leftover and the new relay poll the same adapter: only the leftover exits."""
+    client, adapter = env["client"], env["adapter"]
+    adapter.fab_id = "fab-new"
+    p5 = site_csv(env["tmp"], "flw-h5", 1)
+    stale = env["start_relay"](FakeGrid({71: node("flw-h5", p5, 71)}), fab_id="fab-old")
+    fresh = env["start_relay"](FakeGrid({72: node("flw-h5", p5, 72)}), fab_id="fab-new")
+    stale.join(timeout=10)
+    assert not stale.is_alive() and fresh.is_alive()
+    wait_online(client, ["flw-h5"])
+    tid = client.dispatch(1, {"ref": env["hub"].put_weights(init_weights(1))}, TC, ["flw-h5"], deadline_s=60)
+    assert wait_state(client, tid)["state"] == "completed"
+    assert adapter.relay_info["fab_id"] == "fab-new" and fresh.is_alive()
 
 
 def test_stage_fab_ships_flhub_core(tmp_path):
