@@ -176,8 +176,9 @@ def main(grid: Grid, context: Context) -> None:
     sites = list(cfg.sites)
     random.seed(cfg.seed)  # FedAvg samples with random.sample; with fraction 1.0 it takes every site
     nodes = map_sites(grid, sites, cfg.online_wait_s)
-    rd.write_json("config.json", config_json(cfg, cfg.name, sites, nodes))
-    log.info("native FedAvg %s: sites %s, %d rounds -> %s", cfg.name, nodes, cfg.rounds, rd.path)
+    name = cfg.name.replace("-hub-", "-native-")  # E7 runs the hub config natively: s2-e7-flower-native-*
+    rd.write_json("config.json", config_json(cfg, name, sites, nodes))
+    log.info("native FedAvg %s: sites %s, %d rounds -> %s", name, nodes, cfg.rounds, rd.path)
     strategy = NativeFedAvg(sites, rd, make_evaluator(cfg), fraction_train=1.0, fraction_evaluate=0.0,
                             min_train_nodes=len(sites), min_evaluate_nodes=0, min_available_nodes=len(sites),
                             weighted_by_key="num-examples")
@@ -193,4 +194,4 @@ def main(grid: Grid, context: Context) -> None:
                                        "run_dir": str(rd.path), "utc": utc_now()})
         raise
     rd.write_json("summary.json", {**Runner.summary(rd, time.time() - t0), "kind": "native"})
-    log.info("native FedAvg %s finished: %s", cfg.name, rd.path)
+    log.info("native FedAvg %s finished: %s", name, rd.path)
