@@ -21,6 +21,9 @@ REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 DIR="$HOME/flhub-runtime/vantage6/e6"
 mkdir -p "$DIR"
 now() { date -u +%Y-%m-%dT%H:%M:%S.%3NZ; }
+announce() {  # PLAN.md §8.5: 'E6 inject <what> at <UTC>' to all (best effort)
+  "$REPO/tools/bus" send --to all --type info --subject "E6 inject $1" --body "${2:-vantage6 VM inject.sh}" >/dev/null 2>&1 || true
+}
 
 node_up() { [ -n "$(docker ps -q --filter "name=^vantage6-$1-user$")" ]; }
 connected() {  # last connection line of the node's current container says connected
@@ -56,12 +59,14 @@ straggle() {  # straggle <site> <node> <pct> <round> <until>: E6b window from ta
   wait_line "$node" "$since" "Starting task [0-9]+ - flhub-r$round([^0-9]|\$)" >/dev/null
   bash "$REPO/deploy/vantage6-vm/straggler.sh" on "$site" "$pct" --node "$node" >> "$logf" 2>&1
   echo "$(now) trigger: round $round task arrived, straggler on ($pct %)" >> "$logf"
+  announce "straggler-on:$pct $site at $(now) (round $round)"
   wait_line "$node" "$since" "Starting task [0-9]+ - flhub-r$until([^0-9]|\$)" >/dev/null
   bash "$REPO/deploy/vantage6-vm/straggler.sh" off "$site" >> "$logf" 2>&1
   for c in $(docker ps -q --filter label=vantage6-type=algorithm --filter "label=node=$node"); do
     docker update --cpus 0 "$c" >/dev/null 2>&1 || true   # 0 = no limit
   done
   echo "$(now) trigger: round $until task arrived, straggler off" >> "$logf"
+  announce "straggler-off $site at $(now) (round $until)"
   echo "$(now) done" >> "$logf"
   rm -f "$DIR/inject-$site.pid"
 }
@@ -75,6 +80,7 @@ watch() {  # background worker: watch <site> <node> <action> <round> <after>
   run="$(echo "$line" | sed -n 's/.*\[Task \([0-9]*\)\].*/\1/p')"
   echo "$(now) trigger site=$site round=$round run_id=$run" >> "$logf"
   sleep "$after"
+  announce "$action $site at $(now) (round $round +${after}s)" "trigger: round-$round training start (run $run)"
   case "$action" in
     kill)
       if docker kill "vantage6-$node-run-$run" >/dev/null 2>&1; then
