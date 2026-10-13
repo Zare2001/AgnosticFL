@@ -56,3 +56,9 @@ Sources: wheels vantage6-server/-node 4.15.2 (PyPI, read only), client/common/cl
 - E6b tool: `inject.sh arm v6-h4 straggle:10 --round 7 --until-round 14` (trigger = node log 'Starting task <id> - flhub-r<N>', tty logs end in \r); island rounds 45-46 throttled 44.6/43.6 s vs 11.5 s.
 - S3-frozen 96c44c9 (#210) confirmed (#211): no diff in flhub_core/clients/vantage6 since a43cef3 (image) or adapters/vantage6/service.py since 890966d (adapter); only new E7 native files. Hospitals: image v6-train:a43cef3f75c0, code_version 0.2.0+fe357a1dbec1.
 - S4 prep on the VM: island down, its images/volumes removed, uv cache pruned -> 5.6 GB free; sysmon (per-node) + run follower + task-folder GC running.
+
+### 2026-10-13T16:35Z — S4 — E4a vantage6 scope running (DB mode)
+- Median round time (central RUN end): 1 MB 6.3 s, 8 MB 12.8 s, 32 MB 60.1 s, 64 MB 115.3 s (~1.8 s/MB above 8 MB; ADR-020 mechanism). 128 MB running.
+- vantage6 VM at 64 MB: mem peak 3.3 GB of 31 GB; v6-algorithm (both training containers) 1.4 GB, v6-h3 node 1.0 GB, v6-h4 node 0.8 GB (all < 5 %). Disk 6.1-6.3 GB free (GC cron removes folders 2 min after each run; island venv + torch uv cache removed: +0.8 GB).
+- v6-h3 logged 'Connection error... Retrying' (RemoteDisconnected) twice in the 64 MB run, ~52 s after its algorithm finished (server worker blocked by the per-log-line row rewrites; uWSGI router drops the connection); the vantage6 client retried and the result arrived 4 s later. Not a failure.
+- Follower posts RAM/disk per run that used vantage6 sites; sysmon summaries sent for every run.
