@@ -18,7 +18,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
+import shutil
 import subprocess
 import time
 from datetime import datetime, timezone
@@ -27,6 +29,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[2]
 BUS = str(REPO / "tools" / "bus")
 STATE_DIR = Path.home() / "flhub-runtime" / "vantage6" / "follow"
+SUMMARIES = Path.home() / "flhub-runtime" / "sysmon" / "summaries"
 NODES = ["v6-h3", "v6-h4", "v6-h9", "v6-h10"]
 HEAD = re.compile(r"^#(\d+) (\S+) \[([\w-]+)\] (\S+) -> (\S+): (.*)$")
 RUN = re.compile(r"^RUN (start|end) (\S+) (\S+)")
@@ -65,6 +68,20 @@ def scan(start: str, end: str) -> tuple[list[str], dict, dict]:
         rounds[node] = len({m[2] for m in map(TRAINED.search, lines) if m})
         hits += [f"{node}: {ln[:160]}" for ln in bad[:4]]
     return hits, counts, rounds
+
+
+def memory(name: str) -> str:
+    """VM and largest-process memory peaks of the run window (sysmon summary) + free disk now."""
+    try:
+        d = json.loads((SUMMARIES / f"sysmon-vantage6-{name}.json").read_text())
+    except (OSError, ValueError):
+        return "no sysmon summary"
+    total = os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES") / 2**20
+    procs = sorted(((v.get("rss_mb_peak") or 0, k) for k, v in d.get("procs", {}).items()), reverse=True)[:3]
+    disk = shutil.disk_usage("/").free / 2**30
+    top = ", ".join(f"{k} {mb:.0f} MB ({100 * mb / total:.1f} %)" for mb, k in procs)
+    return (f"VM mem peak {d['system']['mem_used_mb_peak']:.0f} MB of {total:.0f} MB; process RSS peaks: {top}; "
+            f"disk free now {disk:.1f} GB")
 
 
 def health() -> str:
@@ -110,11 +127,16 @@ def main() -> None:
             hits, counts, rounds = scan(start, utc)
             rec = {"run": name, "start": start, "end": utc, "bus_end": m["id"], "sysmon_rc": proc.returncode,
                    "sysmon_out": (proc.stdout + proc.stderr).strip()[-300:], "anomalies": counts,
-                   "rounds_trained": rounds, "health": health()}
+                   "rounds_trained": rounds, "health": health(), "memory": memory(name)}
             with open(STATE_DIR / "runs.jsonl", "a") as f:
                 f.write(json.dumps(rec) + "\n")
             print(f"{now()} RUN end {name}: sysmon rc={proc.returncode}, rounds {rounds}, anomalies {counts}, "
                   f"{rec['health']}", flush=True)
+            if any(rounds.values()):  # the run used vantage6 sites: report the memory peaks (70 % rule)
+                subprocess.run([BUS, "send", "--to", "central", "--type", "info", "--subject",
+                                f"S4 vantage6 {name}: RAM/disk on the vantage6 VM", "--body",
+                                f"{rec['memory']}; rounds trained {rounds}; {rec['health']}"],
+                               capture_output=True, text=True, timeout=60)
             if proc.returncode != 0 or any(counts.values()) or rec["health"] != "HEALTHY":
                 body = "\n".join([f"sysmon summary rc={proc.returncode}; {rec['health']}; rounds trained {rounds}",
                                   f"node log lines flagged during {start}..{utc}: {counts}"] + hits[:12])
