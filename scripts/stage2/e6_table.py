@@ -1,11 +1,14 @@
-"""E6 robustness table (EXPERIMENTS.md E6): per injection, detection and recovery times.
+"""E6 robustness tables (EXPERIMENTS.md E6): injections, per-run outcome, straggler windows.
 
     python scripts/stage2/e6_table.py [--out docs/report/stage2/e6.md]
 
 Injections come from the bus ('E6 inject ...' messages, sent by the framework agents' inject.sh and by
 central's inject_central.py) inside each E6 run's window; detection = first failed attempt or dropped
 site after the injection (run events.jsonl, round records); recovery = end of the round that was hit
-(the round completed, after retries if strict). Also: rounds retried, site-rounds dropped, INV-1.
+(the round completed, after retries if strict). Straggler on/off messages are not injections of that
+kind: E6b is summarized per planned straggler window instead (campaign_e6.sh: nvf-h2 rounds 1-6,
+v6-h4 rounds 7-13, flw-h6 rounds 14-20 at 10 % CPU). The per-run table lists retried rounds and
+dropped site-rounds from the round records, and the INV-1 result from finalized.json.
 """
 
 from __future__ import annotations
@@ -13,6 +16,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import statistics
 import subprocess
 from datetime import datetime
 from pathlib import Path
@@ -22,7 +26,8 @@ RUNS = Path.home() / "flhub-runtime" / "runs" / "stage2"
 OUT = REPO / "docs" / "report" / "stage2" / "e6.md"
 NAMES = ["s2-e6a-strict", "s2-e6a-minsites", "s2-e6b-straggler", "s2-e6c-fedavg", "s2-e6c-fedavgm",
          "s2-e6d-resume", "s2-e6e-server-restart"]
-MSG = re.compile(r"^#(\d+) (\S+) \[[\w-]+\] (\S+) -> \S+: (.*)$")
+STRAGGLERS = {"nvf-h2": (1, 6), "v6-h4": (7, 13), "flw-h6": (14, 20)}
+MSG = re.compile(r"^#(\d+) (\S+) \[([\w-]+)\] (\S+) -> \S+: (.*)$")
 UTC = re.compile(r"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z?)")
 
 
@@ -36,11 +41,35 @@ def bus_injections(since: int = 97) -> list[dict]:
     found = []
     for line in out.splitlines():
         m = MSG.match(line)
-        if m and "E6 inject" in m.group(4):
-            u = UTC.search(m.group(4))
-            found.append({"id": int(m.group(1)), "from": m.group(3), "subject": m.group(4),
+        if m and m.group(3) == "info" and m.group(5).startswith("E6 inject") and "straggler" not in m.group(5):
+            u = UTC.search(m.group(5))
+            found.append({"id": int(m.group(1)), "from": m.group(4), "subject": m.group(5),
                           "t": ts(u.group(1)) if u else ts(m.group(2)[:19] + "Z")})
     return found
+
+
+def load_run(name: str) -> tuple[Path | None, list[dict]]:
+    link = RUNS / f"{name}-latest"
+    if not link.exists():
+        return None, []
+    rd = link.resolve()
+    recs = [json.loads(p.read_text()) for p in sorted((rd / "rounds").glob("r[0-9][0-9][0-9][0-9].json"))]
+    return rd, [r for r in recs if r.get("round", 0) > 0]
+
+
+def spans(rounds: list[int]) -> str:
+    out, start, prev = [], None, None
+    for n in sorted(rounds):
+        if start is None:
+            start = prev = n
+        elif n == prev + 1:
+            prev = n
+        else:
+            out.append(f"{start}" if start == prev else f"{start}-{prev}")
+            start = prev = n
+    if start is not None:
+        out.append(f"{start}" if start == prev else f"{start}-{prev}")
+    return ",".join(out)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -83,6 +112,38 @@ def main(argv: list[str] | None = None) -> int:
             lines.append(f"| {name} | {i['subject'][:70]} | {i['from']} | {hit['round']} | "
                          f"{'-' if det is None else f'{det:.1f}'} | {rec:.1f} | {len(fails) + 1} | "
                          f"{len(hit.get('dropped') or {})} | none | {inv1} |")
+    lines += ["", "| run | rounds | rounds retried | failed attempts | dropped site-rounds | median round s (r>=2) | "
+              "max round s | INV-1 method | INV-1 max diff |", "|---|---|---|---|---|---|---|---|---|"]
+    for name in NAMES:
+        rd, recs = load_run(name)
+        if rd is None:
+            continue
+        fin = json.loads((rd / "finalized.json").read_text()) if (rd / "finalized.json").exists() else {}
+        dropped: dict[str, list[int]] = {}
+        for r in recs:
+            for site in r.get("dropped") or {}:
+                dropped.setdefault(site, []).append(r["round"])
+        times = [r["timing"]["duration_s"] for r in recs if r["round"] >= 2]
+        retried = [r["round"] for r in recs if r.get("failures")]
+        lines.append(f"| {name} | {len(recs)} | {spans(retried) or 'none'} | "
+                     f"{sum(len(r.get('failures') or []) for r in recs)} | "
+                     f"{'; '.join(f'{s} r{spans(v)}' for s, v in sorted(dropped.items())) or 'none'} | "
+                     f"{statistics.median(times):.1f} | {max(times):.1f} | {fin.get('inv1_method', 'pending')} | "
+                     f"{fin.get('inv1_max_diff', '-')} |")
+    rd, recs = load_run("s2-e6b-straggler")
+    if rd is not None:
+        lines += ["", "E6b straggler windows (10 % CPU on one site; deadline_s 20, min_sites 5):", "",
+                  "| site | rounds | site in time | site dropped | median round s | site train s in window | "
+                  "site train s otherwise |", "|---|---|---|---|---|---|---|"]
+        for site, (a, b) in STRAGGLERS.items():
+            win = [r for r in recs if a <= r["round"] <= b]
+            out = [r for r in recs if not a <= r["round"] <= b]
+            tin = [u["metrics"]["train_time_s"] for r in win for u in r["updates"] if u["site_id"] == site]
+            tout = [u["metrics"]["train_time_s"] for r in out for u in r["updates"] if u["site_id"] == site]
+            lines.append(f"| {site} | {a}-{b} | {len(tin)} | {sum(site in (r.get('dropped') or {}) for r in win)} | "
+                         f"{statistics.median(r['timing']['duration_s'] for r in win):.1f} | "
+                         f"{f'{statistics.median(tin):.1f}' if tin else '-'} | "
+                         f"{f'{statistics.median(tout):.1f}' if tout else '-'} |")
     Path(args.out).write_text("\n".join(lines) + "\n")
     print(f"wrote {args.out}")
     return 0
