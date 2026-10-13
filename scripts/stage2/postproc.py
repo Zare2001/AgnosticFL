@@ -8,8 +8,8 @@ Takes jobs from ~/flhub-runtime/runs/stage2/queue/ in order (written by run_fina
              counterpart real run is in runs.md)
   reference  hub.sim --mode centralized|local then finalize --mode reference
   native     finalize --mode native --hub-run (deferred until the hub run is finalized)
-CPU hygiene (PLAN.md §6): no sims while an E3/E4/E5/E7 run is active; otherwise nice 19 and at
-most 2 workers while any run is active (4 when central is idle).
+CPU hygiene (PLAN.md §6): no sims while an E3/E4/E5/E7 run is active or HOLD_POST exists (a sweep
+in progress); otherwise nice 19 and at most 2 workers while any run is active (4 when idle).
 """
 
 from __future__ import annotations
@@ -109,7 +109,7 @@ def loop(once: bool) -> None:
         progressed = False
         for path in jobs:
             run = active()
-            if run and run.get("exp") in NO_SIM_EXPERIMENTS:
+            if (run and run.get("exp") in NO_SIM_EXPERIMENTS) or (RUNS / "HOLD_POST").exists():
                 break
             workers = 2 if run else 4
             job = json.loads(path.read_text())
