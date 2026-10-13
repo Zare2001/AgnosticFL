@@ -3,7 +3,7 @@
 Server app: HubRelayController (imported from the installed `adapters` package, not shipped).
 Client app: the standard Client API script clients/nvflare/client.py via ScriptRunner
 (in-process, numpy exchange, FULL weights), plus the training library flhub_core (.py files of
-this checkout) as job custom code: NVFlare's channel for code updates (ADR-017). NVFlare appends
+this checkout) as job custom code: NVFlare's channel for code updates (ADR-018). NVFlare appends
 custom/ to sys.path, so the hospital environment must not install flhub_core itself.
 
     python -m adapters.nvflare.job --out ~/flhub-runtime/nvflare/server/jobs

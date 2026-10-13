@@ -20,3 +20,9 @@ Newest entries at the bottom. Format: `### <UTC timestamp> — S<n> — <title>`
 - `straggler.sh on|off|status` via a transient system scope with CPUQuota (sudo busctl StartTransientUnit PIDs=client+job), no client restart.
 - Island results (evidence file e6-tools-island.md, ADR-012): kill r3 -> site failed alone after 35 s, client up 4 s / registered 6 s / back in a relay job 62 s, strict retry OK; kill-job -> NVFlare 2.9.0 fails the WHOLE relay job at once (fed_server.py:944-951, no knob); restart via restart.fl acts after ~10 s; straggler 10 % -> 6.5-7.5 s vs ~2 s rounds, back to 2 s after off.
 - Finding for E6/orchestrator: one relay job serves both NVFlare sites, so a site failure means a relay-job restart that takes the other NVFlare site out for ~15-30 s; retries should wait for discover to show the round's sites online.
+
+### 2026-10-13T14:45Z — S1 — rollout channel proven on the island (ADR-018)
+- `adapters/nvflare/job.py`: relay job ships custom/client.py + custom/flhub_core/ (.py of the checkout); export runs inside the script dir (NVFlare resolves the relative script at export time; first attempt silently dropped client.py) and fails if either is missing.
+- Island switched like the hospitals will be: clients on ~/venvs/island-hosp (no flhub_core), data variants materialized with the repo's flhub_core (42 s, 17 variant files/site, manifest-checked) into ~/flhub-island/data next to the stage-1 CSVs.
+- Clients report flhub_core 0.2.0+fe357a1dbec1 from the job; conformance v2 with --variant organamnist-dir0.3: 13 passed, diff 0.0 (payload-64 echo 3.5 s, variant round 3.5 s, restart -> online 40.9 s).
+- Real hospital switch (S2, after central deploys the S1-core relay job): data provisioning first (no downtime), then uninstall flhub_core + client restart (~60 s downtime incl. relay-job restart).
