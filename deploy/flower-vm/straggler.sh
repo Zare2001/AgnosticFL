@@ -41,7 +41,9 @@ start_site() {  # start_site <site> [scoped cpu%]: start the supervisor, optiona
 }
 swap() {  # swap <site> [cpu%]: restart the site's supervisor under the watchdog lock
   exec 9> "$RUNTIME/watchdog.lock"
-  flock -w 120 9 || { echo "watchdog lock busy" >&2; exit 1; }
+  # A supervisor started by the cron watchdog may hold the lock itself (inherited fd): stopping
+  # that site releases it.
+  flock -n 9 || { stop_site "$1" >/dev/null; flock -w 120 9 || { echo "watchdog lock busy" >&2; exit 1; }; }
   stop_site "$1" >/dev/null
   systemctl --user stop "$(unit "$1")" 2>/dev/null || true   # leftover empty scope
   start_site "$@"

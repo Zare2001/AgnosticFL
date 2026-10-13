@@ -14,7 +14,7 @@ export FLHUB_FLOWER_NODES="${FLHUB_FLOWER_E5_NODES:-flw-h11:9096 flw-h12:9097}"
 watchdog_line() {  # cron entry like install.sh's, for this runtime dir and node list
   echo "* * * * * [ -f $RUNTIME/nodes.enabled ] && FLHUB_SUPERLINK=\"\$(cat $RUNTIME/nodes.enabled)\"" \
        "FLHUB_FLOWER_RUNTIME=$RUNTIME FLHUB_FLOWER_NODES=\"$NODES\" FLHUB_WATCHDOG=1" \
-       "flock -n $RUNTIME/watchdog.lock bash $REPO/deploy/flower-vm/start.sh >> $RUNTIME/logs/watchdog.log 2>&1"
+       "flock -n -o $RUNTIME/watchdog.lock bash $REPO/deploy/flower-vm/start.sh >> $RUNTIME/logs/watchdog.log 2>&1"
 }
 
 case "${1:-}" in
