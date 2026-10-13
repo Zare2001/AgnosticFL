@@ -1,0 +1,28 @@
+# vantage6 server config (rendered by install.sh into ~/.config/vantage6/server/flhub.yaml).
+# ${...} placeholders are filled at install time; the rendered file holds a secret (jwt key).
+allow_drop_all: false
+api_path: /api
+description: AgnosticFL vantage6 server
+ip: 0.0.0.0
+port: ${V6_SERVER_PORT}
+uri: sqlite:///flhub.sqlite
+jwt_secret_key: ${V6_JWT_SECRET}
+server_url: http://localhost:${V6_SERVER_PORT}/api
+image: ${V6_SERVER_IMAGE}
+images:
+  server: ${V6_SERVER_IMAGE}
+ui:
+  enabled: false
+logging:
+  backup_count: 5
+  datefmt: '%Y-%m-%d %H:%M:%S'
+  file: flhub-server.log
+  format: '%(asctime)s - %(name)-14s - %(levelname)-8s - %(message)s'
+  level: INFO
+  max_size: 1024
+  use_console: true
+  loggers:
+  - {level: warning, name: urllib3}
+  - {level: warning, name: socketio.server}
+  - {level: warning, name: engineio.server}
+  - {level: warning, name: sqlalchemy.engine}
