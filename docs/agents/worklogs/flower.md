@@ -20,3 +20,10 @@ Newest entries at the bottom. Format: `### <UTC timestamp> — <phase> — <titl
   11. `ArrayRecord({name: Array(ndarray)})` keeps names and order (JSON refs); `Array` = np.save bytes (exact float32 round-trip); `.numpy()`.
   12. Limits: DEFAULT_TTL 12 h; gRPC max ~2 GiB; ServerApp task heartbeat every ~20 s from a thread; no run max-duration -> a long-lived relay run is fine.
 - Next: wait for M0-core; meanwhile prototype the FAB (client + relay) and the adapter against a stub.
+
+### 2026-10-13T12:45Z — P1 — M1-flower island passes
+- Built (island on the flower VM, started only via scripts): hub core :8800 (`python -m hub.core`), SuperLink (fleet 127.0.0.1:9092, HTTP API 127.0.0.1:9093, `--database`), adapter :8813 (`adapters/flower/service.py`, `RelayAdapter` + relay launcher), relay ServerApp (`clients/flower/flhub_flower/server_app.py`, `RelayClient`), SuperNodes flw-h5/flw-h6 (`deploy/flower-vm/*.sh`) in a clean hospital venv (flwr 1.39.0, torch 2.14.1+cpu, flhub_core only; cwd outside the repo).
+- Conformance `pytest tests/conformance --adapter http://127.0.0.1:8813`: 7 passed; max_abs_diff 0.0 in rounds 1, 2, 4; n=784/784; code 0.1.0+9c6b064c1e96 (report /tmp/conformance-flower.json).
+- `hub.orchestrator run --config deploy/flower-vm/island-3r.yaml --wandb offline`: finished, 3 rounds, 6-8 s/round; vs `hub.sim` same config: `equivalence_check` max abs weight diff 0.0 rounds 0-3, acc diff 0.0 pp -> PASS.
+- Problems solved: (1) Flower 1.39 port/API changes (ADR-007); (2) SuperNodes die when an in-memory SuperLink restarts -> persistent `--database` + `supernode.sh` restart loop (tested: same DB keeps ids, wiped DB -> restart in ~10 s, rounds still bit-exact); (3) dead node id still listed online after a SuperNode restart -> non-blocking site-info QUERY, newest node wins; (4) node lost mid-round -> round fails within ~5 s instead of waiting deadline_s; (5) deploy pidfile bug (`cd && setsid ... &` recorded a wrapper pid) fixed.
+- Next: commit + push, M1-flower milestone, deploy-request to central.
