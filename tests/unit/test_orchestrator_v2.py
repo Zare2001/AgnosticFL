@@ -159,3 +159,17 @@ def test_hold_file_pauses_at_a_round_boundary(env):
     assert done.is_set()
     events = [e["event"] for e in latest(tmp, "hold").events()]
     assert "hold" in events and "hold_released" in events
+
+
+def test_reference_modes_centralized_and_local_with_workers(env):
+    _, config, tmp = env
+    import yaml
+
+    cfg = config("ref", tmp / "topology.yaml", rounds=1, eval={"site_shaped": False})
+    # the topology file must exist for schema 2; reuse the mock adapter's one
+    (tmp / "topology.yaml").write_text(yaml.safe_dump({"adapters": {"mock": {"url": "http://127.0.0.1:1",
+                                                                             "sites": SITES}}}))
+    assert sim_main(["--config", cfg, "--mode", "centralized", "--name", "ref-cen"]) == 0
+    assert sim_main(["--config", cfg, "--mode", "local", "--workers", "2", "--name", "ref-local"]) == 0
+    rows = latest(tmp, "ref-local").metrics()
+    assert rows and all(f"local/{s}/test_acc" in rows[-1] for s in SITES)

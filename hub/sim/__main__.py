@@ -30,9 +30,10 @@ from flhub_core.weights import max_abs_diff, sha256_ref, to_safetensors
 from hub.aggregators import state_ref
 from hub.orchestrator.checkpoint import RunDir, utc_now
 from hub.orchestrator.config import config_from_dict, load_config
-from hub.orchestrator.executors import DirectExecutor, _worker_init, load_site_data
+from hub.orchestrator.executors import DirectExecutor, _worker_init
 from hub.orchestrator.inv1 import compare_runs
 from hub.orchestrator.run import Runner, make_evaluator
+from hub.sim.local import _local_site
 
 log = logging.getLogger("flhub.sim")
 
@@ -70,23 +71,6 @@ def run_centralized(cfg, args) -> dict:
     cfg.aggregator = {"name": "fedavg", "params": {}}
     executor = DirectExecutor(("pooled", cfg.dataset), cfg.train_config, "centralized", 0)
     return Runner(cfg, executor, kind="centralized", name=args.name, evaluator=make_evaluator(cfg, args.split)).run()
-
-
-def _local_site(job: tuple) -> tuple:
-    cfg, site, spec, split = job
-    from flhub_core.train import train
-
-    data = load_site_data(spec, site)
-    evaluator = make_evaluator(cfg, split)
-    w = init_weights(cfg.seed, cfg.model, cfg.num_classes)
-    rows = []
-    for epoch in range(1, cfg.rounds + 1):
-        t0 = time.monotonic()
-        w, n, m = train(w, data, {**cfg.train_config, "round": epoch})
-        ev = evaluator(w) if evaluator else {}
-        rows.append({"epoch": epoch, "n": n, "train_s": time.monotonic() - t0, "global_ref": sha256_ref(
-            to_safetensors(w)), **{k: v for k, v in m.items() if k in ("train_loss", "train_acc")}, **ev})
-    return site, rows
 
 
 def run_local(cfg, args) -> dict:

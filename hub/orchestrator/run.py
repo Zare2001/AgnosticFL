@@ -101,7 +101,7 @@ class Runner:
             "run_config": cfg.to_dict(), "train_config": cfg.train_config, "rounds": cfg.rounds,
             "model_seed": cfg.seed, "dataset": cfg.dataset, "dataset_sha256": dataset_info(cfg.dataset).sha256,
             "data_variant": cfg.data_variant, "partition_manifest_sha256": msha,
-            "partition_sizes": {s: m["sites"][s]["n"] for s in cfg.sites} if m else None,
+            "partition_sizes": {s: m["sites"][s]["n"] for s in cfg.sites if s in m["sites"]} if m else None,
             "stage1_partition_sha256": {s: PARTITION_SHA256[s] for s in cfg.sites if s in PARTITION_SHA256}
             if not m else None,
             "model": cfg.model, "model_params": num_parameters(cfg.model, cfg.num_classes),
