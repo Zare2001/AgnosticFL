@@ -17,7 +17,12 @@ for entry in $NODES; do
     [ "$quiet" = 1 ] || echo "$site: already running (pid $(cat "$pidf"))"
     continue
   fi
-  [ -f "$DATA_DIR/$site.csv" ] || { echo "$site: missing $DATA_DIR/$site.csv, run install.sh" >&2; exit 1; }
+  # stage-1 file <site>.csv, or at least one provisioned data variant <variant>-<site>.csv next to it
+  have_data=0
+  for f in "$DATA_DIR/$site.csv" "$DATA_DIR"/*-"$site".csv; do
+    if [ -f "$f" ]; then have_data=1; break; fi
+  done
+  [ "$have_data" = 1 ] || { echo "$site: no data in $DATA_DIR (<site>.csv or <variant>-<site>.csv)" >&2; exit 1; }
   mkdir -p "$RUNTIME/$site"
   # supernode.sh runs the standard flower-supernode and restarts it if it ever exits.
   # One FLWR_HOME per SuperNode so the two nodes never unpack the same FAB concurrently.

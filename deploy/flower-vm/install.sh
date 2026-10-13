@@ -23,5 +23,7 @@ mkdir -p "$RUNTIME/logs" "$RUNTIME/run"
 CRON="* * * * * [ -f $RUNTIME/nodes.enabled ] && FLHUB_SUPERLINK=\"\$(cat $RUNTIME/nodes.enabled)\" \
 FLHUB_WATCHDOG=1 flock -n $RUNTIME/watchdog.lock bash $REPO/deploy/flower-vm/start.sh >> $RUNTIME/logs/watchdog.log 2>&1"
 others="$(crontab -l 2>/dev/null | grep -v 'deploy/flower-vm/start.sh' || true)"
+others="$others
+$(crontab -l 2>/dev/null | grep 'deploy/flower-vm/start.sh' | grep -F 'FLHUB_FLOWER_RUNTIME=' || true)"  # extra.sh (E5)
 printf '%s\n%s\n' "$others" "$CRON" | sed '/^$/d' | crontab -
 echo "install OK (venv $VENV, data $DATA_DIR, watchdog cron entry installed)"
