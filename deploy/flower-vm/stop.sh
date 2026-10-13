@@ -3,6 +3,7 @@
 set -euo pipefail
 . "$(dirname "$0")/common.sh"
 descendants() { local c; for c in $(pgrep -P "$1"); do echo "$c"; descendants "$c"; done; }
+rm -f "$RUNTIME/nodes.enabled"   # keeps the watchdog cron entry from restarting them
 
 for entry in $NODES; do
   site="${entry%%:*}"

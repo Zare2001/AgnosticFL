@@ -3,15 +3,19 @@
 # The only hub-specific settings are the SuperLink address and the node config (site id, data file).
 #   bash deploy/flower-vm/start.sh                              # central SuperLink
 #   FLHUB_SUPERLINK=127.0.0.1:9092 bash deploy/flower-vm/start.sh   # island SuperLink
+# Also enables the watchdog cron entry (install.sh), which re-runs this script every minute.
 set -euo pipefail
 . "$(dirname "$0")/common.sh"
 mkdir -p "$RUNTIME/logs" "$RUNTIME/run"
+echo "$SUPERLINK" > "$RUNTIME/nodes.enabled"
+quiet="${FLHUB_WATCHDOG:-0}"
 
 for entry in $NODES; do
   site="${entry%%:*}"; port="${entry##*:}"
   pidf="$RUNTIME/run/supernode-$site.pid"
   if pid_alive "$pidf"; then
-    echo "$site: already running (pid $(cat "$pidf"))"; continue
+    [ "$quiet" = 1 ] || echo "$site: already running (pid $(cat "$pidf"))"
+    continue
   fi
   [ -f "$DATA_DIR/$site.csv" ] || { echo "$site: missing $DATA_DIR/$site.csv, run install.sh" >&2; exit 1; }
   mkdir -p "$RUNTIME/$site"
@@ -20,5 +24,5 @@ for entry in $NODES; do
   setsid nohup bash "$REPO/deploy/flower-vm/supernode.sh" "$site" "$port" \
       >> "$RUNTIME/logs/supernode-$site.log" 2>&1 < /dev/null &
   echo $! > "$pidf"
-  echo "$site: started (pid $!, superlink $SUPERLINK, local runtime port $port)"
+  echo "$(date -u +%FT%TZ) $site: started (pid $!, superlink $SUPERLINK, local runtime port $port)"
 done

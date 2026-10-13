@@ -24,5 +24,10 @@ for entry in $NODES; do
   node_id="$(grep -ao 'SuperNode ID: [0-9]*' "$RUNTIME/logs/supernode-$site.log" | tail -1)"
   echo "$site: running pid $pid, $conn, ${node_id:-no node id yet}"
 done
+if crontab -l 2>/dev/null | grep -q 'deploy/flower-vm/start.sh' && [ -f "$RUNTIME/nodes.enabled" ]; then
+  echo "watchdog: enabled (cron, superlink $(cat "$RUNTIME/nodes.enabled"))"
+else
+  echo "watchdog: not active"
+fi
 [ "$ok" = 0 ] && echo "flower-vm: HEALTHY" || echo "flower-vm: UNHEALTHY"
 exit "$ok"

@@ -12,4 +12,10 @@ mkdir -p "$RUNTIME/logs" "$RUNTIME/run"
 "$VENV/bin/python" -m flhub_core.data materialize --sites flw-h5 flw-h6 --out "$DATA_DIR"
 "$VENV/bin/python" -c "import flwr, torch, flhub_core; print('flwr', flwr.__version__, \
 'torch', torch.__version__, 'flhub_core', flhub_core.code_version())"
-echo "install OK (venv $VENV, data $DATA_DIR)"
+# Watchdog: re-run start.sh every minute while the nodes are enabled (start.sh enables, stop.sh
+# disables), with the SuperLink address they were started with. start.sh is idempotent.
+CRON="* * * * * [ -f $RUNTIME/nodes.enabled ] && FLHUB_SUPERLINK=\"\$(cat $RUNTIME/nodes.enabled)\" \
+FLHUB_WATCHDOG=1 flock -n $RUNTIME/watchdog.lock bash $REPO/deploy/flower-vm/start.sh >> $RUNTIME/logs/watchdog.log 2>&1"
+others="$(crontab -l 2>/dev/null | grep -v 'deploy/flower-vm/start.sh' || true)"
+printf '%s\n%s\n' "$others" "$CRON" | sed '/^$/d' | crontab -
+echo "install OK (venv $VENV, data $DATA_DIR, watchdog cron entry installed)"
