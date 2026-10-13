@@ -26,3 +26,9 @@ Newest entries at the bottom. Format: `### <UTC timestamp> — S<n> — <title>`
 - Island switched like the hospitals will be: clients on ~/venvs/island-hosp (no flhub_core), data variants materialized with the repo's flhub_core (42 s, 17 variant files/site, manifest-checked) into ~/flhub-island/data next to the stage-1 CSVs.
 - Clients report flhub_core 0.2.0+fe357a1dbec1 from the job; conformance v2 with --variant organamnist-dir0.3: 13 passed, diff 0.0 (payload-64 echo 3.5 s, variant round 3.5 s, restart -> online 40.9 s).
 - Real hospital switch (S2, after central deploys the S1-core relay job): data provisioning first (no downtime), then uninstall flhub_core + client restart (~60 s downtime incl. relay-job restart).
+
+### 2026-10-13T14:55Z — S1/S2 — E7 native FedAvg (ADR-019), sysmon running
+- `adapters/nvflare/native.py` (NativeFedAvg + prepare/submit/finalize/compare) and `deploy/central/nvflare/native/run.sh`; `job.py` exporter takes per-site targets. Island: cnn-small organamnist-iid 3 rounds FINISHED:COMPLETED; clients == local train (0.0); hub fedavg vs NVFlare FedAvg on the same client results 3-6e-8 (float32 InTime vs float64); payload-8 via run.sh OK (evidence e7-native-island.md).
+- Problems solved: FedAvg drops meta after round 1 (re-attach train_config in send_model); server app without custom code -> ComponentNotAuthorized (ship workflow as BYOC server code); `python -m` builder serialized `__main__` class path (build from package import).
+- S1-core milestone 894f7b7 received (bus #129). sysmon started via `deploy/nvflare-vm/sysmon.sh` (per-site client/job components, island grouped apart).
+- Next: purge.sh, island payload check (128-512 MB), data provisioning on nvf-h1/h2, ONE deploy-request.
