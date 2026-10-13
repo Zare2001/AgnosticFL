@@ -71,7 +71,21 @@ Breakdown at 128 MB (relay timings, island), per site of 12.4–14.1 s: prep 0.2
 
 Found in `adapters/common` (central's code): `BaseAdapter._work` downloaded the global model for every task, although `RelayAdapter` ignores it. Cost: +1.46 s per round and about 1 GB adapter RSS at 512 MB. Reported on the bus (#173); fixed by central in a43cef3 (`needs_weights = False` for relay adapters) before S3-frozen.
 
-E4a and E4b on the real system: (S4 results).
+E4a on the real system (central runs `s2-e4a-flower-<S>mb`, 3 rounds, `purge.sh` before every size; medians of rounds 2–3 from the RUN end messages; flower VM memory peak from sysmon):
+
+| payload | median round | flower VM memory peak | result |
+|---|---|---|---|
+| 1 MB | 5.79 s | 1.9 GB | finished |
+| 8 MB | 6.07 s | 2.0 GB | finished |
+| 32 MB | 7.69 s | 2.1 GB | finished |
+| 64 MB | 9.08 s | 2.5 GB | finished |
+| 128 MB | 13.51 s | 3.6 GB | finished |
+| 256 MB | 20.61 s | 4.9 GB (16 %) | finished |
+| 512 MB | — | — | testbed disk limit on central (7.0 GB free needed, 6.0 GB available); passed on the island |
+
+No server-side knob was needed. The SuperNodes logged a few `Connection attempt failed, retrying` lines at the start of the 64 MB and 256 MB runs: reconnects after `purge.sh` restarted the SuperLink just before the run (same node ids, all rounds finished).
+
+E4b on the real system: (S4 results).
 
 ## 5. Experiments supported
 
