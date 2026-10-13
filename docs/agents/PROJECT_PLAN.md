@@ -34,9 +34,9 @@ All framework **servers** run on the central VM, because in a real network the o
 | 8003 | NVFlare admin / FLARE API | localhost |
 | 7601 | vantage6 server API | vantage6 VM |
 | 5050 | Docker registry (vantage6 algorithm image) | vantage6 VM |
-| 9091 | Flower SuperLink ServerAppIo | localhost |
-| 9092 | Flower SuperLink Fleet API | flower VM |
-| 9093 | Flower SuperLink Control API (`flwr run`) | localhost |
+| 9091 | unused (Flower 1.39 has no separate ServerAppIo port) | — |
+| 9092 | Flower SuperLink Fleet API (gRPC) | flower VM |
+| 9093 | Flower 1.39 SuperLink HTTP API (ServerApp + `flwr run`) | localhost |
 
 The project owner opens the public ports in the cloud firewall. Agents must verify reachability in phase 0 (`nc -zv 145.38.205.58 <port>`) and report missing ports to the owner via `tools/bus send --to human --type blocker` **and** in their status.
 
