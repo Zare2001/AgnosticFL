@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Convenience wrapper: loads ~/.flhub/secrets.env and your role, then runs the agentbus CLI.
+#   tools/bus send --to all --type push --subject "a1b2c3 core: add FedAvg" --body "pull needed"
+#   tools/bus inbox | tools/bus wait --timeout 600 | tools/bus status
+set -euo pipefail
+if [ -f "$HOME/.flhub/secrets.env" ]; then set -a; . "$HOME/.flhub/secrets.env"; set +a; fi
+if [ -z "${FLHUB_ROLE:-}" ] && [ -f "$HOME/.flhub/role" ]; then FLHUB_ROLE="$(cat "$HOME/.flhub/role")"; fi
+export FLHUB_ROLE="${FLHUB_ROLE:-}"
+exec python3 "$(cd "$(dirname "$0")" && pwd)/agentbus/agentbus.py" "$@"

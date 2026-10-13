@@ -1,0 +1,41 @@
+# secrets & runtime state (never commit)
+secrets.env
+.env
+*.pem
+*.key
+*.crt
+**/startup/
+**/prod_*/
+api_keys*.yaml
+flhub-runtime/
+
+# data, models, experiment artefacts
+data/
+*.csv
+*.parquet
+*.npz
+*.npy
+*.pt
+*.pth
+*.safetensors
+wandb/
+artifacts/
+checkpoints/
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+dist/
+build/
+
+# misc
+.DS_Store
+*.log
+nohup.out
+bus_transcript.md
+!docs/report/bus_transcript.md
