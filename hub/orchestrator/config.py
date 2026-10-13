@@ -193,8 +193,23 @@ def validate(cfg: RunConfig) -> RunConfig:
     return cfg
 
 
+def deep_merge(base: dict, over: dict) -> dict:
+    out = dict(base)
+    for k, v in over.items():
+        out[k] = deep_merge(out[k], v) if isinstance(v, dict) and isinstance(out.get(k), dict) else v
+    return out
+
+
+def load_raw(path: str | Path) -> dict:
+    """YAML with `extends: <file relative to this one>` resolved (deep merge, this file wins)."""
+    path = Path(path)
+    raw = yaml.safe_load(path.read_text()) or {}
+    parent = raw.pop("extends", None)
+    return deep_merge(load_raw(path.parent / parent), raw) if parent else raw
+
+
 def load_config(path: str | Path, **overrides) -> RunConfig:
-    raw = yaml.safe_load(Path(path).read_text()) or {}
+    raw = load_raw(path)
     raw.update({k: v for k, v in overrides.items() if v is not None})
     cfg = _schema2(raw, str(path)) if int(raw.pop("schema", 1)) >= 2 else _schema1(raw, str(path))
     return validate(cfg)
