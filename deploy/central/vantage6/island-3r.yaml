@@ -1,0 +1,13 @@
+# vantage6 island (P1, vantage6 VM): hub core + vantage6 server/adapter + 2 nodes on this VM, 3 rounds, W&B offline.
+#   python -m hub.orchestrator run --config deploy/central/vantage6/island-3r.yaml --wandb offline
+#   python -m hub.sim --config deploy/central/vantage6/island-3r.yaml --wandb offline   (reference)
+name: vantage6-island-3r
+rounds: 3
+seed: 2026
+train_config: {local_epochs: 1, batch_size: 64, lr: 0.05, momentum: 0.0, seed: 2026}
+hub_url: http://127.0.0.1:8800
+adapters:
+  - {name: vantage6, url: "http://127.0.0.1:8812", sites: [v6-h3, v6-h4]}
+deadline_s: 600
+online_wait_s: 120
+tags: [dev, island]

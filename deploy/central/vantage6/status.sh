@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# Health of the vantage6 side on the central VM. Exit 0 = healthy (server + adapter up).
+# --strict: also require every site online in the adapter's discover.
+set -uo pipefail
+REPO="$(cd "$(dirname "$0")/../../.." && pwd)"
+. "$REPO/deploy/topology.env"
+NAME=flhub
+RT="$HOME/flhub-runtime/vantage6"
+ok=0
+if [ -n "$(docker ps -q --filter "label=vantage6-type=server" --filter "label=name=$NAME")" ] \
+   && v="$(curl -sf "http://127.0.0.1:$V6_SERVER_PORT/api/version")"; then
+  echo "server   OK    $v on :$V6_SERVER_PORT"
+else
+  echo "server   DOWN  (container or :$V6_SERVER_PORT/api/version)"; ok=1
+fi
+img="$(grep '^V6_ALGO_IMAGE=' "$RT/adapter.env" 2>/dev/null | cut -d= -f2-)"
+repo_tag="${img#*/}"
+if [ -n "$img" ] && curl -sf "http://127.0.0.1:$REGISTRY_PORT/v2/${repo_tag%:*}/tags/list" \
+     | grep -q "\"${repo_tag##*:}\""; then
+  echo "image    OK    $img"
+else
+  echo "image    MISSING ${img:-<no adapter.env>} in registry :$REGISTRY_PORT"; ok=1
+fi
+d="$(curl -sf -X POST "http://127.0.0.1:$ADAPTER_V6_PORT/rpc" \
+     -d '{"jsonrpc":"2.0","id":1,"method":"discover","params":{"protocol":"flhub/0.1"}}')"
+if [ -n "$d" ]; then
+  echo "adapter  OK    :$ADAPTER_V6_PORT $(echo "$d" | python3 -c 'import json,sys; r=json.load(sys.stdin)["result"]; print(r["framework"], r["framework_version"], " ".join(s["site_id"] + "=" + s["status"] for s in r["sites"]))')"
+  if [ "${1:-}" = "--strict" ] && echo "$d" | grep -q '"status": "\(offline\|unknown\)"'; then ok=1; fi
+else
+  echo "adapter  DOWN  :$ADAPTER_V6_PORT"; ok=1
+fi
+exit $ok
