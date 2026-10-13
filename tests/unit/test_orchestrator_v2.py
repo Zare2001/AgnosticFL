@@ -130,3 +130,32 @@ def test_schema2_train_config_is_flat(env):
     assert cfg.with_seed(2028).train_config["seed"] == 2028 and cfg.with_seed(2028).seed == 2028
     with pytest.raises(RoundFailed):
         raise RoundFailed("x")
+
+
+def test_hold_file_pauses_at_a_round_boundary(env):
+    import threading
+    import time
+
+    adapter, config, tmp = env
+    cfg = config("hold", adapter(), rounds=2)
+    done = threading.Event()
+
+    def release():
+        link = tmp / "runs" / "hold-latest"
+        while not (link.exists() and (link / "rounds" / "r0000.json").exists()):
+            time.sleep(0.05)
+        flag = link.resolve() / "hold-after-r0001"
+        flag.touch()
+        while not (link / "rounds" / "r0001.json").exists():
+            time.sleep(0.05)
+        time.sleep(1.5)
+        assert not (link / "rounds" / "r0002.json").exists()  # held
+        flag.unlink()
+        done.set()
+
+    t = threading.Thread(target=release, daemon=True)
+    t.start()
+    assert orch_main(["run", "--config", cfg]) == 0
+    assert done.is_set()
+    events = [e["event"] for e in latest(tmp, "hold").events()]
+    assert "hold" in events and "hold_released" in events

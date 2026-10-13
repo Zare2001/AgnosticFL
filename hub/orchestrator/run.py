@@ -144,6 +144,7 @@ class Runner:
         try:
             for rnd in range(start + 1, cfg.rounds + 1):
                 weights, state = self._round(rnd, weights, state)
+                self._hold(rnd)
         except BaseException as exc:
             rd.event("run_failed", error=f"{type(exc).__name__}: {exc}")
             rd.write_json("summary.json", {"status": "failed", "error": f"{type(exc).__name__}: {exc}",
@@ -231,6 +232,17 @@ class Runner:
         log.info("round %d/%d | %d/%d sites | %.1fs | agg %.2fs eval %.1fs%s", rnd, cfg.rounds, len(updates),
                  len(participants), outcome.duration, agg_s, eval_s, "" if acc is None else f" | acc {acc:.4f}")
         return new, new_state
+
+    def _hold(self, rnd: int, max_s: float = 3600.0) -> None:
+        """Fault-injection hook (E6e): wait at this round boundary while <run_dir>/hold-after-rNNNN exists."""
+        flag = self.rd.path / f"hold-after-r{rnd:04d}"
+        if not flag.exists():
+            return
+        t0 = time.monotonic()
+        self.rd.event("hold", round=rnd)
+        while flag.exists() and time.monotonic() - t0 < max_s:
+            time.sleep(0.5)
+        self.rd.event("hold_released", round=rnd, seconds=round(time.monotonic() - t0, 1))
 
     def _gc_blobs(self, model_ref: str, updates: list[dict]) -> None:
         for ref in [model_ref] + [u["weights"] for u in updates if u.get("weights")]:
