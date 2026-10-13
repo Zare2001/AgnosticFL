@@ -43,3 +43,10 @@ Newest entries at the bottom. Format: `### <UTC timestamp> — <phase> — <titl
 - M2-nvflare (central, bus #36): conformance 7/7 vs central :8811 (diff 0.0 rounds 1, 2, 4); `hub.orchestrator --only nvflare --rounds 3 --name nvflare-p2` == hub.sim (diff 0.0).
 - Island leftovers removed (island provisioning incl. its keys, prototype, island hub core, offline wandb dirs). `~/venvs/hub` (island-only) still present; remove before DONE.
 - Next: keep clients up for mixed + final runs; watch logs; report section docs/report/nvflare.md.
+
+### 2026-10-13T13:10Z — P3 — freeze confirmed, final runs served, M3-final (central)
+- Watchdog: deploy/nvflare-vm/start.sh installs a per-minute cron re-run (flock against overlap; the client must not inherit the lock fd -> `9>&-`), stop.sh removes it (c11823e). Tested with a dummy kit in a scratch dir, real clients untouched.
+- P3 freeze b656577 confirmed (bus #60): no flhub_core/clients/nvflare diff; the job copy app_<site>/custom/client.py running at both hospitals is byte-identical to b656577:clients/nvflare/client.py; code_version 0.1.0+9c6b064c1e96; status HEALTHY.
+- Final runs (central, bus #66): nvflare-only pavr8q6u acc 0.8173 / AUC 0.9224 (30 rounds, 80 s); mixed-6sites iehjnc44 acc 0.8654 / AUC 0.9247, 30/30 rounds, 6/6 sites, == sim-fedavg-reference (diff 0.0, rounds 0-30).
+- Client logs: 70 rounds per site in P2+P3, 0 warnings/errors in job logs; relay job 9e4f07a2 served all runs without restart. Island evidence pushed (811cd39).
+- Next: on final-call push docs/report/nvflare.md + report-ready; before DONE remove ~/venvs/hub (island-only).
