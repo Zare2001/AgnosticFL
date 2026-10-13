@@ -30,6 +30,7 @@ HEAD = re.compile(r"^#(\d+) (\S+) \[([\w-]+)\] (\S+) -> (\S+): (.*)$")
 RUN = re.compile(r"^RUN (start|end) (\S+) (\S+)")
 ANOMALY = re.compile(r" - ERROR - |Traceback|Failing job|abort|END_RUN|no connection to server|target_unreachable")
 TRAINED = re.compile(r"\[flhub\] (\S+): round (\d+) n=")
+LOGTS = re.compile(r"^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d")
 
 
 def now() -> str:
@@ -52,15 +53,28 @@ def log_files() -> list[Path]:
     return sorted(SITES_DIR.glob("*/log.txt")) + sorted(SITES_DIR.glob("*/*-*-*-*-*/log.txt"))
 
 
-def scan(offsets: dict[str, int]) -> tuple[list[str], dict[str, int], dict[str, int]]:
-    """(flagged lines, anomaly counts per site, rounds trained per site) appended since `offsets`."""
+def local_ts(utc: str) -> str:
+    """Bus UTC time -> the NVFlare log's local 'YYYY-mm-dd HH:MM:SS' (lexicographically comparable)."""
+    t = datetime.strptime(utc.rstrip("Z")[:19], "%Y-%m-%dT%H:%M:%S").replace(tzinfo=timezone.utc)
+    return t.astimezone().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def scan(offsets: dict[str, int], start: str, end: str) -> tuple[list[str], dict[str, int], dict[str, int]]:
+    """(flagged lines, anomaly counts per site, rounds trained per site) appended since `offsets` and
+    logged between the run's start and end (UTC); lines without a timestamp inherit the previous one."""
     hits, counts, trained = [], {}, {}
+    lo, hi = local_ts(start), local_ts(end)
     for path in log_files():
         site = path.relative_to(SITES_DIR).parts[0]
         with open(path, "rb") as f:
             f.seek(offsets.get(str(path), 0))
             text = f.read().decode(errors="replace")
+        ts = lo
         for ln in text.splitlines():
+            if LOGTS.match(ln):
+                ts = ln[:19]
+            if not lo <= ts <= hi:
+                continue
             if TRAINED.search(ln):
                 trained[site] = trained.get(site, 0) + 1
             elif ANOMALY.search(ln):
@@ -114,7 +128,7 @@ def main() -> None:
             start = opened["start"] if opened else utc
             proc = subprocess.run(["bash", str(REPO / "deploy" / "nvflare-vm" / "sysmon.sh"), "send", name, start, utc],
                                   capture_output=True, text=True, timeout=300)
-            hits, counts, trained = scan(opened["offsets"]) if opened else ([], {}, {})
+            hits, counts, trained = scan(opened["offsets"], start, utc) if opened else ([], {}, {})
             rec = {"run": name, "start": start, "end": utc, "bus_end": m["id"], "sysmon_rc": proc.returncode,
                    "sysmon_out": (proc.stdout + proc.stderr).strip()[-300:], "trained": trained,
                    "anomalies": counts, "health": health()}
