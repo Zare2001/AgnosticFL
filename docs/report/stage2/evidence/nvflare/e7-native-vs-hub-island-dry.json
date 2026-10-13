@@ -1,0 +1,26 @@
+{
+ "native": "/home/zpalanciya/flhub-island/runs/e7-cnn-dry",
+ "hub": "/home/zpalanciya/flhub-island/runs/hub/island-e7-hub-cnn-dry-20261013T152908Z",
+ "rounds": [
+  {
+   "round": 0,
+   "global_max_abs_diff": 0.0
+  },
+  {
+   "round": 1,
+   "global_max_abs_diff": 2.9802322387695312e-08,
+   "one_step_aggregation_diff": 2.9802322387695312e-08
+  },
+  {
+   "round": 2,
+   "global_max_abs_diff": 0.0006298845401033759,
+   "one_step_aggregation_diff": 5.960464477539063e-08
+  },
+  {
+   "round": 3,
+   "global_max_abs_diff": 0.03387218713760376,
+   "one_step_aggregation_diff": 5.960464477539063e-08
+  }
+ ],
+ "native_vs_hub_max_diff": 0.03387218713760376
+}

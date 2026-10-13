@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # E7 native baseline on central: NVFlare's built-in FedAvg on the run's NVFlare hospitals, no hub.
-#   bash deploy/central/nvflare/native/run.sh <configs/stage2/<run>.yaml> <out_dir>
+#   bash deploy/central/nvflare/native/run.sh configs/stage2/e7/s2-e7-nvflare-hub-<cnn|payload>.yaml <out_dir>
+# The hub config of the matching E7 hub run; the native run is named s2-e7-nvflare-native-<cnn|payload>.
 # Runs next to the (idle) relay job: the NVFlare server schedules up to 4 jobs and the hospitals
 # have no GPU limits, so the relay job needs no pause. The clients get the relay job's custom code
 # (clients/nvflare/client.py + flhub_core of this checkout); see adapters/nvflare/native.py.

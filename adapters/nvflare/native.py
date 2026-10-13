@@ -10,7 +10,7 @@ leave the aggregation untouched:
 The clients run the relay job's unchanged custom code: clients/nvflare/client.py + flhub_core.
 
 On central (deploy/central/nvflare/native/run.sh):
-    python -m adapters.nvflare.native prepare --config RUN.yaml --out RUN_DIR [--name NAME]
+    python -m adapters.nvflare.native prepare --config configs/stage2/e7/s2-e7-nvflare-hub-cnn.yaml --out RUN_DIR
     python -m adapters.nvflare.native submit RUN_DIR --admin-kit KIT [--timeout S]
     python -m adapters.nvflare.native finalize RUN_DIR
     python -m adapters.nvflare.native compare RUN_DIR HUB_RUN_DIR   (E7 analysis)
@@ -102,22 +102,17 @@ class NativeFedAvg(FedAvg):
 
 # ---- central side: build, submit, finalize ----------------------------------------------------
 def load_run_config(path: str, name: str | None = None) -> dict:
-    """The fields of a stage-2 run config (YAML/JSON) that the native run needs.
+    """The native run's settings from a stage-2 hub run config (central's loader, so `extends`,
+    dataset/partition, model and seed resolve exactly as for the hub run). The train_config is the
+    one the hub dispatches (hub.orchestrator.config.build_train_config); the run name is the hub
+    name with "-hub-" replaced by "-native-" (s2-e7-nvflare-hub-cnn -> s2-e7-nvflare-native-cnn)."""
+    from hub.orchestrator.config import build_train_config, load_config
 
-    train_config is what the hub dispatches (the yaml's train_config plus model and data_variant,
-    which flhub_core 0.2 reads from it); sites are the run's NVFlare sites."""
-    import yaml
-
-    raw = yaml.safe_load(Path(path).read_text())
-    tc = dict(raw.get("train_config") or {})
-    for key in ("model", "data_variant"):
-        if raw.get(key) is not None and key not in tc:
-            tc[key] = raw[key]
-    rcfg = {"name": name or raw.get("name") or Path(path).stem, "rounds": int(raw["rounds"]),
-            "seed": int(raw.get("seed", tc.get("seed", 2026))), "sites": list(raw["sites"]), "train_config": tc,
-            "deadline_s": float(raw.get("deadline_s", 1800)), "source": str(path)}
-    rcfg["train_config"].setdefault("seed", rcfg["seed"])
-    return rcfg
+    cfg = load_config(path)
+    return {"name": name or cfg.name.replace("-hub-", "-native-"), "hub_name": cfg.name, "rounds": cfg.rounds,
+            "seed": cfg.seed, "sites": list(cfg.sites), "model": cfg.model, "num_classes": cfg.num_classes,
+            "data_variant": cfg.data_variant, "train_config": build_train_config(cfg),
+            "deadline_s": cfg.deadline_s, "source": str(path)}
 
 
 def build_native_job(run_dir: Path, rcfg: dict) -> Path:
@@ -140,24 +135,23 @@ def build_native_job(run_dir: Path, rcfg: dict) -> Path:
 
 
 def is_payload_run(rcfg: dict) -> bool:
-    return str(rcfg["train_config"].get("model", "")).startswith("payload-")
+    return str(rcfg["model"]).startswith("payload-")
 
 
-def prepare(config: str, out: str, name: str | None = None) -> Path:
+def prepare(config: str, out: str, name: str | None = None, rounds: int | None = None) -> Path:
     import flhub_core
-    from flhub_core.data import DATASETS
     from flhub_core.model import init_weights
-    from flhub_core.train import TrainConfig
     from flhub_core.weights import sha256_ref, to_safetensors
 
     rcfg = load_run_config(config, name)
+    if rounds:  # dry runs only; final runs use the config's rounds
+        rcfg.update(rounds=int(rounds), dry_run=True)
     run_dir = Path(out).expanduser().resolve()
     (run_dir / "rounds").mkdir(parents=True, exist_ok=False)
-    tc = TrainConfig.from_dict(rcfg["train_config"])
-    weights = init_weights(rcfg["seed"], tc.model, DATASETS[tc.dataset].num_classes)
+    weights = init_weights(rcfg["seed"], rcfg["model"], rcfg["num_classes"])  # = the hub's round 0
     init = to_safetensors(weights)
     (run_dir / "init.safetensors").write_bytes(init)
-    rcfg.update(mode="native", framework="nvflare", dataset=tc.dataset, init_ref=sha256_ref(init),
+    rcfg.update(mode="native", framework="nvflare", init_ref=sha256_ref(init),
                 flhub_core_version=flhub_core.code_version(), prepared_at=utc())
     (run_dir / "native_config.json").write_text(json.dumps(rcfg, indent=1))
     job_dir = build_native_job(run_dir, rcfg)
@@ -264,6 +258,7 @@ def main(argv=None):
     p.add_argument("--config", required=True)
     p.add_argument("--out", required=True)
     p.add_argument("--name", default=None)
+    p.add_argument("--rounds", type=int, default=None, help="dry runs only")
     s = sub.add_parser("submit")
     s.add_argument("run_dir")
     s.add_argument("--admin-kit", required=True)
@@ -275,7 +270,7 @@ def main(argv=None):
     c.add_argument("hub_dir")
     a = ap.parse_args(argv)
     if a.cmd == "prepare":
-        prepare(a.config, a.out, a.name)
+        prepare(a.config, a.out, a.name, a.rounds)
     elif a.cmd == "submit":
         status = submit(a.run_dir, a.admin_kit, a.timeout)
         raise SystemExit(0 if status.startswith("FINISHED:COMPLETED") else 1)

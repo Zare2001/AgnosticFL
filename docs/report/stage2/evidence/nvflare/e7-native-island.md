@@ -13,3 +13,20 @@ Findings: (1) FedAvg replaces the model meta after each round, so the hub train_
 `send_model()`; (2) a server app without custom code is held to the kit's class allow-list (ComponentNotAuthorized),
 so the job ships the workflow module as BYOC server code; (3) running the builder as `python -m` would serialize the
 class as `__main__`-derived `native.NativeFedAvg`, so the job is built from the package import.
+
+## Native vs hub with central's E7 config (dry run, 3 rounds, island)
+
+`configs/stage2/e7/s2-e7-nvflare-hub-cnn.yaml` (organamnist-iid, cnn-small, lr 0.1, nvf-h1 n=5761, nvf-h2 n=5760):
+native `s2-e7-nvflare-native-cnn` (native/run.sh path, `--rounds 3`) vs hub orchestrator v2 (`--only nvflare --rounds 3`).
+`python -m adapters.nvflare.native compare` (`e7-native-vs-hub-island-dry.json`):
+
+| round | global max abs diff native vs hub | one-step aggregation diff (hub fedavg of the native clients vs native global) |
+|---|---|---|
+| 0 | 0.0 (same init) | — |
+| 1 | 2.98e-08 | 2.98e-08 |
+| 2 | 6.30e-04 | 5.96e-08 |
+| 3 | 3.39e-02 | 5.96e-08 |
+
+The aggregation itself differs only at float32 rounding level (NVFlare FedAvg: float32, weights 5761/5760 not
+exactly representable; hub: float64, cast once). Local SGD (lr 0.1) amplifies that perturbation from round 2 on, so
+the two trajectories drift apart; E7 compares them by the per-round diff plus final test metrics.
