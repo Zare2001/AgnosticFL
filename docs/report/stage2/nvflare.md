@@ -45,7 +45,27 @@ How a model travels: FLModel numpy params are serialized with FOBS; `NumpyArrayD
 
 Island (relay path, localhost, defaults): 128 MB 5–6 s/round, 256 MB 9–10 s, 512 MB 16–17 s (VM peak memory +5.3 GB), 1024 MB 32.8 s. No server-side knob was needed before E4a.
 
-E4a/E4b on the real system: (S4 results).
+E4a on the real system (final runs, `runs.md`, INV-1 full sim 0.000 for every run; breakdown from the run data,
+`docs/report/stage2/evidence/nvflare/e4a-breakdown.md`; medians over rounds 2–3):
+
+| payload | median round (s) | NVFlare transfer (s) | hub prep + store (s) | VM memory peak (GB) | client job RSS peak (GB) |
+|---|---|---|---|---|---|
+| 1 MB | 2.52 | 2.36 | 0.01 | 1.68 | 0.43 |
+| 8 MB | 2.67 | 2.39 | 0.04 | 1.74 | 0.47 |
+| 32 MB | 2.66 | 1.95 | 0.22 | 1.97 | 0.58 |
+| 64 MB | 3.67 | 2.56 | 0.43 | 2.20 | 0.72 |
+| 128 MB | 5.08 | 2.88 | 0.88 | 2.65 | 0.95 |
+| 256 MB | 10.29 | 6.29 | 1.69 | 3.48 | 1.35 |
+| 512 MB | not run: testbed disk limit on central (7.0 GB needed, 5.0 GB free; bus #250) | | | | |
+
+- No NVFlare limit was reached; bytes on the NVFlare VM's wire ≈ 1.06 × payload.
+- Below ~64 MB an NVFlare round costs ~2.3–2.6 s whatever the size: the server tells each client to wait
+  `task_request_interval` (default 2 s, `private/fed/server/server_json_config.py:102`, `WAIT_TIME` header) before its
+  next task request; the client side of a round takes ~0.55 s. Server-side job knob, latency only; left at its default
+  (frozen), and the E7 native runs have the same floor.
+- In the mixed scope NVFlare's fan-out stayed at 1.8–3.8 s (1–64 MB); those rounds were set by vantage6.
+
+E4b on the real system: (S4 results).
 
 ## 5. Experiments supported
 
