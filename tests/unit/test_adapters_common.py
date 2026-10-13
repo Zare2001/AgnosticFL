@@ -114,7 +114,8 @@ def test_dispatch_collect_envelopes(hub):
     srv, client = start(adapter)
     try:
         d = client.discover()
-        assert d["protocol"] == "flhub/0.1" and [s["status"] for s in d["sites"]] == ["online", "online"]
+        assert d["protocol"] == "flhub/0.2" and [s["status"] for s in d["sites"]] == ["online", "online"]
+        assert client.call("discover", protocol="flhub/0.1")["protocol"] == "flhub/0.1"  # 0.1 callers still served
         with pytest.raises(RpcError) as e:
             client.dispatch(3, {"ref": ref}, TC, ["a", "zzz"])
         assert e.value.code == -32011
