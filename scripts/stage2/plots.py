@@ -246,26 +246,38 @@ def e4a_points(scope: str) -> list[tuple[float, float | None, Run | None]]:
     return pts
 
 
+def e4a_limits(scope: str) -> list[tuple[int, str]]:
+    """(size, result) of the sizes the sweep stopped at (testbed disk limit, failed)."""
+    p = RUNS / f"e4a-{scope}.json"
+    if not p.exists():
+        return []
+    return [(r["size_mb"], r["result"]) for r in json.loads(p.read_text())["runs"] if r["result"] not in ("ok",)]
+
+
 def fig_e4a_time(out: Path) -> None:
     scopes = ["nvflare", "vantage6", "flower", "mixed"]
     data = {s: e4a_points(s) for s in scopes}
     if not any(data.values()):
         print("e4a_time: no E4a runs yet")
         return
-    fig, ax = plt.subplots(figsize=(7, 4.4))
+    fig, ax = plt.subplots(figsize=(7.4, 4.6))
     for scope in scopes:
         good = [(x, t) for x, t, _ in data[scope] if t is not None]
-        bad = [x for x, t, _ in data[scope] if t is None]
-        if good:
-            ax.plot([g[0] for g in good], [g[1] for g in good], "o-", color=FW_COLOR[scope], label=scope, ms=5)
-        for x in bad:
-            ax.plot([x], [good[-1][1] if good else 1], "x", color=FW_COLOR[scope], ms=10, mew=2)
+        if not good:
+            continue
+        ax.plot([g[0] for g in good], [g[1] for g in good], "o-", color=FW_COLOR[scope], ms=5)
+        ax.annotate(scope, good[-1], xytext=(6, 0), textcoords="offset points", va="center", fontsize=8,
+                    color=TEXT)
+        for size, result in e4a_limits(scope):
+            ax.plot([size], [good[-1][1]], marker="v" if "disk" in result else "x", color=FW_COLOR[scope],
+                    ms=8, mfc="none", mew=1.5)
     ax.set_xscale("log", base=2)
     ax.set_yscale("log")
+    ax.set_xticks([1, 8, 32, 64, 128, 256, 512], ["1", "8", "32", "64", "128", "256", "512"])
     ax.set_xlabel("payload per site and direction (MiB)")
     ax.set_ylabel("round time, median of rounds 2-3 (s)")
-    ax.set_title("E4a: round time vs payload (x = failed size)", loc="left")
-    ax.legend(fontsize=8)
+    ax.set_title("E4a: round time vs payload (open triangle = next size stopped by the testbed disk rule)",
+                 loc="left", fontsize=9)
     save(fig, "e4a_round_time_vs_payload", out)
 
 
