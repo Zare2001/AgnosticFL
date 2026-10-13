@@ -1,0 +1,8 @@
+project hpml_surf-surf/AgnosticFL: 6 runs, keep 6, delete 0
+remaining:
+  KEEP   mixed-6sites                 iehjnc44   state=finished  final/test_acc=0.8653846153846154 https://wandb.ai/hpml_surf-surf/AgnosticFL/runs/iehjnc44
+  KEEP   flower-only                  011lasv0   state=finished  final/test_acc=0.7580128205128205 https://wandb.ai/hpml_surf-surf/AgnosticFL/runs/011lasv0
+  KEEP   vantage6-only                twk49dhp   state=finished  final/test_acc=0.8637820512820513 https://wandb.ai/hpml_surf-surf/AgnosticFL/runs/twk49dhp
+  KEEP   nvflare-only                 pavr8q6u   state=finished  final/test_acc=0.8173076923076923 https://wandb.ai/hpml_surf-surf/AgnosticFL/runs/pavr8q6u
+  KEEP   sim-fedavg-reference         kur37gs2   state=finished  final/test_acc=0.8653846153846154 https://wandb.ai/hpml_surf-surf/AgnosticFL/runs/kur37gs2
+  KEEP   centralized-baseline         j5gn5knm   state=finished  final/test_acc=0.8605769230769231 https://wandb.ai/hpml_surf-surf/AgnosticFL/runs/j5gn5knm
