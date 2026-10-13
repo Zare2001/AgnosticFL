@@ -255,7 +255,19 @@ Four Claude agents (Opus 5.5 orchestrators with Haiku subagents), one per VM. Th
 
 **How subagents were used** (examples):
 - central: a `runner` built the three framework venvs on the central VM with the pins (PASS, no resolver conflicts). `scribe` wrote the central worklog entries from facts supplied after each milestone.
-- Framework agents used `scout` for API studies of the installed versions, `runner` for island test runs and `gitops` for commits. Their examples are in §8a.
+- flower:
+  - Three `scout`s in parallel read the *installed* flwr 1.39.0 (SuperLink/SuperExec flags, SuperNode/FAB install, `flwr run`). They found that ServerAppIo 9091 is gone, `--clientappio-api-address` is removed, connections live in `$FLWR_HOME/config.toml`, and the FAB has limits (bus #7, ADR-007).
+  - One scout claim ("a SuperNode retries forever") was wrong. Island tests showed a SuperNode exits on UNAUTHENTICATED after an in-memory SuperLink restart, which led to `--database` and the restart loop.
+  - `gitops` split the first slice into 5 path-scoped commits (661236f).
+- vantage6:
+  - Three `scout`s read the installed vantage6 4.15.2 source (CLI, client and algorithm tools, plus the node source inside the node image). They found that `v6 server/node new` is interactive only, the node image tag rule, the `require_algorithm_pull` default, that results come back as JSON strings, and that the official base image is py3.10 (ADR-004).
+  - `gitops` made 14 commits in 7 runs with exact file lists and secret-scanned the report before pushing.
+- nvflare:
+  - Two `scout`s read the installed NVFlare 2.9.0 FLARE API and provisioning code and produced a 15-line API summary in the worklog.
+  - The two critical pitfalls were found by the agent's own verification: the 2.9 class allow-list with its BYOC bypass, and absolute-path `ScriptRunner`.
+  - `gitops` made 18 commits in 9 pushes and recovered once from a stale origin ref.
+- The framework agents did not use `runner` or `scribe`: island debugging needed live interaction, and they wrote reports from first-hand evidence.
+- Lesson: subagent findings were treated as leads and verified against the installed code or by tests.
 
 ## 9. Problems encountered and how they were solved
 
@@ -332,3 +344,112 @@ Versions (`deploy/versions.env`): Python 3.11.17, torch 2.14.1+cpu (CPU index), 
    ~/venvs/hub/bin/python scripts/wandb_cleanup.py --dedupe && ~/venvs/hub/bin/python scripts/wandb_cleanup.py --dedupe --apply
    ```
    Rough estimate from this build: about 30 minutes of script time from fresh VMs. That covers venv installs, the ~2-minute vantage6 image build, and ~15 minutes for the six final runs.
+
+## 12. Definition of Done — evidence
+
+Checked on 2026-10-13 between 13:15 and 13:20 UTC. The output below is trimmed.
+
+**1. All services start from `deploy/` scripts; `status.sh` on each VM reports healthy.**
+```
+central  $ bash deploy/central/status.sh   (13:15:19Z, exit 0)
+  agent bus :7700 OK | hub core :8800 OK | registry :5050 OK {"repositories":["flhub/v6-train"]}
+  nvflare  OK: server up (flhub-central, fed :8002, admin :8003); adapter 127.0.0.1:8811; nvf-h1 online, nvf-h2 online
+  vantage6 OK: server {"version": "4.15.2"} on :7601; image 145.38.205.58:5050/flhub/v6-train:bd800cee7922; v6-h3=online v6-h4=online
+  flower   OK: superlink fleet 0.0.0.0:9092, HTTP 127.0.0.1:9093; adapter :8813; relay polling; flw-h5=online, flw-h6=online
+  HEALTHY
+nvflare  $ bash deploy/nvflare-vm/status.sh   (13:15:24Z, exit 0)
+  nvf-h1: up (connected to flhub-central:8002 = 145.38.205.58, job processes: 1)   nvf-h2: up (same)   status: HEALTHY
+vantage6 $ bash deploy/vantage6-vm/status.sh  (13:15:23Z, exit 0)
+  v6-h3 OK connected node:4.15.2 -> http://145.38.205.58:7601 (central)   v6-h4 OK connected (same)
+flower   $ bash deploy/flower-vm/status.sh    (13:15:24Z, exit 0)
+  flw-h5: running, connected to 145.38.205.58:9092   flw-h6: running, connected to 145.38.205.58:9092   flower-vm: HEALTHY
+```
+
+**2. Hospital clients run the frameworks' standard client patterns; only connection settings and credentials are hub-specific.**
+- Each framework agent verified this on its VM; see §5 and `docs/report/<fw>.md` §4.
+- The hospital venvs contain only the framework, torch, numpy, safetensors and `flhub_core`. `import adapters` / `import hub` fail there, and the vantage6 host has no torch.
+- Training code arrives as standard framework payload: the NVFlare job's `custom/client.py` (byte-identical to the repo), the vantage6 image from the operator's registry, and the Flower FAB via `flwr run`.
+- Every envelope carries `client_code_version 0.1.0+9c6b064c1e96`.
+
+**3. Every adapter passes the conformance suite against the central deployment.**
+```
+pytest tests/conformance --adapter http://127.0.0.1:8811  -> 7 passed in 13.7 s (NVFlare;  max_abs_diff 0.0 rounds 1, 2, 4)
+pytest tests/conformance --adapter http://127.0.0.1:8812  -> 7 passed in 26.4 s (vantage6; max_abs_diff 0.0 rounds 1, 2, 4)
+pytest tests/conformance --adapter http://127.0.0.1:8813  -> 7 passed in 30.2 s (Flower;   max_abs_diff 0.0 rounds 1, 2, 4)
+```
+Reports: `docs/report/evidence/conformance-{nvflare,vantage6,flower}-central.json`.
+
+**4. `mixed-6sites` completed all rounds with all 6 sites in every round.**
+```
+rounds logged: 30 | num_sites per round: [6] | (nvflare, vantage6, flower) sites per round: [(2, 2, 2)]
+every round has all 6 sites: True | client code versions: {'0.1.0+9c6b064c1e96'} | W&B iehjnc44 state=finished
+```
+
+**5. The equivalence check passed.**
+```
+python scripts/equivalence_check.py ~/flhub-runtime/runs/mixed-6sites-latest ~/flhub-runtime/runs/sim-fedavg-reference-latest
+max abs weight diff over all rounds: 0.000e+00 (tol 1e-05) -> PASS     (rounds 0-30, every round 0.000e+00)
+final test acc diff: 0.0000 pp (tol 0.1) -> PASS
+EQUIVALENCE: PASS          (also in W&B summary of iehjnc44: equivalence/pass = true)
+```
+
+**6. The W&B project contains exactly the final runs, all finished and tagged `final`.**
+```
+python scripts/wandb_cleanup.py --dedupe --apply
+project hpml_surf-surf/AgnosticFL: 6 runs, keep 6, delete 0
+  KEEP mixed-6sites iehjnc44 | flower-only 011lasv0 | vantage6-only twk49dhp | nvflare-only pavr8q6u |
+       sim-fedavg-reference kur37gs2 | centralized-baseline j5gn5knm   (state=finished, tags=['final'], group final-2026-10-13)
+```
+No development run was ever logged online: all P1/P2 runs used `--wandb offline` and `disabled`.
+
+**7. `main` is green; every commit is by Zare2001 with no AI attribution.**
+```
+~/venvs/hub     pytest                                   -> 28 passed, 9 skipped (conformance needs --adapter; framework tests skip without the framework)
+~/venvs/flower  pytest tests/flower                      -> 5 passed
+~/venvs/nvflare pytest tests/unit/test_nvflare_adapter.py -> 7 passed
+~/venvs/v6      pytest tests/unit/test_vantage6_adapter.py -> 5 passed
+git log --format='%an|%cn|%B' | grep -Ei 'co-authored|claude|anthropic'   -> (nothing)
+git log --format='%an|%cn' | sort | uniq -c                               -> all commits Zare2001|Zare2001
+```
+
+**8. Reports are pushed:** `REPORT.md`, `README.md`, `docs/DECISIONS.md` (ADR-001..007), `docs/report/{central,nvflare,vantage6,flower}.md`, `docs/report/bus_transcript.md` and `docs/report/evidence/`.
+
+**9. all-done and DONE files:** the central agent broadcasts `all-done` after pushing this report. Each agent verifies its DoD items, writes its final worklog entry and creates `~/.flhub/DONE`; the confirmations are at the end of the bus transcript.
+
+## 13. Limitations, security notes and next steps
+
+**Not production-ready:**
+- **Plaintext updates at the hub.** The orchestrator, hub core and adapters see every site's weights. There is no secure aggregation and no differential privacy (out of scope by the owner's assumptions). Weights are also stored unencrypted in the vantage6 server database (collaboration encryption is off).
+- **Transport security is mixed.**
+  - NVFlare uses its provisioned mTLS (root CA `CN=flhub`, kits valid until 2027-10-08).
+  - vantage6 (:7601) and the registry (:5050) are plain HTTP.
+  - Flower (:9092) runs `--insecure` without SuperNode authentication.
+  - The test network relies on the cloud firewall (only the four VM IPs).
+- **Single operator.** One VM hosts the hub and all three framework servers. Whoever holds it (and the NVFlare admin kit, the vantage6 root account, the Flower SuperLink) controls every federation.
+- **No anomaly checks** beyond envelope validation (spec, finite values, round, base model, config hash). Malicious or broken sites are not detected (owner's assumption).
+- **Bit-exactness is conditional.** It needs identical CPU code paths and pinned versions. On mixed hardware, fall back to the CPU-feature pinning in ADR-003 or the metric tolerance.
+- **Latency** is dominated by framework mechanics: vantage6 starts one container per task (~8 s/round), Flower one ClientApp process per message (~7 s). Fine for 30 rounds, not for thousands.
+- **Operations.** Watchdogs are cron jobs, logs are local files, and there is no monitoring. The vantage6 4.15 CLI needs workarounds on Python 3.11 (ADR-005).
+
+**Recommended next steps:**
+1. **Secure aggregation.** Move aggregation into MPC or threshold HE between the adapters, so the hub only sees the aggregate (protocol `flhub/0.2`: masked updates and an `aggregate` step). Add DP noise at the clients via `flhub_core`.
+2. **Close the transport gaps.** Use Flower TLS + `--enable-supernode-auth`, an HTTPS reverse proxy for vantage6, a registry with TLS and auth, and pin the vantage6 image by digest. Bind NVFlare admin to loopback.
+3. **More frameworks through the same protocol.** BranchKey or others: implement `BaseAdapter`, pass `tests/conformance`, add deploy scripts (§14).
+4. **Federated evaluation** (`capabilities.evaluate`), and partial participation with stragglers (today every site must answer).
+5. **vantage6 5.x on Kubernetes,** and separate operators per framework server.
+6. **A real hospital pilot** with non-IID data, data-quality checks and a governance model for the hub operator.
+
+## 14. How to add a new framework adapter
+
+1. **Understand the contract.** Read `docs/agents/PROTOCOL.md` (five JSON-RPC methods, the envelope, error codes) and `adapters/mock/service.py`, the smallest complete adapter (60 lines).
+2. **Write the adapter** in `adapters/<fw>/service.py`, on the central/operator side only:
+   - If your framework lets an external client start work (like vantage6's user API), subclass `adapters.common.BaseAdapter` and implement:
+     - `site_status() -> {site_id: "online"|"offline"|"unknown"}`
+     - `run_round(task, weights, client_config) -> [SiteResult(site_id, num_examples, metrics, client_code_version, weights=...)]`
+   - If the server-side workflow must run inside the framework server (like NVFlare's ModelController or Flower's ServerApp), subclass `RelayAdapter`. In the framework's server workflow, loop over `RelayClient.next_job()` → send `job["config"]` and the weights to `job["sites"]` → `post_result(...)` (see `adapters/common/relay.py`).
+   - The base class handles protocol checks, error codes, deadlines, cancel, hub-core blobs and envelopes.
+3. **Keep the hospital side standard.** Use the framework's documented client pattern. Inside it, call `flhub_core.train.train(weights, flhub_core.data.load_site(path_or_df), client_config)` and return the weights (float32, `state_dict` names), `num_examples`, `metrics` and `flhub_core.code_version()`. The only hub-specific items should be connection settings, credentials and the data path. Ship the code the framework's way (job, image, app bundle).
+4. **Check determinism.** `python -m flhub_core.selfcheck` on the hospital machine must print the same `result` hash as the hub.
+5. **Pass the admission test** with `pytest tests/conformance --adapter http://127.0.0.1:<port> -v -s --report conformance-<fw>.json`. It requires round 1 to equal direct `flhub_core.train` (≤ 1e-6), correct error codes, busy handling, and recovery after cancel.
+6. **Add deploy scripts and a config entry.** Scripts: `deploy/central/<fw>/{install,start,stop,status}.sh` (status exits 1 unless all sites are online) and `deploy/<fw>-vm/...` for the hospitals. Add one entry under `adapters:` in `configs/final.yaml`, with a free local port and the site list.
+7. **Run it.** `python -m hub.orchestrator run --config configs/final.yaml --only <fw> --rounds 3 --wandb offline`, then the mixed run; check `scripts/equivalence_check.py` against `hub.sim`. Nothing in the orchestrator, hub core or protocol changes.
