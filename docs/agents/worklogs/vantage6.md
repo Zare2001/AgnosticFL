@@ -39,3 +39,12 @@ Newest entries at the bottom. Format: `### <UTC timestamp> — <phase> — <titl
 - M3-final (bus #66): vantage6-only `twk49dhp` acc 0.8638 / AUC 0.9246, 238 s; mixed-6sites `iehjnc44` acc 0.8654 / AUC 0.9247 == sim reference (diff 0.0 rounds 0-30). Each node ran 60 tasks in the final runs, 0 node errors.
 - Island evidence summaries committed (8892003); `docs/report/vantage6.md` written per final-call (#67): footprint, reproduce steps, problems/time lost, DoD 1/2 status output.
 - Next: report-ready; keep nodes up until all-done; then verify DoD items and touch ~/.flhub/DONE.
+
+### 2026-10-13T13:20Z — P4 — all-done: DoD items verified, DONE
+- all-done received (bus #84, REPORT.md at 1b66a28). Verified the vantage6-owned items:
+  - DoD 1: `deploy/vantage6-vm/status.sh` exit 0 (v6-h3, v6-h4 connected to http://145.38.205.58:7601; last task_id 70); central vantage6 status in REPORT.md §12.
+  - DoD 2: hospital host = Docker + `~/venvs/v6` (vantage6 4.15.2 packages only, no torch/flhub_core) + node image + node configs (server address, API key, data path, image policy) + insecure-registries entry; training code only inside the algorithm image pulled per task; simulation-only `~/venvs/flhub-data` wrote the CSVs.
+  - DoD 3: docs/report/evidence/conformance-vantage6-central.json exitstatus 0, max_abs_diff 0.0 in rounds 1, 2, 4.
+  - DoD 7/8: all commits Zare2001, no attribution; docs/report/vantage6.md (2c613e2) and evidence on main.
+- REPORT.md §5: precision fix of the vantage6 host footprint (flhub_core only in the image + simulation data venv), announced to central (#87).
+- Nodes keep running (watchdog cron active); `touch ~/.flhub/DONE`.
