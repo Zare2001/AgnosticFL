@@ -139,7 +139,30 @@ References: centralized training on the pooled split reaches 84.7 % (balanced 83
 - **Framework-correlated skew is mild here.** When the class mix differs between frameworks but the two sites of a framework are IID halves (`fwcorr`), FedAvg loses about 1 pp overall and 6 pp on the worst site. Every site still sees most classes (figure in §2.4), unlike the Dirichlet partitions, where a site holds 2–4 classes. So skew that follows framework boundaries is not worse than skew between sites.
 - Federating pays: even the worst skew (`dir0.1`, 74.7 %) is far above training alone on the same data (26.3 %).
 
-*(pending: E2, E3)*
+### 5.2 E2 — aggregation algorithms
+
+![e2 grid](docs/report/stage2/figures/e2_final_accuracy_grid.png)
+
+Final test accuracy % (mean ± sd over 3 seeds; in brackets the worst-site accuracy %). The `fedavg` column is E1.
+
+| partition | fedavg | fedavgm | fedadam | fedyogi | fedadagrad | fedprox |
+|---|---|---|---|---|---|---|
+| iid | 83.8 ± 0.4 (84.2) | 82.9 ± 0.3 (83.3) | 83.4 ± 0.1 (83.8) | 83.8 ± 1.1 (84.2) | 82.5 ± 1.7 (82.9) | 84.2 ± 0.5 (84.6) |
+| dir0.3 | 78.0 ± 0.9 (57.2) | **80.2 ± 1.6 (62.3)** | 57.7 ± 36.1 (41.8) | 80.1 ± 1.4 (61.9) | 75.3 ± 2.5 (50.6) | 77.8 ± 1.3 (56.4) |
+| dir0.1 | 74.7 ± 2.0 (60.5) | 78.3 ± 3.1 (59.3) | 77.0 ± 2.7 (62.8) | **78.4 ± 1.2 (65.3)** | 68.9 ± 7.7 (41.8) | 74.9 ± 1.1 (61.3) |
+| rounds to target, `iid` (seed 2026) | 16 | 27 | 24 | 19 | 36 | 16 |
+
+Hyperparameters from S3 (tuned on `dir0.3`, validation split): fedavgm η 1.0 (β 0.9), fedadam η 0.03, fedyogi η 0.03, fedadagrad η 0.03, fedprox μ 0.01; the client lr 0.1 is shared.
+
+![e2 dir0.1](docs/report/stage2/figures/e2_dir01_accuracy_vs_round.png)
+
+- **Server momentum and Yogi help under label skew.** On `dir0.3` and `dir0.1`, fedavgm and fedyogi gain 2–4 pp of test accuracy over FedAvg (and up to 5 pp on the worst site on `dir0.3`). With IID data they gain nothing and reach the target later (27 and 19 rounds against 16), because their server learning rates were tuned for the skewed case.
+- **FedAdam can diverge.** One of three `dir0.3` seeds (2027, a `hub.sim` run) holds 81 % until round 45 and then collapses to 16.2 % at round 50 (test loss 8.65). Its test loss had been rising since round 39 (1.34, then 1.59 at round 45). This is the known instability of Adam-type server steps when the second-moment estimate becomes small (τ = 1e-3, β2 = 0.99). FedYogi updates the second moment additively, which limits its decay; it stays stable on the same partition and seeds. FedAdagrad, whose accumulated second moment only grows, is the weakest server optimizer here; its `dir0.1` final-round value (68.9 ± 7.7) comes from a single-round dip, and the mean of its last five rounds is 73.2 ± 0.4.
+- **FedProx with μ = 0.01 behaves like FedAvg.** S3 chose μ = 0.01 by validation accuracy (90.3 %, against 90.2 % at μ = 0.001 and 88.9 % at μ = 0.1). At this strength the proximal term changes little: the test results are within 0.4 pp of FedAvg on every partition.
+- **No aggregator reaches 80.5 % on `dir0.1` within 50 rounds**, and only fedavgm and fedyogi come close on `dir0.3` (the target is 95 % of centralized accuracy). Label skew remains the dominant effect; the choice of server optimizer recovers part of it.
+- **Changing the aggregator is a hub-only change.** All 15 E2 configurations ran on the same hospital deployment as E1, with no restart, no data change and 0 changed lines in `clients/` between them. FedProx's μ reaches the clients inside the opaque `train_config`, and every adapter forwards it unchanged (§4).
+
+*(pending: E3)*
 
 ## 6. RQ4 — Performance (E3, E4, E5, E7)
 

@@ -118,12 +118,12 @@ def fig_e1_final(out: Path) -> None:
     for off, idx, label, color in ((-0.18, 1, "test accuracy", SERIES[0]), (0.18, 2, "worst-site (site-shaped)",
                                                                              SERIES[1])):
         means = [np.mean(r[idx]) if r[idx] else np.nan for r in rows]
-        sds = [np.std(r[idx]) if len(r[idx]) > 1 else 0 for r in rows]
+        sds = [np.std(r[idx], ddof=1) if len(r[idx]) > 1 else 0 for r in rows]
         ax.bar(x + off, means, width=0.34, color=color, label=label, yerr=sds, capsize=3, ecolor=TEXT2)
     ax.set_xticks(x, [r[0] for r in rows])
     ax.set_ylabel("final accuracy (mean ± sd over seeds)")
     ax.set_title("E1: final accuracy and worst-site accuracy per partition (FedAvg)", loc="left")
-    ax.legend(loc="lower left", fontsize=8)
+    ax.legend(ncol=2, fontsize=8, loc="upper center", bbox_to_anchor=(0.5, -0.1), frameon=False)
     save(fig, "e1_final_and_worst_site", out)
 
 
@@ -142,13 +142,13 @@ def fig_e2_grid(out: Path) -> None:
     x = np.arange(len(pids))
     for i, agg in enumerate(AGGS):
         means = [np.mean(data[(p, agg)]) if data[(p, agg)] else np.nan for p in pids]
-        sds = [np.std(data[(p, agg)]) if len(data[(p, agg)]) > 1 else 0 for p in pids]
+        sds = [np.std(data[(p, agg)], ddof=1) if len(data[(p, agg)]) > 1 else 0 for p in pids]
         ax.bar(x + (i - 2.5) * width, means, width=width * 0.92, color=SERIES[i], label=agg, yerr=sds, capsize=2,
                ecolor=TEXT2)
     ax.set_xticks(x, pids)
     ax.set_ylabel("final test accuracy (mean ± sd, 3 seeds)")
     ax.set_title("E2: aggregator × partition (seed 2026 real, 2027/2028 hub.sim)", loc="left")
-    ax.legend(ncol=3, fontsize=8, loc="lower left")
+    ax.legend(ncol=6, fontsize=8, loc="upper center", bbox_to_anchor=(0.5, -0.1), frameon=False)
     save(fig, "e2_final_accuracy_grid", out)
 
 
