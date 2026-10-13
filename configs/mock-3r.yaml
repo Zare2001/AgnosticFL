@@ -1,0 +1,11 @@
+# Orchestrator self-test: hub core + mock adapter (python -m adapters.mock --port 8819), 3 rounds, offline.
+name: mock-3r
+rounds: 3
+seed: 2026
+train_config: {local_epochs: 1, batch_size: 64, lr: 0.05, momentum: 0.0, seed: 2026}
+hub_url: http://127.0.0.1:8800
+adapters:
+  - {name: mock, url: "http://127.0.0.1:8819", sites: [nvf-h1, nvf-h2, v6-h3, v6-h4, flw-h5, flw-h6]}
+deadline_s: 600
+online_wait_s: 60
+tags: [dev]
