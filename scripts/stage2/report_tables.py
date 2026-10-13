@@ -198,6 +198,19 @@ def main(argv: list[str] | None = None) -> int:
                 ov = (b - a) if a and b else None
                 lines.append(f"| {fw} | {c} | {fmt(a, 2)} | {fmt(b, 2)} | {fmt(ov, 2)} | "
                              f"{fmt(100 * ov / a if ov is not None and a else None, 1)} |")
+    # RQ1: INV-1 per final real run (from runs.md, which finalize_run.py fills after the gate passed)
+    runs_md = Path(__file__).resolve().parents[2] / "docs" / "report" / "stage2" / "runs.md"
+    rows = [[c.strip() for c in x.strip().strip("|").split("|")] for x in runs_md.read_text().splitlines()
+            if x.startswith("| s2-")]
+    real = [r for r in rows if r[2] == "real"]
+    by_method = {}
+    for r in real:
+        by_method.setdefault(r[9].split(":")[0], []).append(r)
+    lines += ["", "### RQ1 — INV-1 for every final real run", "",
+              f"{len(real)} real runs finalized; methods: " + ", ".join(f"{k} {len(v)}" for k, v in by_method.items())
+              + f"; max inv1_max_diff over all: {max((float(r[10]) for r in real if r[10] not in ('-', '')), default=0.0):.3g}.",
+              "", "| run | exp | method | max abs diff |", "|---|---|---|---|"]
+    lines += [f"| {r[0]} | {r[1]} | {r[9]} | {r[10]} |" for r in real]
     Path(args.out).write_text("\n".join(lines) + "\n")
     print(f"wrote {args.out}")
     return 0
