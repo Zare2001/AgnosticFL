@@ -1,0 +1,7 @@
+# Diagnostic (not a final run, not uploaded): s2-e6c-fedavgm diverged at fraction 0.5 with the S3 server
+# step (eta 1.0, beta 0.9). Same config with eta 0.3, in hub.sim, to see whether the step size is the cause.
+extends: ../stage2/e6/s2-e6c-fedavgm.yaml
+name: diag-e6c-fedavgm-eta0.3
+experiment: DIAG
+aggregator: {name: fedavgm, params: {eta: 0.3, beta: 0.9}}
+runs_dir: ~/flhub-runtime/runs-dev
