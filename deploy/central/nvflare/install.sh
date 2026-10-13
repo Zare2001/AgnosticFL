@@ -19,7 +19,7 @@ bash "$HERE/provision.sh"
 mkdir -p "$NVF_JOBS" "$NVF_LOGS"
 rm -rf "${NVF_JOBS:?}/flhub-relay"
 n_sites=$(wc -w <<<"$NVF_SITES")
-job_dir=$("$PY" -m adapters.nvflare.job --out "$NVF_JOBS" \
+job_dir=$("$PY" -m adapters.nvflare.job --out "$NVF_JOBS" --hub-url "$NVF_HUB_URL" \
   --adapter-url "http://127.0.0.1:$NVF_ADAPTER_PORT" --min-clients "$n_sites")
 echo "install: relay job folder $job_dir"
 echo "install: OK"
