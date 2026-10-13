@@ -1,4 +1,4 @@
-# Configuration of the final runs (PROJECT_PLAN.md §6 P3). FROZEN once announced on the bus.
+# Configuration of the final runs (PROJECT_PLAN.md §6 P3). FROZEN 2026-10-13 (P3 freeze, announced on the bus).
 #   mixed-6sites          python -m hub.orchestrator run --config configs/final.yaml --name mixed-6sites
 #   nvflare-only (etc.)   python -m hub.orchestrator run --config configs/final.yaml --only nvflare --name nvflare-only
 #   sim-fedavg-reference  python -m hub.sim --config configs/final.yaml

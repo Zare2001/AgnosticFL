@@ -1,0 +1,40 @@
+{
+ "run_a": "/home/zpalanciya/flhub-runtime/runs/mixed-p2-20261013T125018Z",
+ "run_b": "/home/zpalanciya/flhub-runtime/runs/sim-mixed-p2-20261013T125046Z",
+ "rounds": 3,
+ "weight_tol": 1e-05,
+ "acc_tol_pp": 0.1,
+ "max_abs_diff_all_rounds": 0.0,
+ "final_test_acc_a": 0.625,
+ "final_test_acc_b": 0.625,
+ "final_acc_diff_pp": 0.0,
+ "weights_pass": true,
+ "metric_pass": true,
+ "pass": true,
+ "per_round": [
+  {
+   "round": 0,
+   "max_abs_diff": 0.0,
+   "test_acc_a": 0.625,
+   "test_acc_b": 0.625
+  },
+  {
+   "round": 1,
+   "max_abs_diff": 0.0,
+   "test_acc_a": 0.625,
+   "test_acc_b": 0.625
+  },
+  {
+   "round": 2,
+   "max_abs_diff": 0.0,
+   "test_acc_a": 0.625,
+   "test_acc_b": 0.625
+  },
+  {
+   "round": 3,
+   "max_abs_diff": 0.0,
+   "test_acc_a": 0.625,
+   "test_acc_b": 0.625
+  }
+ ]
+}
