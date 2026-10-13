@@ -1,0 +1,19 @@
+{
+ "variant": "organamnist-fwcorr",
+ "dataset": "organamnist",
+ "pid": "fwcorr",
+ "definition": "framework-correlated skew: per class framework shares ~ Dirichlet(0.3 1_3), IID halves inside",
+ "partition_seed": 2026,
+ "dataset_sha256": "7c8c8b0753e2c0d7f70928817eac02be7cbb09f6beff4346e9d0ea79ecb598bd",
+ "num_classes": 11,
+ "class_names": ["bladder", "femur-left", "femur-right", "heart", "kidney-left", "kidney-right", "liver", "lung-left", "lung-right", "pancreas", "spleen"],
+ "total": 34561,
+ "sites": {
+  "nvf-h1": {"n": 3219, "label_hist": [656, 197, 203, 184, 162, 479, 1, 52, 155, 1109, 21], "sha256": "edde29adbff4d063b119f005d72d87e82bd2732c8306439601b2e686372bd634", "fingerprint": "a0f22e791b7082e1541f6596305d1169e1390c78b29cbb9c190703c81a66e216", "file": "organamnist-fwcorr-nvf-h1.csv"},
+  "nvf-h2": {"n": 3218, "label_hist": [657, 197, 203, 183, 162, 479, 1, 51, 155, 1108, 22], "sha256": "4df2f51702356690cedef83664149a7cd6d008161958ee4df69df03ebd507885", "fingerprint": "971d8c0bd116a7bab282d3093d8c309da9fff36776cb11639d86a3c81a4e6532", "file": "organamnist-fwcorr-nvf-h2.csv"},
+  "v6-h3": {"n": 9076, "label_hist": [210, 199, 472, 0, 743, 1145, 2946, 22, 1692, 397, 1250], "sha256": "117da79a41c6c2feaeb8b6ffd22d50e32c124e4b91561a300b95a84178927fa5", "fingerprint": "b8da2a907436c65e57e8d945cafe9724115aac5ec94cd5d872df5e41504d1a12", "file": "organamnist-fwcorr-v6-h3.csv"},
+  "v6-h4": {"n": 9075, "label_hist": [210, 198, 472, 0, 743, 1144, 2947, 21, 1692, 397, 1251], "sha256": "81130b86aee27986363cde3c6c39e2566c86ce8b1b285b3e6a2d074f6d461b32", "fingerprint": "d1cc954453baa31fd7ccd388d65fae0b7ad4ecf51589b0771cc8dfbefe4f750a", "file": "organamnist-fwcorr-v6-h4.csv"},
+  "flw-h5": {"n": 4985, "label_hist": [111, 300, 3, 554, 1076, 285, 134, 1887, 117, 10, 508], "sha256": "59842d901d3304f1c9a44abbd8c61d60424fcee7c1fd9987e386ecd90478dc23", "fingerprint": "9239b02cb4b9678d395653456db21642f1ad22c39999b6cdb488c3de1d305249", "file": "organamnist-fwcorr-flw-h5.csv"},
+  "flw-h6": {"n": 4988, "label_hist": [112, 299, 4, 553, 1077, 285, 135, 1886, 118, 10, 509], "sha256": "4b578c3658f4cf198b97441b4c536348b2d59ceac8b1b6755b76a549a6122511", "fingerprint": "7d5ad23ada8f51922130103f5c08ddcb8427caba90d3523ed6286b061477d398", "file": "organamnist-fwcorr-flw-h6.csv"}
+ }
+}

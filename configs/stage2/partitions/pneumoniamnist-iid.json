@@ -1,0 +1,19 @@
+{
+ "variant": "pneumoniamnist-iid",
+ "dataset": "pneumoniamnist",
+ "pid": "iid",
+ "definition": "stratified random split, equal sizes",
+ "partition_seed": 2026,
+ "dataset_sha256": "e1792d3f03751cb101e99f19a63b3c1941436c988665f47853417b05be250cd8",
+ "num_classes": 2,
+ "class_names": ["normal", "pneumonia"],
+ "total": 4708,
+ "sites": {
+  "nvf-h1": {"n": 785, "label_hist": [192, 593], "sha256": "9956007981524bd843c6bcd8c6424b6a3893e6216c82623c627346cbbbd071fe", "fingerprint": "5d435ddef9abfa7418c981681cac084766bf4be347b85bd3ef0dafaf6b740b00", "file": "pneumoniamnist-iid-nvf-h1.csv"},
+  "nvf-h2": {"n": 785, "label_hist": [216, 569], "sha256": "728c1ae41186210e6eb54a3fdf59d30e4705c4292140de15924e5a497aa36f22", "fingerprint": "70eb16d8259aad89df8e5f9d86c918b5a48d7532c44d8348f3da121867eddab2", "file": "pneumoniamnist-iid-nvf-h2.csv"},
+  "v6-h3": {"n": 785, "label_hist": [218, 567], "sha256": "93e2067524e750c9d728690c56b267d938472c5ccecfaa49146289d93c27cce0", "fingerprint": "b6ce9e2a446386b0a78f3bcf3d8b46dd91d053b6e1397c925330e1bbc5c030b9", "file": "pneumoniamnist-iid-v6-h3.csv"},
+  "v6-h4": {"n": 785, "label_hist": [201, 584], "sha256": "3d14269d3abd1ff4b84183c58b241c0b33fa4e8e8ef25f4f34e077ede0798df3", "fingerprint": "f80568024c3591f9047feb98acaba49240d347d2f6b9dfbbbc282aae67b958c3", "file": "pneumoniamnist-iid-v6-h4.csv"},
+  "flw-h5": {"n": 784, "label_hist": [193, 591], "sha256": "44dc0771ad147dfcd346f28abf62e23799de61fd2d672a8c59265245181b7da5", "fingerprint": "d9f0ec1c0eb3e4aa6f0fa7fc1f14b4bf5f73eed758eeb6896d61427e4c34023a", "file": "pneumoniamnist-iid-flw-h5.csv"},
+  "flw-h6": {"n": 784, "label_hist": [194, 590], "sha256": "9b4ba56df945e3fc41bcb53f6ad80498c563e76757ac98faa071d01c5206083a", "fingerprint": "7d6a83bb1b47504626f817dab9b6b902386b0abe96d6af8d84dd43e107e8b070", "file": "pneumoniamnist-iid-flw-h6.csv"}
+ }
+}

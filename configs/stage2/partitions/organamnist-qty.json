@@ -1,0 +1,19 @@
+{
+ "variant": "organamnist-qty",
+ "dataset": "organamnist",
+ "pid": "qty",
+ "definition": "IID labels (stratified), sizes 1:32:2:16:4:8 (nvf-h1..flw-h6)",
+ "partition_seed": 2026,
+ "dataset_sha256": "7c8c8b0753e2c0d7f70928817eac02be7cbb09f6beff4346e9d0ea79ecb598bd",
+ "num_classes": 11,
+ "class_names": ["bladder", "femur-left", "femur-right", "heart", "kidney-left", "kidney-right", "liver", "lung-left", "lung-right", "pancreas", "spleen"],
+ "total": 34561,
+ "sites": {
+  "nvf-h1": {"n": 549, "label_hist": [31, 22, 22, 23, 63, 61, 98, 62, 62, 48, 57], "sha256": "69125e29fe0d675e920b79d635448ca4b276bd649b4cda25eb26af1556164c16", "fingerprint": "183fe9caf6de8e3232375a7747f35266c68489a61729f3878e1b6dadf917fe36", "file": "organamnist-qty-nvf-h1.csv"},
+  "nvf-h2": {"n": 17555, "label_hist": [994, 706, 689, 749, 2012, 1939, 3131, 1991, 1995, 1540, 1809], "sha256": "da853e124ca57df3edf7a46d6ffed547ea3c0d5f3572aec1c2fffbdc58271966", "fingerprint": "1ac9d7dd07ebed4a66de81f7cf3dacb82ef2509c578968613d4d721a11843900", "file": "organamnist-qty-nvf-h2.csv"},
+  "v6-h3": {"n": 1097, "label_hist": [62, 44, 43, 47, 126, 121, 196, 124, 125, 96, 113], "sha256": "6554f2c1ac7c957b5dae9520f874718f72d9f62c9db7dcdb3d4443b8049b1916", "fingerprint": "f9762608a1a25f35ce3c2417b6c4c84de2fc948dd9b84356b943d2c3aee09064", "file": "organamnist-qty-v6-h3.csv"},
+  "v6-h4": {"n": 8777, "label_hist": [497, 353, 344, 375, 1006, 970, 1565, 995, 998, 770, 904], "sha256": "d8f9e7b8e2d66ef022c81a93097ca6de8e99b53d3fbefd06e0ba20fc18269e76", "fingerprint": "45ba216dee730e761ae1ab352ee31f4b262d523fd38b55136667d5faa99108f2", "file": "organamnist-qty-v6-h4.csv"},
+  "flw-h5": {"n": 2194, "label_hist": [124, 88, 87, 93, 252, 242, 391, 249, 250, 192, 226], "sha256": "e6d9cbef090564a2bf62288ba65b83571a3f9b28bc77ba6a8d791186098603d7", "fingerprint": "dfd9f1bbeb6512f7b8b9f5ae856ff108861e00f7c8b577f84d23fe4a7ecb5dcc", "file": "organamnist-qty-flw-h5.csv"},
+  "flw-h6": {"n": 4389, "label_hist": [248, 177, 172, 187, 504, 484, 783, 498, 499, 385, 452], "sha256": "58d927ca03a1fe6c63b3166a5c4201f3d8e9194e4527eb39c0e586fecf6b6a57", "fingerprint": "25952c7529fcf209a2f947896ffb9079d9f4babd1ad3feda4efef63351d62ff2", "file": "organamnist-qty-flw-h6.csv"}
+ }
+}

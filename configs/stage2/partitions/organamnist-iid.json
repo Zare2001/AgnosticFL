@@ -1,0 +1,19 @@
+{
+ "variant": "organamnist-iid",
+ "dataset": "organamnist",
+ "pid": "iid",
+ "definition": "stratified random split, equal sizes",
+ "partition_seed": 2026,
+ "dataset_sha256": "7c8c8b0753e2c0d7f70928817eac02be7cbb09f6beff4346e9d0ea79ecb598bd",
+ "num_classes": 11,
+ "class_names": ["bladder", "femur-left", "femur-right", "heart", "kidney-left", "kidney-right", "liver", "lung-left", "lung-right", "pancreas", "spleen"],
+ "total": 34561,
+ "sites": {
+  "nvf-h1": {"n": 5761, "label_hist": [326, 232, 226, 246, 660, 637, 1027, 653, 655, 505, 594], "sha256": "27b10d37b6b44efd8b958b654cf05c3f501861ab93ceb1e532e812e0c6a62459", "fingerprint": "19a91b53c7d24b632ddea3e989925b66f5d79cf3f1c5770d923ae6daf638939f", "file": "organamnist-iid-nvf-h1.csv"},
+  "nvf-h2": {"n": 5760, "label_hist": [326, 232, 226, 246, 660, 636, 1028, 653, 655, 505, 593], "sha256": "720a9206ba393b4fa0415bfc3afef3cb6e567295fe9918c7e20c884810cb8a40", "fingerprint": "eb95f1133484ef75f36d66ea1ee7fdf0c4a290f736627b3696bf1342b8ca13bc", "file": "organamnist-iid-nvf-h2.csv"},
+  "v6-h3": {"n": 5760, "label_hist": [326, 232, 226, 246, 660, 636, 1028, 653, 655, 505, 593], "sha256": "58f98fed1c3b64b4bd05c8de65f52fa8388091494249d3fa4efd1c55c0c7440d", "fingerprint": "0eb45d4d7d4b21474ec22f7b1263f1059285010931fa2cce677562e008c0afab", "file": "organamnist-iid-v6-h3.csv"},
+  "v6-h4": {"n": 5760, "label_hist": [326, 232, 226, 245, 661, 636, 1027, 654, 654, 506, 593], "sha256": "16429d1fa9a8fbad47fbcc64551209e7cbe5ead5e76b7151724c52f60eff04f2", "fingerprint": "fbd8b854cefb71b761e65b613f595ca52d0d563d1bea996da1dffdd32f77a3c8", "file": "organamnist-iid-v6-h4.csv"},
+  "flw-h5": {"n": 5760, "label_hist": [326, 231, 227, 245, 661, 636, 1027, 653, 655, 505, 594], "sha256": "beea1cbb72b477f317f94371e76ef83c5f509390498c635ac95a720b6bcf9f5f", "fingerprint": "8fb81add7478fe4050156fb17ec370d6c48822f438ddb3f131b1f1457e787639", "file": "organamnist-iid-flw-h5.csv"},
+  "flw-h6": {"n": 5760, "label_hist": [326, 231, 226, 246, 661, 636, 1027, 653, 655, 505, 594], "sha256": "ee0c6e6f6b1b7032f0d14d9f7d144854f4ee8f6ca02b5189deda80850d0eb294", "fingerprint": "3c2887db9a3cb747316bc4b700ca0c7b6ef36b54164855c267036f2758d8c55f", "file": "organamnist-iid-flw-h6.csv"}
+ }
+}

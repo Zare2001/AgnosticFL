@@ -1,0 +1,25 @@
+{
+ "variant": "organamnist-iid12",
+ "dataset": "organamnist",
+ "pid": "iid12",
+ "definition": "stratified random split over 12 sites, equal sizes",
+ "partition_seed": 2026,
+ "dataset_sha256": "7c8c8b0753e2c0d7f70928817eac02be7cbb09f6beff4346e9d0ea79ecb598bd",
+ "num_classes": 11,
+ "class_names": ["bladder", "femur-left", "femur-right", "heart", "kidney-left", "kidney-right", "liver", "lung-left", "lung-right", "pancreas", "spleen"],
+ "total": 34561,
+ "sites": {
+  "nvf-h1": {"n": 2881, "label_hist": [163, 116, 113, 123, 330, 319, 513, 327, 327, 253, 297], "sha256": "69a1032b28373843201d033b12ec1daed8ba7414f8c15379576ff59331606eee", "fingerprint": "d4f4a7404c967be9dc88c2aadd4ddbd724f6733a5b07fe94e8793438ddc6cc35", "file": "organamnist-iid12-nvf-h1.csv"},
+  "nvf-h2": {"n": 2880, "label_hist": [163, 116, 113, 123, 330, 318, 514, 327, 327, 253, 296], "sha256": "1054ccb2cfdd1c8955b2dc05c37db92216e36d271ff0b8ba9455285ba39cb097", "fingerprint": "603cb5bdbaad25049cfd2d1bd54a79344025703821fbf84948e697ea1b7e09ea", "file": "organamnist-iid12-nvf-h2.csv"},
+  "v6-h3": {"n": 2880, "label_hist": [163, 116, 113, 123, 330, 318, 514, 327, 327, 253, 296], "sha256": "f12b27d537b14505e11a2632074e4a5a83405bc073d72d85d4d0c52ba7565f31", "fingerprint": "391b71fd99d2b6e89bf3d795cdeae7e22fdc060641f82907e875ad94a3d8efb4", "file": "organamnist-iid12-v6-h3.csv"},
+  "v6-h4": {"n": 2880, "label_hist": [163, 116, 113, 123, 330, 318, 514, 327, 327, 253, 296], "sha256": "eb46f2ae4cca54aebeb5eb994b408bf9dd1eb0f7a5b6c01e6fb8927556758017", "fingerprint": "b4fab767f327c844a28a083e91107cd7d01bdc6618805d76001f31a7e6794c01", "file": "organamnist-iid12-v6-h4.csv"},
+  "flw-h5": {"n": 2880, "label_hist": [163, 116, 113, 123, 330, 318, 514, 326, 328, 252, 297], "sha256": "84838e23921809d0989d22ab0fedae0d440a229ea830e358ef96945e3e466f95", "fingerprint": "10aa5f23e4b14efe9a208fd0825a18dedafae14103ca338a8ba70c2ecbfebf89", "file": "organamnist-iid12-flw-h5.csv"},
+  "flw-h6": {"n": 2880, "label_hist": [163, 116, 113, 123, 330, 318, 514, 326, 328, 252, 297], "sha256": "18eafe98fde1940b2b2a4c6042517712f74ffb76e87749d74bab6f0e5e6d98eb", "fingerprint": "b55f67e2b42cb5f18ac8b6e3ed0e5114ced217bf13189f0be03e2125d789b49a", "file": "organamnist-iid12-flw-h6.csv"},
+  "nvf-h7": {"n": 2880, "label_hist": [163, 116, 113, 123, 330, 318, 514, 326, 328, 252, 297], "sha256": "f11e02c5f6125dcb5032f6fff8527d48ec48f1d2f631b1491c4cde8b22ea4fa0", "fingerprint": "7da84db3c4deaef809691e4b471b54c49b770617767aa4844d2e8fc9d4a56ce2", "file": "organamnist-iid12-nvf-h7.csv"},
+  "nvf-h8": {"n": 2880, "label_hist": [163, 116, 113, 123, 330, 318, 514, 326, 328, 252, 297], "sha256": "8dc5c9dd4d659bab510a41169e9b0e5a29c91f8ca786c08958a4f70c7bfa0e22", "fingerprint": "8862c47fb34f983b130d3b59f9dae9057e8385b57b74f0d14fba6dbfcdbdc9fb", "file": "organamnist-iid12-nvf-h8.csv"},
+  "v6-h9": {"n": 2880, "label_hist": [163, 116, 113, 123, 330, 318, 514, 326, 328, 252, 297], "sha256": "022a6567a51a37000c2d2abd90dded72aa4ad71fd59a905de46abb4eeb8891b0", "fingerprint": "d0667e6e25897d2ef1e2794239c53873ea5585cf3df8c9c12992c5415272ee6a", "file": "organamnist-iid12-v6-h9.csv"},
+  "v6-h10": {"n": 2880, "label_hist": [163, 116, 113, 122, 331, 318, 513, 327, 327, 253, 297], "sha256": "08f075854d5d3e48cf0c8756b43b20e55a1a79eef428e1f84199942e50fbc5f3", "fingerprint": "e02fd4e9a1b1730b51a9c1acbd068fc54fcc61225801859c283eb6bd39b9b3fc", "file": "organamnist-iid12-v6-h10.csv"},
+  "flw-h11": {"n": 2880, "label_hist": [163, 115, 114, 122, 331, 318, 513, 327, 327, 253, 297], "sha256": "9c69e2474734774c55a2c78b9e1408491ccfbde08c0b6f0707f6f6fd0bf07df4", "fingerprint": "a3b1b0922ba98beda92683079aa180db3d6c6307556c1037680d2c59815b56b7", "file": "organamnist-iid12-flw-h11.csv"},
+  "flw-h12": {"n": 2880, "label_hist": [163, 115, 113, 123, 331, 318, 513, 327, 327, 253, 297], "sha256": "47b3b3eea3699c5fef2dd2b2221ada18534f32de1aed36906ca8f31ec9698e97", "fingerprint": "dce261d237a0fcd981d92f5a812281b36a24e55f3b0f7b0d2326b7f7852988f2", "file": "organamnist-iid12-flw-h12.csv"}
+ }
+}

@@ -1,0 +1,19 @@
+{
+ "variant": "organamnist-mix",
+ "dataset": "organamnist",
+ "pid": "mix",
+ "definition": "dir0.3 proportions q_k with the qty sizes",
+ "partition_seed": 2026,
+ "dataset_sha256": "7c8c8b0753e2c0d7f70928817eac02be7cbb09f6beff4346e9d0ea79ecb598bd",
+ "num_classes": 11,
+ "class_names": ["bladder", "femur-left", "femur-right", "heart", "kidney-left", "kidney-right", "liver", "lung-left", "lung-right", "pancreas", "spleen"],
+ "total": 34561,
+ "sites": {
+  "nvf-h1": {"n": 549, "label_hist": [0, 0, 0, 0, 0, 1, 548, 0, 0, 0, 0], "sha256": "faf0217c015ca208271a018437028d3e8087f36666c7be037fc3d3e5f0fb94a9", "fingerprint": "846d2cd350f8d08498e490cc64b4f7abde03ded44fb5d1622d9c17bce737e61c", "file": "organamnist-mix-nvf-h1.csv"},
+  "nvf-h2": {"n": 17555, "label_hist": [241, 0, 0, 0, 3963, 3816, 5616, 3919, 0, 0, 0], "sha256": "515005d68d59143e2255b7b2d674537dd7cc8b2fccd94081457e46290bf414d5", "fingerprint": "fd4e4f5ec3762b680dd5edc24f26cdbf19d7a93a05a8458ad579fd9686c915c8", "file": "organamnist-mix-nvf-h2.csv"},
+  "v6-h3": {"n": 1097, "label_hist": [0, 0, 0, 1074, 0, 0, 0, 0, 0, 1, 22], "sha256": "3a763858067bc6aa5d63b604b2736b98c749404acf9a88a07320ffc489b5b2e2", "fingerprint": "4904b23dcf3564d08f744bf7704fc5c784d0e0c7c0bfa92fd057903d38480af6", "file": "organamnist-mix-v6-h3.csv"},
+  "v6-h4": {"n": 8777, "label_hist": [0, 1390, 0, 400, 0, 0, 0, 0, 418, 3030, 3539], "sha256": "f9b3d86e13138a15c770f57fe7309f8c01033f8b3ff9e7dfdcbb4c51360ffc6a", "fingerprint": "cf389e7706caefd26aafaf53e689d3d9956b04ad630523814c086acff4646860", "file": "organamnist-mix-v6-h4.csv"},
+  "flw-h5": {"n": 2194, "label_hist": [1715, 0, 0, 0, 0, 0, 0, 0, 479, 0, 0], "sha256": "f8a76f081be7e3aa4df9c12ce6a849ec3c0d1a1c1ad0aac6440382026d11b193", "fingerprint": "bda915e58612cc91603bf641647e7aa5fe9db8fb4d57cc9669dcdcb11f68c313", "file": "organamnist-mix-flw-h5.csv"},
+  "flw-h6": {"n": 4389, "label_hist": [0, 0, 1357, 0, 0, 0, 0, 0, 3032, 0, 0], "sha256": "d9dc32386c6c0a01553c5457fc320c88ade12d335cdff349ed0d6b5d6f38084f", "fingerprint": "4b9095a35e8247260c114b790947b0e61a8ff1741b5e47d5a2edd1a6d930e6ca", "file": "organamnist-mix-flw-h6.csv"}
+ }
+}
