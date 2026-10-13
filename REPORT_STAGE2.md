@@ -105,7 +105,30 @@ Data provisioning (all frameworks) is a data-only step: `python -m flhub_core.da
 
 ## 5. RQ3 — Learning under heterogeneity (E1, E2, E3)
 
-*(pending)*
+All learning results use OrganAMNIST, `cnn-small`, 1 local epoch, batch 64, client lr 0.1, 50 rounds, and the official test split (17,778 images). Seed 2026 runs on the real system; seeds 2027 and 2028 run in `hub.sim` only, which is valid because every real seed-2026 run is hash-identical to its simulation (§3). "Worst-site" is the site-shaped accuracy: the per-class test accuracies weighted by each site's training label histogram; rounds-to-target is the first round with test accuracy ≥ 0.95 × the centralized accuracy (0.95 × 84.7 % = 80.5 %).
+
+### 5.1 E1 — data heterogeneity (FedAvg)
+
+![e1](docs/report/stage2/figures/e1_accuracy_vs_round.png)
+
+| partition | final test acc % | mean of last 5 rounds % | balanced acc % | macro AUC % | worst-site acc % | rounds to target |
+|---|---|---|---|---|---|---|
+| iid | 83.8 ± 0.4 | 83.5 ± 0.5 | 82.8 ± 0.5 | 98.2 ± 0.1 | 84.2 ± 0.4 | 16 |
+| qty | 84.3 ± 0.9 | 83.4 ± 0.6 | 83.1 ± 0.8 | 98.2 ± 0.3 | 84.7 ± 0.9 | 12 |
+| fwcorr | 82.9 ± 0.5 | 83.3 ± 0.7 | 81.7 ± 0.8 | 98.0 ± 0.1 | 78.5 ± 0.4 | 20 |
+| dir1.0 | 76.7 ± 4.7 | 78.9 ± 0.4 | 75.7 ± 5.3 | 96.7 ± 1.0 | 63.8 ± 12.5 | not reached |
+| dir0.3 | 78.0 ± 0.9 | 77.6 ± 0.5 | 77.4 ± 1.0 | 96.8 ± 0.3 | 57.2 ± 2.7 | not reached |
+| dir0.1 | 74.7 ± 2.0 | 74.2 ± 2.4 | 73.3 ± 2.5 | 96.0 ± 0.6 | 60.5 ± 3.8 | not reached |
+| mix | 75.4 ± 2.4 | 73.4 ± 0.8 | 72.6 ± 3.4 | 96.1 ± 1.0 | 63.6 ± 7.4 | not reached |
+
+References: centralized training on the pooled split reaches 84.7 % (balanced 83.0 %, AUC 98.1 %); each site alone for 50 epochs reaches on average 69.2 % on `iid` and 26.3 % on `dir0.1`.
+
+- **Label skew is what hurts.** Site-level label skew costs FedAvg 6–9 pp of test accuracy and 25–30 pp on the worst site, and none of these partitions reaches the target within 50 rounds. The final-round accuracy also swings between seeds (dir1.0: ± 4.7 pp) and over rounds (single-round dips of up to 45 pp at lr 0.1), so the mean of the last five rounds is the steadier summary.
+- **Quantity skew alone costs nothing.** With IID labels, sizes 1:32:2:16:4:8 reach the same accuracy as `iid` and the target 4 rounds earlier: the largest site (17,555 images, 51 % of the FedAvg weight) takes 274 local steps per round.
+- **Framework-correlated skew is mild here.** When the class mix differs between frameworks but the two sites of a framework are IID halves (`fwcorr`), FedAvg loses about 1 pp overall and 6 pp on the worst site. Every site still sees most classes (figure in §2.4), unlike the Dirichlet partitions, where a site holds 2–4 classes. So skew that follows framework boundaries is not worse than skew between sites.
+- Federating pays: even the worst skew (`dir0.1`, 74.7 %) is far above training alone on the same data (26.3 %).
+
+*(pending: E2, E3)*
 
 ## 6. RQ4 — Performance (E3, E4, E5, E7)
 
