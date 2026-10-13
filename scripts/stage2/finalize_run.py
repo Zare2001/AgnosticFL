@@ -117,13 +117,18 @@ def gate(rd: RunDir, args, cfg: dict, summary: dict) -> dict:
     raise GateFailed(f"unknown mode {mode}")
 
 
+def frozen_sha() -> str | None:
+    p = Path.home() / "flhub-runtime" / "frozen_sha"
+    return p.read_text().split()[0] if p.exists() else None
+
+
 def wandb_config(cfg: dict) -> dict:
     keep = ("run_name", "kind", "mode", "experiment", "train_config", "rounds", "model_seed", "dataset",
             "dataset_sha256", "data_variant", "partition_manifest_sha256", "partition_sizes", "model", "model_params",
             "aggregator", "participation", "deadline_s", "round_retries", "netem", "sites", "framework_versions",
             "protocols", "protocol", "git_sha", "git_dirty", "flhub_core_version", "torch_version", "python_version",
             "deploy_versions", "config_file")
-    return {k: cfg[k] for k in keep if k in cfg}
+    return {**{k: cfg[k] for k in keep if k in cfg}, "frozen_sha": frozen_sha()}
 
 
 def tags_for(cfg: dict, exp: str, mode: str, extra: list[str]) -> list[str]:
