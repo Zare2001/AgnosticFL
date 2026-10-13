@@ -35,3 +35,11 @@ Newest entries at the bottom. Format: `### <UTC timestamp> — <phase> — <titl
 - `python -m hub.orchestrator run --config deploy/central/nvflare/island-3r.yaml --wandb offline` -> finished, 3 rounds x 2 sites, 3-4 s per round, test acc 0.625 (run dir ~/flhub-runtime/runs/nvflare-island-3r-20261013T123046Z).
 - `python -m hub.sim` with the same config + `scripts/equivalence_check.py` -> max abs weight diff 0.000e+00 in rounds 0-3, acc diff 0.0 pp: EQUIVALENCE PASS.
 - P1 criteria met: conformance 7/7, 3-round island run, idempotent scripts (central: install/start/stop/status, VM: install/start/stop/status). Next: deploy-request to central.
+
+### 2026-10-13T12:39Z — P2 — hospitals switched to central; M2-nvflare (central)
+- deploy-request b19f888 (bus #25) -> deploy-result PASS (bus #29): central ran deploy/central/nvflare/install.sh + start.sh at e586fc4; server flhub-central (0.0.0.0:8002, admin 8003 closed in the cloud firewall), adapter 127.0.0.1:8811, relay job 9e4f07a2. Kits arrived encrypted (bus files #1, #2).
+- Switch on this VM: island server/adapter/hub core stopped; `rm -rf ~/venvs/nvflare && deploy/nvflare-vm/install.sh` -> hospital venv has only nvflare 2.9.0, torch 2.14.1+cpu, numpy 2.4.4, safetensors 0.8.0, flhub_core; kits -> ~/flhub-runtime/nvflare/sites/<site>, archives deleted; `deploy/nvflare-vm/start.sh` -> both registered; status.sh: connected to flhub-central:8002 = 145.38.205.58, 1 job process each. 8003 not reachable from here (good).
+- Bug fixed on the way (870de71): start.sh exited silently on a fresh kit (`cat log.txt | wc -l` under pipefail); registration check now one awk (no SIGPIPE false negatives).
+- M2-nvflare (central, bus #36): conformance 7/7 vs central :8811 (diff 0.0 rounds 1, 2, 4); `hub.orchestrator --only nvflare --rounds 3 --name nvflare-p2` == hub.sim (diff 0.0).
+- Island leftovers removed (island provisioning incl. its keys, prototype, island hub core, offline wandb dirs). `~/venvs/hub` (island-only) still present; remove before DONE.
+- Next: keep clients up for mixed + final runs; watch logs; report section docs/report/nvflare.md.
