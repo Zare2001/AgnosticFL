@@ -18,7 +18,7 @@ Schema 2 (stage-2 PLAN.md §4.3):
     deadline_s: 1800
     round_retries: 1
     eval: {every: 1, site_shaped: true, split: test, threads: 1}
-    retention: {keep_every: 10, blobs: rolling}
+    retention: {keep_every: 10, blobs: rolling, checkpoints: all}   # checkpoints: latest = payload runs
     wandb: {group: E1, tags: [...]}
     netem: none
 

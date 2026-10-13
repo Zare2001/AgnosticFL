@@ -224,6 +224,9 @@ class Runner:
             rd.event("sites_dropped", round=rnd, dropped=outcome.dropped)
         if self.hub and cfg.retention.get("blobs") == "rolling":
             self._gc_blobs(model_ref, updates)
+        if cfg.retention.get("checkpoints") == "latest" and rnd > 1:
+            # payload runs: the hashes in metrics.jsonl suffice for INV-1; keep only what resume needs
+            rd.apply_retention({0, rnd})
         acc = m.get("global/test_acc", m.get("global/val_acc"))
         log.info("round %d/%d | %d/%d sites | %.1fs | agg %.2fs eval %.1fs%s", rnd, cfg.rounds, len(updates),
                  len(participants), outcome.duration, agg_s, eval_s, "" if acc is None else f" | acc {acc:.4f}")
