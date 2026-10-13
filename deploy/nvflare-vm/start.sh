@@ -17,7 +17,9 @@ for site in "${sites[@]}"; do
     continue
   fi
   rm -f "$ws/shutdown.fl"
-  log_from[$site]=$(( $(cat "$ws/log.txt" 2>/dev/null | wc -l) + 1 ))
+  lines=0
+  if [ -f "$ws/log.txt" ]; then lines=$(wc -l < "$ws/log.txt"); fi
+  log_from[$site]=$((lines + 1))
   (cd "$ws" && FLHUB_DATA_PATH="$FLHUB_DATA_DIR/$site.csv" setsid nohup bash startup/start.sh \
     > "$ws/start.out" 2>&1 < /dev/null &)
   echo "start: $site starting (data $FLHUB_DATA_DIR/$site.csv)"
@@ -25,7 +27,10 @@ done
 
 for site in "${sites[@]}"; do
   ws="$NVF_SITES_DIR/$site"
-  registered() { tail -n "+${log_from[$site]}" "$ws/log.txt" 2>/dev/null | grep -q "Successfully registered client"; }
+  registered() {  # one awk instead of tail | grep -q, which can fail on SIGPIPE under pipefail
+    awk -v from="${log_from[$site]}" 'NR >= from && /Successfully registered client/ {ok = 1} END {exit !ok}' \
+      "$ws/log.txt" 2>/dev/null
+  }
   for _ in $(seq 1 60); do registered && break; sleep 1; done
   if registered; then
     echo "start: $site registered with the NVFlare server"
