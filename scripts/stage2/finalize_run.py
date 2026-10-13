@@ -112,8 +112,13 @@ def gate(rd: RunDir, args, cfg: dict, summary: dict) -> dict:
             worst = max(worst, d)
         if not per_round:
             raise GateFailed("no common round checkpoints with the hub run")
-        rd.write_json("native_vs_hub.json", {"hub_run": str(hub.path), "per_round": per_round, "max": worst})
-        return {"inv1_method": "native", "native_vs_hub_max_diff": worst, "inv1_max_diff": None, "inv1_pass": True}
+        # payload hub runs keep only the latest checkpoint; the per-round global hashes cover every round
+        common = sorted(set(rd.recorded_rounds()) & set(hub.recorded_rounds()))
+        equal = [r for r in common if rd.record(r).get("global_ref") == hub.record(r).get("global_ref")]
+        rd.write_json("native_vs_hub.json", {"hub_run": str(hub.path), "per_round": per_round, "max": worst,
+                                             "rounds_compared_by_hash": common, "hash_equal_rounds": equal})
+        return {"inv1_method": "native", "native_vs_hub_max_diff": worst, "inv1_max_diff": None, "inv1_pass": True,
+                "native_vs_hub_hash_equal": f"{len(equal)}/{len(common)}"}
     raise GateFailed(f"unknown mode {mode}")
 
 
