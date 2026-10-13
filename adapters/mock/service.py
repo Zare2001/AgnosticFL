@@ -62,7 +62,8 @@ class MockAdapter(BaseAdapter):
         return not (task.cancelled or task.site_cancelled(site))
 
     def run_round(self, task, weights, client_config):
-        for site in task.sites:
+        # sites train one after another; hanging sites go last so that the others still finish
+        for site in sorted(task.sites, key=lambda s: s in self.hang):
             if task.cancelled:
                 raise FrameworkError("cancelled")
             if task.site_cancelled(site):

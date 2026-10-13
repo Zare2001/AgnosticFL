@@ -49,7 +49,8 @@ def test_load_config(tmp_path):
                  "  - {name: y, url: 'http://127.0.0.1:2', sites: [c]}\nwandb: {project: P, tags: [dev]}\n")
     cfg = load_config(p, rounds=5)
     assert cfg.rounds == 5 and cfg.sites == ["a", "b", "c"] and cfg.train_config["lr"] == 0.1
-    assert cfg.train_config["batch_size"] == 64 and cfg.wandb_project == "P" and cfg.tags == ["dev"]
+    assert cfg.train_config["batch_size"] == 64 and cfg.wandb["project"] == "P" and cfg.wandb["tags"] == ["dev"]
+    assert cfg.schema == 1 and set(cfg.train_config) == {"local_epochs", "batch_size", "lr", "momentum", "seed"}
     p.write_text("name: t\nadapters:\n  - {name: x, url: u, sites: [a]}\n  - {name: y, url: v, sites: [a]}\n")
     with pytest.raises(ValueError):
         load_config(p)
