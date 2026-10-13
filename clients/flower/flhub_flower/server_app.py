@@ -3,23 +3,28 @@
 One long-lived Flower run, started by the Flower adapter service with ``flwr run``. The
 loop long-polls the adapter for the next dispatched round (adapters.common.RelayClient),
 sends standard TRAIN messages with the global weights to the hospital SuperNodes through
-the ``Grid`` and posts the replies back. Weights move between the relay and the hub core
-by blob reference (PROTOCOL.md §4); the adapter builds the envelopes.
+the ``Grid`` and reports every site's reply back as soon as it arrives (flhub/0.2 per-site
+results). Weights move between the relay and the hub core by blob reference (PROTOCOL.md
+§4); the adapter builds the envelopes.
 
 SuperNode ids change whenever a SuperNode restarts, so the relay maps node ids to site ids
 by sending a QUERY message to every new node (answered by the ClientApp's ``@app.query()``
 handler with its ``site-id`` node config) and reports the mapped sites for ``discover``.
+A beat thread tells the adapter that this relay is alive, so a relay that died with its
+SuperLink is replaced quickly (adapters/flower/service.py).
 """
 
 from __future__ import annotations
 
 import json
 import logging
+import threading
 import time
 from typing import Any
 
 from adapters.common.hubclient import HubError, http_request
 from adapters.common.relay import RelayClient
+from flhub_core import code_version
 from flwr.app import ConfigRecord, Context, Message, MessageType, RecordDict
 from flwr.serverapp import Grid, ServerApp
 
@@ -39,24 +44,31 @@ app = ServerApp()
 
 NODE_REFRESH_S = 5.0  # how often online nodes are re-read from the SuperLink
 QUERY_RETRY_S = 30.0  # back-off for nodes that did not answer the site-info query
+SITE_WAIT_S = 60.0  # a site without a SuperNode gets this long (<= 1/4 of the deadline) to connect
 PULL_INTERVAL_S = 1.0
-HEARTBEAT_S = 10.0  # progress post + cancel check interval while a round runs
+HEARTBEAT_S = 5.0  # how often a running round asks the adapter which sites it still wants
+BEAT_S = 5.0  # liveness beat to the adapter, from its own thread (also during long transfers)
 ADAPTER_LOST_S = 600.0  # exit if the adapter is unreachable this long
+ACTIVE = ("queued", "running")
 
 
 class Relay:
     """Moves flhub rounds between the adapter service and the Flower Grid."""
 
     def __init__(self, grid: Grid, client: RelayClient, poll_timeout_s: float = 10.0,
-                 query_timeout_s: float = 60.0) -> None:
+                 query_timeout_s: float = 60.0, fab_id: str = "", run_id: int | None = None) -> None:
         self.grid = grid
         self.client = client
         self.poll_timeout_s = poll_timeout_s
         self.query_timeout_s = query_timeout_s
+        self.fab_id = fab_id
+        self.run_id = run_id
+        self.job_id: str | None = None  # round in progress, for the beat
         self.sites: dict[int, dict[str, Any]] = {}  # node_id -> site info
         self._pending: dict[str, tuple[int, float]] = {}  # query msg id -> (node_id, sent)
         self._query_failed: dict[int, float] = {}  # node_id -> retry-after time
         self._superseded: set[int] = set()  # nodes replaced by a newer node of the same site
+        self._orphans: dict[str, tuple[str, str, float]] = {}  # msg id -> (site, job, forget-after)
         self._last_refresh = float("-inf")
 
     # ---------------------------------------------------------------- node mapping
@@ -127,122 +139,104 @@ class Relay:
         self._query_failed.pop(nid, None)
         log.info("node %s serves site %s", nid, site)
 
-    def wait_for_sites(self, sites: list[str], timeout_s: float) -> None:
-        """Give pending site-info queries a moment when a job needs an unmapped site."""
-        end = time.monotonic() + timeout_s
-        self.refresh_nodes(force=True)
-        while time.monotonic() < end:
-            mapped = {info["site_id"] for info in self.sites.values()}
-            if set(sites) <= mapped or not self._pending:
-                return
-            time.sleep(PULL_INTERVAL_S)
-            self.refresh_nodes()
+    def node_of_site(self) -> dict[str, int]:
+        return {info["site_id"]: nid for nid, info in self.sites.items()}
 
     def report_sites(self) -> None:
-        self.client.report_sites({info["site_id"]: "online" for info in self.sites.values()})
-
-    # ---------------------------------------------------------------- message exchange
-    def _exchange(self, msgs: list[Message], timeout_s: float, on_reply: Any = None,
-                  keep_waiting: Any = None) -> tuple[dict[int, Message], set[int]]:
-        """Push messages, pull replies until all arrived, the timeout expired or
-        ``keep_waiting()`` returned False.
-
-        Returns ``({dst_node_id: reply}, lost)``; ``lost`` are destination nodes that
-        went offline before replying. ``on_reply(node_id, reply)`` runs per reply.
-        """
-        if not msgs:
-            return {}, set()
-        ids = list(self.grid.push_messages(msgs))
-        if len(ids) != len(msgs) or not all(ids):
-            raise RuntimeError(f"SuperLink accepted {sum(map(bool, ids))} of {len(msgs)} messages")
-        node_of = {mid: msg.metadata.dst_node_id for msg, mid in zip(msgs, ids, strict=True)}
-        replies: dict[int, Message] = {}
-        lost: set[int] = set()
-        end = time.monotonic() + timeout_s
-        next_check = time.monotonic() + NODE_REFRESH_S
-        while node_of and time.monotonic() < end:
-            for reply in self.grid.pull_messages(list(node_of)):
-                nid = node_of.pop(reply.metadata.reply_to_message_id, None)
-                if nid is None:
-                    continue
-                replies[nid] = reply
-                if on_reply is not None:
-                    on_reply(nid, reply)
-            if not node_of or (keep_waiting is not None and not keep_waiting()):
-                break
-            if time.monotonic() >= next_check:
-                online = set(self.grid.get_node_ids())
-                for mid, nid in list(node_of.items()):
-                    if nid not in online:
-                        del node_of[mid]
-                        lost.add(nid)
-                next_check = time.monotonic() + NODE_REFRESH_S
-            time.sleep(PULL_INTERVAL_S)
-        return replies, lost
+        self.client.report_sites({info["site_id"]: "online" for info in list(self.sites.values())})
 
     # ---------------------------------------------------------------- training round
     def run_job(self, job: dict[str, Any]) -> None:
-        """Run one dispatched round; post all site results, or one error."""
+        """Run one dispatched round and report each site as soon as it replies or fails.
+
+        Sites without a connected SuperNode get up to SITE_WAIT_S (at most a quarter of the
+        deadline) to (re)connect while the others already train. Sites the adapter no longer
+        wants (cancelled per site, task over) are dropped; their late replies are discarded.
+        """
         job_id, sites, deadline_s = job["job_id"], list(job["sites"]), float(job["deadline_s"])
+        start = time.monotonic()
+        end = start + deadline_s
         try:
             arrays = weights_to_arrayrecord(self.client.get_model(job))
         except Exception as exc:  # report, keep the relay alive
             log.exception("job %s: cannot load the global model", job_id)
-            self._post_error(job_id, f"relay cannot load global model {job['model']['ref']}: {exc}")
-            return
-
-        self.wait_for_sites(sites, timeout_s=min(self.query_timeout_s, 30.0))
-        node_of_site = {info["site_id"]: nid for nid, info in self.sites.items()}
-        missing = [s for s in sites if s not in node_of_site]
-        if missing:
-            self._post_error(job_id, f"no connected SuperNode for site(s) {missing}")
+            for site in sites:
+                self._site_error(job_id, site, f"relay cannot load global model {job['model']['ref']}: {exc}")
             return
         # The job config (dispatch train_config + round) travels unchanged to flhub_core.train.
         config = ConfigRecord({**job["config"], "base-model": str(job["model"]["ref"]), "job-id": str(job_id)})
-        msgs = [
-            Message(RecordDict({ARRAYS: arrays, CONFIG: config}), node_of_site[site], MessageType.TRAIN,
-                    ttl=deadline_s, group_id=str(job["round"]))
-            for site in sites
-        ]
-        site_of_node = {node_of_site[s]: s for s in sites}
-        results: list[dict[str, Any]] = []
-        errors: list[str] = []
-        state = {"beat": time.monotonic(), "live": True}
+        give_up = start + min(SITE_WAIT_S, deadline_s / 4)
+        waiting = list(sites)  # sites not sent yet (no connected SuperNode so far)
+        sent: dict[str, tuple[int, str]] = {}  # message id -> (node id, site)
+        next_check, next_ask = start + NODE_REFRESH_S, start + HEARTBEAT_S
+        self.refresh_nodes(force=True)
+        while (waiting or sent) and time.monotonic() < end:
+            now = time.monotonic()
+            if waiting:
+                self.refresh_nodes()
+                nodes = self.node_of_site()
+                ready = [s for s in waiting if s in nodes]
+                if ready:
+                    sent.update(self._send(ready, nodes, arrays, config, end - now, job["round"]))
+                    waiting = [s for s in waiting if s not in ready]
+                if now >= give_up:
+                    for site in waiting:
+                        self._site_error(job_id, site, f"no connected SuperNode for site {site} "
+                                                       f"after {now - start:.0f} s")
+                    waiting = []
+            for reply in self.grid.pull_messages(list(sent)) if sent else []:
+                entry = sent.pop(reply.metadata.reply_to_message_id, None)
+                if entry is not None:
+                    self._report_reply(job_id, entry[1], entry[0], reply)
+            if now >= next_check and (waiting or sent):
+                next_check = now + NODE_REFRESH_S
+                # A node that went offline, or whose site answered from a newer node (the
+                # SuperNode restarted), will never reply.
+                self.refresh_nodes(force=True)
+                for mid, (nid, site) in list(sent.items()):
+                    if nid not in self.sites:
+                        del sent[mid]
+                        self._site_error(job_id, site, f"SuperNode {nid} went offline or was replaced "
+                                                       f"by a restarted SuperNode during the round")
+            if now >= next_ask and (waiting or sent):
+                next_ask = now + HEARTBEAT_S
+                wanted = self._wanted_sites(job_id)
+                if wanted is not None:  # the adapter's view: drop sites it no longer waits for
+                    dropped = [s for s in waiting if s not in wanted]
+                    waiting = [s for s in waiting if s in wanted]
+                    for mid, (_, site) in list(sent.items()):
+                        if site not in wanted:
+                            del sent[mid]
+                            self._orphan(mid, site, job_id, end)
+                            dropped.append(site)
+                    if dropped:
+                        log.info("job %s: adapter no longer waits for %s", job_id, dropped)
+            if waiting or sent:
+                time.sleep(PULL_INTERVAL_S)
+        for mid, (_, site) in sent.items():  # deadline passed: the adapter has failed these sites
+            self._orphan(mid, site, job_id, end + 60.0)
 
-        def on_reply(nid: int, reply: Message) -> None:
-            site = site_of_node[nid]
-            try:
-                results.append(self._result_from_reply(site, nid, reply))
-            except Exception as exc:  # error reply, malformed reply or blob store failure
-                log.warning("job %s: bad reply from %s: %s", job_id, site, exc)
-                errors.append(f"{site}: {exc}")
-                return
-            self._post_progress(job_id, len(results))
+    def _send(self, sites: list[str], nodes: dict[str, int], arrays, config: ConfigRecord, ttl: float,
+              rnd: int) -> dict[str, tuple[int, str]]:
+        msgs = [Message(RecordDict({ARRAYS: arrays, CONFIG: config}), nodes[site], MessageType.TRAIN,
+                        ttl=max(ttl, 1.0), group_id=str(rnd)) for site in sites]
+        ids = list(self.grid.push_messages(msgs))
+        if len(ids) != len(msgs) or not all(ids):
+            raise RuntimeError(f"SuperLink accepted {sum(map(bool, ids))} of {len(msgs)} messages")
+        return {mid: (nodes[site], site) for mid, site in zip(ids, sites, strict=True)}
 
-        def keep_waiting() -> bool:
-            if time.monotonic() - state["beat"] >= HEARTBEAT_S:
-                state["beat"] = time.monotonic()
-                state["live"] = self._job_pending(job_id)
-                if state["live"]:
-                    self._post_progress(job_id, len(results))
-            return state["live"]
-
+    def _report_reply(self, job_id: str, site: str, nid: int, reply: Message) -> None:
         try:
-            replies, lost = self._exchange(msgs, deadline_s, on_reply, keep_waiting)
-        except Exception as exc:  # SuperLink/Grid failure: fail the round, keep the relay alive
-            log.exception("job %s: grid exchange failed", job_id)
-            self._post_error(job_id, f"flower grid error: {exc}")
+            result = self._result_from_reply(site, nid, reply)
+        except Exception as exc:  # error reply, malformed reply or blob store failure
+            log.warning("job %s: bad reply from %s: %s", job_id, site, exc)
+            self._site_error(job_id, site, str(exc))
             return
-        if not state["live"]:
-            log.info("job %s is no longer pending (cancelled or timed out)", job_id)
-            return
-        errors += [f"{site_of_node[n]}: SuperNode {n} went offline during the round" for n in lost]
-        errors += [f"{site_of_node[n]}: no reply within {deadline_s:.0f} s" for n in site_of_node
-                   if n not in replies and n not in lost]
-        if errors:
-            self._post_error(job_id, "; ".join(errors))
-        else:
-            self._post(lambda: self.client.post_result(job_id, results), job_id)
+        try:
+            if not self.client.post_site_result(job_id, result):
+                log.info("job %s: adapter dropped the late result of %s", job_id, site)
+        except HubError as exc:
+            log.warning("job %s: result of %s not delivered: %s", job_id, site, exc)
 
     def _result_from_reply(self, site: str, nid: int, reply: Message) -> dict[str, Any]:
         if reply.has_error():
@@ -257,36 +251,58 @@ class Relay:
         return self.client.result(site, arrayrecord_to_weights(content[ARRAYS]), num_examples, metrics,
                                   str(info.get("client-code-version", "unknown")))
 
-    def _job_pending(self, job_id: str) -> bool:
-        """False once the adapter dropped the job (cancelled or deadline exceeded)."""
+    def _wanted_sites(self, job_id: str) -> set[str] | None:
+        """Sites the adapter still waits for; None if it cannot tell right now."""
         try:
-            status, body = http_request(f"{self.client.base}/relay/status", "GET", timeout=10)
-            return status != 200 or job_id in json.loads(body).get("pending", [job_id])
+            status = self.client.job_status(job_id)
         except Exception:  # adapter briefly unreachable: keep waiting
-            return True
+            return None
+        if status is None or status.get("state") not in ACTIVE:
+            return set()
+        return {s for s, st in status.get("sites", {}).items() if st in ACTIVE}
 
-    def _post(self, fn: Any, job_id: str) -> None:
+    def _site_error(self, job_id: str, site: str, message: str) -> None:
         try:
-            fn()
-        except HubError as exc:  # e.g. 404 after a cancel: the adapter no longer wants it
-            log.warning("job %s: post ignored by the adapter: %s", job_id, exc)
+            self.client.post_site_error(job_id, site, message)
+        except HubError as exc:  # e.g. the job is gone after a cancel
+            log.warning("job %s: error of %s not delivered: %s", job_id, site, exc)
 
-    def _post_error(self, job_id: str, message: str) -> None:
-        self._post(lambda: self.client.post_error(job_id, message), job_id)
+    def _orphan(self, mid: str, site: str, job_id: str, until: float) -> None:
+        """Keep pulling a reply nobody waits for, so it does not linger in the SuperLink."""
+        self._orphans[mid] = (site, job_id, until)
 
-    def _post_progress(self, job_id: str, done: int) -> None:
-        self._post(lambda: self.client.post_progress(job_id, done), job_id)
+    def drop_orphans(self) -> None:
+        if not self._orphans:
+            return
+        for reply in self.grid.pull_messages(list(self._orphans)):
+            site, job_id, _ = self._orphans.pop(reply.metadata.reply_to_message_id, ("?", "?", 0.0))
+            log.info("job %s: dropped the late reply of %s (site no longer wanted)", job_id, site)
+        now = time.monotonic()
+        for mid, (_, _, until) in list(self._orphans.items()):
+            if now > until:
+                del self._orphans[mid]
 
     # ---------------------------------------------------------------- main loop
+    def beat_forever(self) -> None:
+        """Tell the adapter this relay is alive, independent of what the main loop does."""
+        url = f"{self.client.base}/relay/beat"
+        while True:
+            body = {"fab_id": self.fab_id, "run_id": self.run_id, "job_id": self.job_id,
+                    "code_version": code_version()}
+            try:
+                http_request(url, "POST", json.dumps(body).encode(), "application/json", timeout=10)
+                self.report_sites()
+            except Exception:  # adapter briefly unreachable, or an adapter without /relay/beat
+                pass
+            time.sleep(BEAT_S)
+
     def serve(self) -> None:
-        log.info("relay polling %s", self.client.base)
+        log.info("relay polling %s (fab %s)", self.client.base, self.fab_id or "-")
+        threading.Thread(target=self.beat_forever, name="relay-beat", daemon=True).start()
         last_ok = time.monotonic()
         while True:
             self.refresh_nodes()
-            try:
-                self.report_sites()
-            except HubError as exc:
-                log.warning("cannot report sites: %s", exc)
+            self.drop_orphans()
             job = self.client.next_job(timeout=self.poll_timeout_s)
             if job.get("error"):
                 if time.monotonic() - last_ok > ADAPTER_LOST_S:
@@ -298,7 +314,15 @@ class Relay:
                 log.info("relay: shutdown requested by the adapter")
                 return
             if job["type"] == "train":
-                self.run_job(job)
+                self.job_id = job["job_id"]
+                try:
+                    self.run_job(job)
+                except Exception as exc:  # SuperLink/Grid failure: fail the sites, keep the relay alive
+                    log.exception("job %s: grid exchange failed", job["job_id"])
+                    for site in job["sites"]:
+                        self._site_error(job["job_id"], site, f"flower grid error: {exc}")
+                finally:
+                    self.job_id = None
 
 
 def _error_text(reply: Message) -> str:
@@ -313,4 +337,5 @@ def main(grid: Grid, context: Context) -> None:
     cfg = context.run_config
     client = RelayClient(str(cfg["adapter-url"]), hub_url=str(cfg["hub-url"]))
     Relay(grid, client, poll_timeout_s=float(cfg["poll-timeout-s"]),
-          query_timeout_s=float(cfg["query-timeout-s"])).serve()
+          query_timeout_s=float(cfg["query-timeout-s"]), fab_id=str(cfg.get("fab-id", "")),
+          run_id=context.run_id).serve()
