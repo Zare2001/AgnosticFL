@@ -70,6 +70,10 @@ def scan(offsets: dict[str, int]) -> tuple[list[str], dict[str, int], dict[str, 
     return hits, counts, trained
 
 
+def offsets_now() -> dict[str, int]:
+    return {str(p): p.stat().st_size for p in log_files()}
+
+
 def health() -> str:
     proc = subprocess.run(["bash", str(REPO / "deploy" / "nvflare-vm" / "status.sh")], capture_output=True,
                           text=True, timeout=60)
@@ -102,8 +106,8 @@ def main() -> None:
             if not run:
                 continue
             kind, name, utc = run[1], run[2], run[3]
-            if kind == "start":
-                state["open"][name] = {"start": utc, "offsets": {str(p): p.stat().st_size for p in log_files()}}
+            if kind == "start":  # offsets of the previous poll (<= 15 s before): no run line is missed
+                state["open"][name] = {"start": utc, "offsets": state.get("last_offsets") or offsets_now()}
                 print(f"{now()} RUN start {name} {utc} (#{m['id']})", flush=True)
                 continue
             opened = state["open"].pop(name, None)
@@ -124,6 +128,7 @@ def main() -> None:
                 subprocess.run([BUS, "send", "--to", "central", "--type", "info", "--subject",
                                 f"S4 nvflare {name}: flagged NVFlare client log lines or health", "--body", body],
                                capture_output=True, text=True, timeout=60)
+        state["last_offsets"] = offsets_now()
         state_path.write_text(json.dumps(state))
         time.sleep(15)
 
