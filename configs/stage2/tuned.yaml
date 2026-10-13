@@ -1,0 +1,9 @@
+# S3 tuning result (scripts/stage2/tune.py); read by scripts/stage2/make_configs.py
+lr: 0.1
+fedavgm: 1.0
+fedadam: 0.03
+fedyogi: 0.03
+fedadagrad: 0.03
+fedprox: 0.01
+a_star: fedavgm
+tuned: true
