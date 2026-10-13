@@ -158,6 +158,8 @@ def test_round_is_bit_exact_vs_flhub_core(env):
         assert e["num_examples"] == n == 40
         assert e["metrics"]["train_loss"] == pytest.approx(metrics["train_loss"], abs=1e-12)
         assert e["base_model"] == ref and e["framework"] == "flower" and e["round"] == 3
+        relay_keys = ("flower_relay_prep_s", "flower_relay_push_s", "flower_relay_reply_s", "flower_relay_store_s")
+        assert all(e["metrics"][k] >= 0 for k in relay_keys), e["metrics"]
 
 
 def test_restarted_supernode_replaces_stale_node(env):

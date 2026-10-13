@@ -152,12 +152,17 @@ class Relay:
         Sites without a connected SuperNode get up to SITE_WAIT_S (at most a quarter of the
         deadline) to (re)connect while the others already train. Sites the adapter no longer
         wants (cancelled per site, task over) are dropped; their late replies are discarded.
+        Each site result carries the relay's timings (RQ4 round-time breakdown), added to the
+        client metrics: flower_relay_prep_s (job -> model ready), flower_relay_push_s (TRAIN
+        message pushed to the SuperLink), flower_relay_reply_s (pushed -> reply pulled: SuperNode
+        download, ClientApp, upload) and flower_relay_store_s (reply -> weights in the hub core).
         """
         job_id, sites, deadline_s = job["job_id"], list(job["sites"]), float(job["deadline_s"])
         start = time.monotonic()
         end = start + deadline_s
         try:
             arrays = weights_to_arrayrecord(self.client.get_model(job))
+            prep_s = time.monotonic() - start
         except Exception as exc:  # report, keep the relay alive
             log.exception("job %s: cannot load the global model", job_id)
             for site in sites:
@@ -168,6 +173,7 @@ class Relay:
         give_up = start + min(SITE_WAIT_S, deadline_s / 4)
         waiting = list(sites)  # sites not sent yet (no connected SuperNode so far)
         sent: dict[str, tuple[int, str]] = {}  # message id -> (node id, site)
+        timing: dict[str, dict[str, float]] = {}  # site -> relay timings
         next_check, next_ask = start + NODE_REFRESH_S, start + HEARTBEAT_S
         self.refresh_nodes(force=True)
         while (waiting or sent) and time.monotonic() < end:
@@ -177,17 +183,26 @@ class Relay:
                 nodes = self.node_of_site()
                 ready = [s for s in waiting if s in nodes]
                 if ready:
+                    t_push = time.monotonic()
                     sent.update(self._send(ready, nodes, arrays, config, end - now, job["round"]))
+                    pushed = time.monotonic()
+                    for site in ready:
+                        timing[site] = {"flower_relay_prep_s": prep_s, "flower_relay_push_s": pushed - t_push,
+                                        "pushed": pushed}
                     waiting = [s for s in waiting if s not in ready]
                 if now >= give_up:
                     for site in waiting:
                         self._site_error(job_id, site, f"no connected SuperNode for site {site} "
                                                        f"after {now - start:.0f} s")
                     waiting = []
-            for reply in self.grid.pull_messages(list(sent)) if sent else []:
+            replies = self.grid.pull_messages(list(sent)) if sent else []
+            pulled = time.monotonic()
+            for reply in replies:
                 entry = sent.pop(reply.metadata.reply_to_message_id, None)
                 if entry is not None:
-                    self._report_reply(job_id, entry[1], entry[0], reply)
+                    t = timing.get(entry[1], {})
+                    t["flower_relay_reply_s"] = pulled - t.pop("pushed", pulled)
+                    self._report_reply(job_id, entry[1], entry[0], reply, t)
             if now >= next_check and (waiting or sent):
                 next_check = now + NODE_REFRESH_S
                 # A node that went offline, or whose site answered from a newer node (the
@@ -225,9 +240,12 @@ class Relay:
             raise RuntimeError(f"SuperLink accepted {sum(map(bool, ids))} of {len(msgs)} messages")
         return {mid: (nodes[site], site) for mid, site in zip(ids, sites, strict=True)}
 
-    def _report_reply(self, job_id: str, site: str, nid: int, reply: Message) -> None:
+    def _report_reply(self, job_id: str, site: str, nid: int, reply: Message,
+                      timing: dict[str, float] | None = None) -> None:
         try:
+            t0 = time.monotonic()
             result = self._result_from_reply(site, nid, reply)
+            result["metrics"].update({**(timing or {}), "flower_relay_store_s": time.monotonic() - t0})
         except Exception as exc:  # error reply, malformed reply or blob store failure
             log.warning("job %s: bad reply from %s: %s", job_id, site, exc)
             self._site_error(job_id, site, str(exc))
