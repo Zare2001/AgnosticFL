@@ -81,6 +81,10 @@ def process(job: dict, workers: int) -> str:
         else:
             rc = sh(sim_cmd(workers) + ["--config", job["config"], "--compare", run_dir, "--name",
                                         f"{name}-inv1sim", "--runs-dir", str(RUNS / "inv1")], log)
+            if rc == 0 and "payload" in name or "-e4" in name:  # echo payloads: hashes suffice (PLAN §7)
+                sim_dir = latest_run(f"{name}-inv1sim", RUNS / "inv1")
+                for p in (sim_dir / "rounds").glob("*.safetensors") if sim_dir else []:
+                    p.unlink()
             rc = rc or finalize([run_dir, "--mode", "real", *notes], log)
     elif kind == "sim":
         if not finalized(job["counterpart"]):

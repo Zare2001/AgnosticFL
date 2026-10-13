@@ -7,7 +7,8 @@ run_final.py real (which applies the disk rule: free >= 3 GB + 4 x payload x sit
 the central RAM rule (any process peak RSS > 70 % of RAM ends the sweep for the scope), and on a
 failed run the sweep stops and the framework agent is asked for a server-side knob; after the knob
 is deployed, rerun with --retry --sizes <that size>,... (one retry; a second failure is the limit).
-Results go to <runs>/e4a-<scope>.json and the campaign log. While the sweep runs, HOLD_POST keeps
+After a successful run its weight checkpoints are deleted (echo payloads: the global_ref hashes in
+rounds/*.json suffice for INV-1, PLAN.md §7). Results go to <runs>/e4a-<scope>.json and the campaign log. While the sweep runs, HOLD_POST keeps
 postproc.py from starting sims (CPU hygiene); the queued INV-1 jobs run after the sweep.
 """
 
@@ -44,6 +45,15 @@ def purge(fws: list[str]) -> dict:
         p = subprocess.run(["bash", str(script)], cwd=REPO, capture_output=True, text=True, timeout=900)
         out[fw] = f"rc={p.returncode} {(p.stdout + p.stderr).strip()[-300:]}"
     return out
+
+
+def drop_checkpoints(run_dir: Path | None) -> float:
+    """Payload runs: the per-round hashes in rounds/*.json are the INV-1 evidence; weights files go."""
+    freed = 0
+    for p in (run_dir / "rounds").glob("*.safetensors") if run_dir else []:
+        freed += p.stat().st_size
+        p.unlink()
+    return round(freed / 2**20, 1)
 
 
 def failure_text(run_dir: Path | None) -> str:
@@ -104,6 +114,7 @@ def main(argv: list[str] | None = None) -> int:
                         "this is the limit (component, error, knob, side).", to=fw)
                 break
             entry["result"] = "ok"
+            entry["checkpoints_freed_mb"] = drop_checkpoints(run_dir)
             state["runs"].append(entry)
             if over:
                 entry["result"] = "ok, RAM rule hit"
