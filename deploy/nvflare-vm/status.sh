@@ -21,9 +21,10 @@ for site in "${sites[@]}"; do
   fi
   pid=$(cat "$ws/pid.fl")
   conns=$(ss -Htnp state established "( dport = :$port )" 2>/dev/null | grep -c "pid=$pid," || true)
-  jobs=$(pgrep -f "worker_process.*$ws" | wc -l)
+  jobs=$(pgrep -f "worker_process.*$ws/" | wc -l)
   if [ "$conns" -ge 1 ]; then
-    echo "$site: up (pid $pid, connected to $target = ${ip:-?}, job processes: $jobs, data $FLHUB_DATA_DIR/$site.csv)"
+    wd=off; [ -e "$ws/.enabled" ] && wd=on
+    echo "$site: up (pid $pid, connected to $target = ${ip:-?}, job processes: $jobs, watchdog $wd, data $FLHUB_DATA_DIR/$site.csv)"
   else
     echo "$site: NOT CONNECTED (pid $pid, server $target = ${ip:-?})"; ok=0
   fi

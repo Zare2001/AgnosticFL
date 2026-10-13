@@ -1,14 +1,18 @@
 #!/usr/bin/env bash
-# Stops NVFlare hospital clients: stop.sh [site ...]. Uses the kit's own shutdown.fl mechanism
-# (what startup/stop_fl.sh does, without its interactive prompt). Idempotent.
+# Stops NVFlare hospital clients: stop.sh [site ...] (default: the NVFlare sites of the topology).
+# Uses the kit's own shutdown.fl mechanism (what startup/stop_fl.sh does, without its interactive
+# prompt) and disables the watchdog for these sites only. Idempotent.
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$HERE/common.sh"
 sites=("$@"); [ ${#sites[@]} -eq 0 ] && read -ra sites <<<"$NVF_SITES"
-nvf_watchdog_off  # otherwise cron would restart the stopped clients
+mkdir -p "$NVF_SITES_DIR"
+exec 9>"$NVF_SITES_DIR/.start.lock"  # no watchdog start while we stop
+flock -w 180 9 || { echo "stop: another start.sh/stop.sh holds the lock" >&2; exit 1; }
 
 for site in "${sites[@]}"; do
   ws="$NVF_SITES_DIR/$site"
+  rm -f "$ws/.enabled"
   if nvf_pid_alive "$ws/daemon_pid.fl"; then
     dpid=$(cat "$ws/daemon_pid.fl")
     touch "$ws/shutdown.fl"
@@ -19,7 +23,8 @@ for site in "${sites[@]}"; do
     echo "stop: $site not running"
   fi
   # job processes (worker_process) that outlived the client process
-  pkill -f "nvflare.private.fed.app.client.worker_process.*$ws" 2>/dev/null || true
+  pkill -f "nvflare.private.fed.app.client.worker_process.*$ws/" 2>/dev/null || true
   rm -f "$ws/shutdown.fl"
 done
+nvf_watchdog_sync
 echo "stop: OK"

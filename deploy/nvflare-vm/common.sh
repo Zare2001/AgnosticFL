@@ -12,14 +12,23 @@ NVF_SITES="${NVF_SITES% }"
 
 nvf_pid_alive() { [ -f "$1" ] && kill -0 "$(cat "$1")" 2>/dev/null; }
 
-# Watchdog: cron re-runs start.sh every minute while enabled (start.sh enables, stop.sh disables).
-# It covers what the kit's own restart loop cannot: a dead daemon or a VM reboot.
-NVF_CRON_TAG="# flhub-nvflare-watchdog"
-nvf_watchdog_on() {
-  local line="* * * * * bash $REPO/deploy/nvflare-vm/start.sh >> $NVF_SITES_DIR/watchdog.log 2>&1 $NVF_CRON_TAG"
-  crontab -l 2>/dev/null | grep -qF "$line" && return 0
-  { crontab -l 2>/dev/null | grep -vF "$NVF_CRON_TAG" || true; echo "$line"; } | crontab -
+# Watchdog: one cron line per sites dir runs `start.sh --watchdog` every minute, which starts every
+# site of that dir with an enabled marker ($ws/.enabled: start.sh sets it, stop.sh removes it).
+# It covers what the kit's own restart loop cannot: a dead daemon, a daemon that gave up, a reboot.
+NVF_CRON_TAG="# flhub-nvflare-watchdog $NVF_SITES_DIR"
+nvf_enabled_sites() {
+  local m
+  for m in "$NVF_SITES_DIR"/*/.enabled; do [ -e "$m" ] && basename "$(dirname "$m")"; done
+  return 0
 }
-nvf_watchdog_off() {
-  { crontab -l 2>/dev/null | grep -vF "$NVF_CRON_TAG" || true; } | crontab -
+nvf_watchdog_sync() {  # the cron line exists iff a site of this sites dir is enabled
+  local line cur want
+  line="* * * * * NVF_SITES_DIR=$NVF_SITES_DIR NVF_VENV=$NVF_VENV FLHUB_DATA_DIR=$FLHUB_DATA_DIR"
+  line+=" bash $REPO/deploy/nvflare-vm/start.sh --watchdog >> $NVF_SITES_DIR/watchdog.log 2>&1 $NVF_CRON_TAG"
+  cur=$(crontab -l 2>/dev/null || true)
+  # other lines: not ending with this dir's tag, and not the stage-1 form (tag without a directory)
+  want=$(awk -v tag="$NVF_CRON_TAG" 'NF && substr($0, length($0) - length(tag) + 1) != tag \
+    && $0 !~ /# flhub-nvflare-watchdog$/' <<<"$cur")
+  if [ -n "$(nvf_enabled_sites)" ]; then want=$(printf '%s\n%s' "$want" "$line" | sed '/^$/d'); fi
+  [ "$want" = "$cur" ] || printf '%s\n' "$want" | sed '/^$/d' | crontab -
 }
