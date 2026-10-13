@@ -2,8 +2,9 @@
 
     python scripts/stage2/collect_sysmon.py [--since 98]
 
-Every bus file whose name contains a final run name (s2-e1-iid-fedavg-nvflare-sysmon.json,
+Every bus file named after a final run (s2-e1-iid-fedavg-nvflare-sysmon.json,
 sysmon-flower-s2-e1-iid-fedavg.json) is stored as <run_dir>/sysmon/<file name>, unless it is there already.
+Files of other runs that contain a final run's name (inv4-<run>, dry runs) are skipped.
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from campaign import REPO, RUNS  # noqa: E402
 
+FWS = ("nvflare", "vantage6", "flower")
 FILE_MSG = re.compile(r"^#(\d+) \S+ \[\w+\] (\w+) -> \S+: file #(\d+): (\S+)")
 
 
@@ -34,7 +36,8 @@ def main(argv: list[str] | None = None) -> int:
             continue
         file_id, fname = m.group(3), m.group(4)
         stem = fname[:-len(".json")]
-        run = next((n for n in names if stem.endswith(n) or stem.startswith(n + "-") or f"-{n}-" in stem), None)
+        # exact names only: sysmon-<fw>-<run>.json or <run>-<fw>-sysmon.json (not inv4-<run>, dry runs)
+        run = next((n for n in names for fw in FWS if stem in (f"sysmon-{fw}-{n}", f"{n}-{fw}-sysmon")), None)
         if run is None:
             continue
         dest = (RUNS / f"{run}-latest").resolve() / "sysmon" / fname
