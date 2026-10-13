@@ -138,7 +138,7 @@ This is the key claim of the project: each hospital runs its framework's standar
 
 | | NVFlare (nvf-h1, nvf-h2) | vantage6 (v6-h3, v6-h4) | Flower (flw-h5, flw-h6) |
 |---|---|---|---|
-| Installs | venv: `nvflare==2.9.0`, `torch==2.14.1+cpu`, numpy, safetensors, `flhub_core` | `vantage6==4.15.2` CLI (venv) + Docker; node image `ghcr.io/vantage6/infrastructure/node:4.15.2`. No torch or flhub_core on the host | venv: `flwr==1.39.0`, `torch==2.14.1+cpu`, numpy, safetensors, `flhub_core` |
+| Installs | venv: `nvflare==2.9.0`, `torch==2.14.1+cpu`, numpy, safetensors, `flhub_core` | `vantage6==4.15.2` CLI (venv) + Docker; node image `ghcr.io/vantage6/infrastructure/node:4.15.2`. No torch on the host; `flhub_core` runs only inside the algorithm image (the simulation-only `~/venvs/flhub-data`, numpy + `flhub_core.data`, wrote the site CSVs) | venv: `flwr==1.39.0`, `torch==2.14.1+cpu`, numpy, safetensors, `flhub_core` |
 | Configures | startup kit from the operator (server `flhub-central:8002`, mTLS certs); data path `~/flhub-data/<site>.csv` (default) | node YAML: `server_url http://145.38.205.58`, `port 7601`, `api_key`, database `uri` = the site CSV, policy `allowed_algorithms` = the operator's image; Docker `insecure-registries: 145.38.205.58:5050` | `flower-supernode --insecure --superlink 145.38.205.58:9092 --port 9094 --node-config "site-id='flw-h5' data-path='/home/<user>/flhub-data/flw-h5.csv'"` (flw-h6: `--port 9095`; values are TOML-quoted) |
 | Code that runs | `clients/nvflare/client.py`: standard Client API loop (`flare.init/receive/send`) around `flhub_core.train` | algorithm `v6_flhub.train` (`@data(1)`, `@metadata`, `wrap_algorithm()`) around `flhub_core.train` | `clients/flower` ClientApp: `@app.train()` (ArrayRecord/ConfigRecord → `flhub_core.train` → ArrayRecord + MetricRecord), `@app.query()` site id |
 | How it arrives | job custom code deployed by the NVFlare server (standard job deployment) | image pulled by the node from the operator's registry for each task (standard) | FAB shipped by `flwr run` from the SuperLink (standard) |
@@ -146,7 +146,7 @@ This is the key claim of the project: each hospital runs its framework's standar
 
 **Evidence:**
 - Every hospital's envelopes carry `client_code_version 0.1.0+9c6b064c1e96`, the same as the hub's.
-- The vantage6 host has no torch and no flhub_core (`~/venvs/v6`: vantage6 packages only).
+- The vantage6 host has no torch; its node venv `~/venvs/v6` holds vantage6 packages only, and `flhub_core` runs only inside the algorithm image (plus the simulation-only data venv `~/venvs/flhub-data` that created the site CSVs).
 - The Flower hospital venv cannot import the hub package (`import adapters` fails).
 - The NVFlare job code at both hospitals is byte-identical to `clients/nvflare/client.py` at the frozen SHA.
 
