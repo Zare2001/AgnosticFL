@@ -70,3 +70,10 @@ Newest entries at the bottom. Format: `### <UTC timestamp> — S<n> — <title>`
 - 97 s adapter restart (central 15:45Z): central's adapter.log confirmed it: the exiting old relay's last beat (old fab) set the adapter's single global shutdown flag; the new relay 3704... polled 1.3 s after its start and took it; launcher cooldown 60 s -> relay 18236... Fix 17cdfd1: the relay sends its fab id with every poll, only a stale relay is answered `shutdown`, stale beats get `leave` and no liveness credit (tests/flower 11 passed incl. stale + fresh relays; island restart 34.2/29.2 s). Deployed by central (fab-id 2c9803ea5884).
 - S3-frozen 96c44c9 (#210). Confirm #213: (a) `git diff 17cdfd1 96c44c9 -- flhub_core clients/flower adapters/flower deploy/central/flower` empty; (b) SuperNodes on FAB agnosticfl.flhub-flower.0.2.0.6345f77d, flhub_core 0.2.0+fe357a1dbec1 (both sites); (c) HEALTHY, sysmon pid 163931, run follower pid 236748.
 - Island shut down (`island.sh down`) before S4; 29 GB RAM available. Phase S4.
+
+### 2026-10-13T17:30Z — S4 — E4a done (flower 1-256 MB ok, 512 MB testbed disk limit); breakdown; E1 running
+- Central E4a (#381): no framework limit hit; testbed disk limits 512 MB (nvflare, flower), 256 MB (vantage6), 128 MB (mixed). Flower medians 5.79/6.07/7.69/9.08/13.51/20.61 s for 1/8/32/64/128/256 MB; flower VM memory peak <= 4.9 GB (16 %), posted by the follower per run.
+- Breakdown (`deploy/flower-vm/analysis/e4a_breakdown.py` on bus files #74/#75, relay timings): Flower's own path ~5 s/round fixed (fresh ClientApp per message + pulls) + ~0.03 s/MB; hub side 0.1 s (1 MB) .. 4.9 s (256 MB). Report section 4 updated (2c1791b, report commit after it).
+- Follower: 'Connection attempt failed' retries after purge.sh restarts are counted apart and no longer alert (central informed #327).
+- Re-freeze 975a949 (hub-only): confirmed #400 (no diff in flower paths).
+- E6d dry run bit-exact (#390). E1 -> E2 running since 17:12Z; next for me: E6 ARMs (E6a kill-node flw-h5 r15 +4 s; E6b prepare flw-h6 + straggler-on:10 at r14), E5 extras, E7 analysis, E4b netem.
