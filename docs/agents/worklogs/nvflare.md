@@ -57,3 +57,10 @@ Newest entries at the bottom. Format: `### <UTC timestamp> — <phase> — <titl
 - DoD 2: hospital venv = nvflare 2.9.0, torch 2.14.1+cpu, numpy 2.4.4, safetensors 0.8.0, flhub_core (hub package not importable); hub-specific items only: startup kit (flhub-central:8002 + mTLS certs), /etc/hosts alias, data path; job code custom/client.py byte-identical to b656577.
 - DoD 3: conformance 7/7 vs central :8811 (docs/report/evidence/conformance-nvflare-central.json). DoD 7: all commits Zare2001, no attribution (git log check: 0 matches); tests/unit/test_nvflare_adapter.py 7 passed (central, ~/venvs/nvflare).
 - VM state left running: nvf-h1/nvf-h2 clients (cron watchdog on), relay job 9e4f07a2; island leftovers and ~/venvs/hub removed. ~/.flhub/DONE created.
+
+### 2026-10-13T13:40Z — P4 — independent DoD re-check from the nvflare VM
+- DoD 1/2: own status.sh HEALTHY (exit 0, re-run 13:3xZ); vantage6 (#81) and flower (#82) VM status replies exit 0; central aggregate HEALTHY in REPORT.md §12.
+- DoD 3: docs/report/evidence/conformance-{nvflare,vantage6,flower}-central.json: exitstatus 0, max_abs_diff 0.0 in rounds 1, 2, 4 for all six sites.
+- DoD 4/5/6 (W&B API, read-only, scratch venv in /tmp): project hpml_surf-surf/AgnosticFL has exactly 6 runs = the expected names, all state=finished, tags=['final'], group final-2026-10-13; mixed-6sites: 30 logged rounds, all with round/num_sites=6, sites nvf-h1/h2, v6-h3/h4, flw-h5/h6; summary equivalence/pass=True, max_abs_weight_diff=0; equivalence-final.json: 31 checkpoints, max diff 0.0.
+- DoD 7: pytest at origin/main (cb19c68) in a scratch venv with nvflare 2.9.0 + flwr 1.39.0 + pandas: 40 passed, 7 skipped (conformance needs an adapter); conformance --adapter mock: 7 passed; attribution grep 0 matches, all commits Zare2001. DoD 8: REPORT.md, README.md, DECISIONS.md (7 ADRs), 4 report sections, bus transcript on main.
+- DoD 9: all-done #84; DONE replies #89/#91/#93; central board DONE at 13:21:00Z after its closing commits and REPORT §12.9. Scratch venv/wandb dir removed; only ~/venvs/nvflare remains.
