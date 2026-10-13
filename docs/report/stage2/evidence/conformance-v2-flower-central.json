@@ -1,7 +1,7 @@
 {
  "tests": {
   "round_1": {
-   "seconds": 7.0,
+   "seconds": 8.0,
    "sites": {
     "flw-h5": {
      "max_abs_diff": 0.0,
@@ -110,7 +110,7 @@
    }
   },
   "round_10_after_restart": {
-   "online_after_s": 35.3,
+   "online_after_s": 29.7,
    "sites": {
     "flw-h5": {
      "max_abs_diff": 0.0,
@@ -127,7 +127,7 @@
    }
   },
   "payload_64_round_11": {
-   "seconds": 8.5,
+   "seconds": 8.0,
    "sites": {
     "flw-h5": {
      "max_abs_diff": 0.0,
