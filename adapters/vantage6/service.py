@@ -57,6 +57,7 @@ class Vantage6Adapter(BaseAdapter):
     adapter_name = "vantage6"
     framework = "vantage6"
     framework_version = "unknown"
+    needs_weights = False  # run_round sends the model blob's exact bytes, never the parsed weights
 
     def __init__(self, sites: list[str], *, server_url: str, server_port: int, api_path: str, username: str,
                  password: str, collaboration: str, image: str, hub: HubClient | None = None) -> None:
