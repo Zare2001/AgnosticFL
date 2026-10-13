@@ -1,12 +1,18 @@
 """Unit tests for the NVFlare adapter's relay-job keeper and site status (no NVFlare server needed)."""
 
+import threading
+import time
+
 import pytest
 
 pytest.importorskip("nvflare")
 
-from adapters.common import FrameworkError, RelayClient  # noqa: E402
+from flhub_core.model import init_weights  # noqa: E402
+
+from adapters.common import HubClient, RelayClient  # noqa: E402
 from adapters.nvflare import service  # noqa: E402
 from adapters.nvflare.service import NVFlareAdapter  # noqa: E402
+from hub.core.server import HubCore  # noqa: E402
 
 SITES = ["nvf-h1", "nvf-h2"]
 TC = {"local_epochs": 1, "batch_size": 64, "lr": 0.05, "momentum": 0.0, "seed": 2026}
@@ -42,19 +48,61 @@ class FakeAdmin:
 
 
 @pytest.fixture
-def adapter():
-    admin = FakeAdmin()
-    ad = NVFlareAdapter(SITES, admin, "/tmp/flhub-relay")
-    srv = ad.build_server("127.0.0.1", 0).start()
-    ad.relay = RelayClient(srv.url)  # plays the relay inside the NVFlare server job
-    yield ad
+def hub(tmp_path):
+    srv = HubCore(tmp_path / "hub").build_server("127.0.0.1", 0).start()
+    yield HubClient(srv.url)
     srv.stop()
+
+
+def make_adapter(hub, sites=SITES, base_sites=None):
+    admin = FakeAdmin()
+    admin.clients = {s: set() for s in (base_sites or sites)}  # connected, in no job yet
+    ad = NVFlareAdapter(sites, admin, "/tmp/flhub-relay", hub, base_sites=base_sites)
+    ad.srv = ad.build_server("127.0.0.1", 0).start()
+    ad.relay = RelayClient(ad.srv.url, hub.base_url)  # plays the relay inside the NVFlare server job
+    return ad
+
+
+@pytest.fixture
+def adapter(hub):
+    ad = make_adapter(hub)
+    yield ad
+    ad.srv.stop()
+
+
+def go_online(ad, sites=SITES, job="job-1"):
+    ad.relay.report_sites({s: "online" for s in sites})
+    ad.admin.clients.update({s: {job} for s in sites})
+    ad.client_jobs(max_age_s=0)
 
 
 def test_keeper_submits_once_and_adopts(adapter):
     adapter.keep_once()
     adapter.keep_once()
     assert adapter.admin.submitted == ["job-1"] and adapter.relay_job_id == "job-1"
+
+
+def test_keeper_waits_for_base_sites_then_grace(adapter, monkeypatch):
+    adapter.admin.clients = {}
+    adapter.keep_once()
+    assert adapter.admin.submitted == []  # nobody connected
+    adapter.admin.clients = {"nvf-h2": set()}
+    adapter.keep_once()
+    assert adapter.admin.submitted == []  # nvf-h1 may still come: one job start for both
+    monkeypatch.setattr(service, "SUBMIT_GRACE_S", 0.0)
+    adapter.keep_once()
+    assert adapter.admin.submitted == ["job-1"]  # grace over: run with the site that is there
+
+
+def test_offline_extra_sites_block_nothing(hub):
+    ad = make_adapter(hub, sites=SITES + ["nvf-h7", "nvf-h8"], base_sites=SITES)
+    try:
+        ad.keep_once()  # base sites connected, extras absent: submit at once
+        assert ad.admin.submitted == ["job-1"]
+        go_online(ad)
+        assert ad.site_status() == {"nvf-h1": "online", "nvf-h2": "online", "nvf-h7": "offline", "nvf-h8": "offline"}
+    finally:
+        ad.srv.stop()
 
 
 def test_keeper_aborts_extra_jobs(adapter):
@@ -75,11 +123,53 @@ def test_site_online_needs_relay_view_and_client_probe(adapter):
     assert adapter.site_status() == {"nvf-h1": "offline", "nvf-h2": "online"}
 
 
-def test_run_round_fails_fast_when_a_site_is_offline(adapter):
+def test_offline_sites_fail_alone(adapter):
     adapter.keep_once()
     task = adapter.tasks.create("nvflare", 1, SITES, "sha256:" + "0" * 64, TC, 60)
-    with pytest.raises(FrameworkError, match="not online"):
-        adapter.run_round(task, {}, {})
+    adapter.tasks.start(task)
+    assert adapter.run_round(task, {}, {}) == []  # nobody online: every site fails at once
+    assert task.state == "failed" and set(task.status()["site_errors"]) == set(SITES)
+
+
+def run_round_async(ad, task, hub):
+    weights = init_weights(2026)
+    ref = hub.put_weights(weights)
+    task.model_ref = ref
+    threading.Thread(target=ad._work, args=(task,), daemon=True).start()
+    return weights
+
+
+def test_round_runs_on_the_online_site(adapter, hub):
+    adapter.keep_once()
+    go_online(adapter, ["nvf-h2"])
+    task = adapter.tasks.create("nvflare", 3, SITES, "sha256:" + "0" * 64, TC, 60)
+    weights = run_round_async(adapter, task, hub)
+    job = adapter.relay.next_job(timeout=5)
+    assert job["type"] == "train" and job["sites"] == ["nvf-h2"]  # nvf-h1 failed at dispatch
+    assert adapter.relay.post_site_result(job["job_id"], adapter.relay.result("nvf-h2", weights, 7, {}, "v"))
+    end = time.time() + 5
+    while not task.terminal and time.time() < end:
+        time.sleep(0.02)
+    assert task.state == "failed" and task.site_state == {"nvf-h1": "failed", "nvf-h2": "done"}
+    assert [e["site_id"] for e in task.envelopes] == ["nvf-h2"]
+
+
+def test_site_that_goes_offline_mid_round_fails(adapter, hub, monkeypatch):
+    monkeypatch.setattr(service, "OFFLINE_FAIL_S", 0.0)
+    monkeypatch.setattr(service, "SITE_WATCH_S", 0.05)
+    monkeypatch.setattr(service, "CLIENT_JOBS_TTL_S", 0.0)
+    adapter.keep_once()
+    go_online(adapter)
+    task = adapter.tasks.create("nvflare", 4, SITES, "sha256:" + "0" * 64, TC, 60)
+    run_round_async(adapter, task, hub)
+    job = adapter.relay.next_job(timeout=5)
+    assert job["sites"] == SITES
+    adapter.admin.clients = {"nvf-h2": {"job-1"}}  # nvf-h1 killed mid-round
+    end = time.time() + 5
+    while task.site_state["nvf-h1"] != "failed" and time.time() < end:
+        time.sleep(0.02)
+    assert task.site_state == {"nvf-h1": "failed", "nvf-h2": "running"}
+    assert adapter.relay.job_status(job["job_id"])["sites"]["nvf-h1"] == "failed"  # the relay cancels it
 
 
 def test_reconnected_site_outside_job_triggers_graceful_restart(adapter, monkeypatch):

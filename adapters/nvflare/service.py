@@ -6,7 +6,13 @@ alive, and restarts it gracefully when a hospital client (re)connects that is no
 A site is online only when the relay reports it as a live job client AND the client answers
 the server's job-status probe for the running relay job.
 
+flhub/0.2: a round runs on the online sites of its dispatch; an offline site, or one that goes
+offline during the round, fails on its own (the others go on). Registered sites that are not
+connected (e.g. the E5 extra sites) never block anything; --base-sites only shapes when the
+relay job is (re)submitted.
+
     python -m adapters.nvflare.service --admin-kit DIR --job-dir DIR [--port 8811] [--sites nvf-h1 nvf-h2]
+        [--base-sites nvf-h1 nvf-h2]
 """
 
 from __future__ import annotations
@@ -20,7 +26,6 @@ import time
 
 import nvflare
 
-from adapters.common.base import FrameworkError
 from adapters.common.hubclient import HubClient
 from adapters.common.relay import RelayAdapter
 from adapters.nvflare.flare_admin import FlareAdmin
@@ -32,6 +37,9 @@ KEEPER_PERIOD_S = 10.0
 CLIENT_JOBS_TTL_S = 5.0
 REJOIN_AFTER_S = 15.0  # a connected site outside the relay job for this long triggers a job restart
 SHUTDOWN_GRACE_S = 60.0  # then abort the old job if it did not end by itself
+SUBMIT_GRACE_S = 30.0  # submit once every base site is connected, or this long after the first one
+OFFLINE_FAIL_S = 30.0  # a site of a running round that is offline this long fails (the others go on)
+SITE_WATCH_S = 5.0
 
 
 class NVFlareAdapter(RelayAdapter):
@@ -39,41 +47,70 @@ class NVFlareAdapter(RelayAdapter):
     framework = "nvflare"
     framework_version = nvflare.__version__
 
-    def __init__(self, sites: list[str], admin: FlareAdmin, job_dir: str, hub: HubClient | None = None) -> None:
+    def __init__(self, sites: list[str], admin: FlareAdmin, job_dir: str, hub: HubClient | None = None,
+                 base_sites: list[str] | None = None) -> None:
         super().__init__(sites, hub)
         self.admin = admin
         self.job_dir = os.path.abspath(os.path.expanduser(job_dir))
+        self.base_sites = [s for s in (base_sites or sites) if s in sites]
         self.relay_job_id: str | None = None
-        self._client_jobs: tuple[float, dict[str, set[str]]] = (float("-inf"), {})
+        self._client_jobs: tuple[float, dict[str, set[str]] | None] = (float("-inf"), None)
         self._outside_since: dict[str, float] = {}
         self._restart_asked: float | None = None
+        self._first_connected: float | None = None
 
     # ---- site status ---------------------------------------------------------------------
-    def client_jobs(self, max_age_s: float = CLIENT_JOBS_TTL_S) -> dict[str, set[str]]:
-        """{client: job ids} from the server's probe of the clients, cached for a few seconds."""
+    def client_jobs(self, max_age_s: float | None = None) -> dict[str, set[str]] | None:
+        """{client: job ids} from the server's probe of the clients, cached for CLIENT_JOBS_TTL_S;
+        None if the probe failed (unknown)."""
         stamp, jobs = self._client_jobs
-        if time.monotonic() - stamp > max_age_s:
+        if time.monotonic() - stamp > (CLIENT_JOBS_TTL_S if max_age_s is None else max_age_s):
             try:
                 jobs = self.admin.client_jobs()
             except Exception as exc:
                 log.warning("FLARE API client job status failed: %s", exc)
-                jobs = {}
+                jobs = None
             self._client_jobs = (time.monotonic(), jobs)
         return jobs
 
     def site_status(self) -> dict[str, str]:
         relay_view = super().site_status()  # the relay's live job clients ({} if the relay is silent)
-        jobs = self.client_jobs()
+        jobs = self.client_jobs() or {}
         return {
             s: "online" if relay_view.get(s) == "online" and self.relay_job_id in jobs.get(s, ()) else "offline"
             for s in self.sites
         }
 
     def run_round(self, task, weights, client_config):
-        offline = [s for s, st in self.site_status().items() if s in task.sites and st != "online"]
-        if offline:  # fail fast instead of waiting for the deadline
-            raise FrameworkError(f"NVFlare sites not online in the relay job: {offline}")
-        return super().run_round(task, weights, client_config)
+        status = self.site_status()
+        for s in task.active_sites():  # fail offline sites at once; the others go on
+            if status.get(s) != "online":
+                self.report_site_error(task, s, f"NVFlare site {s} is not online in relay job {self.relay_job_id}")
+        if not task.active_sites():
+            return []
+        stop = threading.Event()
+        threading.Thread(target=self._watch_sites, args=(task, stop), name=f"{task.task_id}-sites",
+                         daemon=True).start()
+        try:
+            return super().run_round(task, weights, client_config)
+        finally:
+            stop.set()
+
+    def _watch_sites(self, task, stop: threading.Event) -> None:
+        """Fails a site of the running round once it has been offline for OFFLINE_FAIL_S (e.g. a
+        killed client), instead of letting the round wait for the deadline. An unknown status
+        (FLARE API probe failed) never fails a site."""
+        offline_since: dict[str, float] = {}
+        while not stop.wait(SITE_WATCH_S) and not task.terminal:
+            if self.client_jobs() is None:
+                continue
+            status, now = self.site_status(), time.monotonic()
+            for s in task.active_sites():
+                if status.get(s) == "online":
+                    offline_since.pop(s, None)
+                elif now - offline_since.setdefault(s, now) >= OFFLINE_FAIL_S:
+                    self.report_site_error(task, s, f"NVFlare site {s} went offline during round {task.round} "
+                                                    f"(not in relay job {self.relay_job_id} for {OFFLINE_FAIL_S:.0f}s)")
 
     # ---- relay job lifecycle -------------------------------------------------------------
     def _busy(self) -> bool:
@@ -96,9 +133,20 @@ class NVFlareAdapter(RelayAdapter):
         if not active:
             self._restart_asked = None
             self._outside_since.clear()
+            jobs = self.client_jobs(max_age_s=0)
+            connected = [s for s in self.sites if s in (jobs or {})]
+            if not connected:
+                self._first_connected = None
+                return  # nothing to run on yet
+            now = time.monotonic()
+            self._first_connected = self._first_connected or now
+            missing = [s for s in self.base_sites if s not in connected]
+            if missing and now - self._first_connected < SUBMIT_GRACE_S:
+                return  # give the other base sites a moment, so that one job start covers all of them
+            self._first_connected = None
             self._shutdown.clear()  # a shutdown nobody picked up must not end the new relay
             self.relay_job_id = self.admin.submit_job(self.job_dir)
-            log.info("submitted relay job %s from %s", self.relay_job_id, self.job_dir)
+            log.info("submitted relay job %s from %s (connected: %s)", self.relay_job_id, self.job_dir, connected)
             return
         job = active[0]
         if job["job_id"] != self.relay_job_id:
@@ -113,6 +161,8 @@ class NVFlareAdapter(RelayAdapter):
         if job["status"] != "RUNNING":
             return  # scheduled; waits for its clients
         jobs = self.client_jobs(max_age_s=0)
+        if jobs is None:
+            return  # probe failed: decide nothing
         now = time.monotonic()
         for site in self.sites:
             if site in jobs and self.relay_job_id not in jobs[site]:
@@ -147,7 +197,7 @@ class NVFlareAdapter(RelayAdapter):
     def _route_status(self, req):
         status, body = super()._route_status(req)
         return status, {**body, "relay_job_id": self.relay_job_id,
-                        "client_jobs": {k: sorted(v) for k, v in self._client_jobs[1].items()}}
+                        "client_jobs": {k: sorted(v) for k, v in (self._client_jobs[1] or {}).items()}}
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -155,15 +205,18 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--port", type=int, default=8811)
     ap.add_argument("--sites", nargs="+", default=["nvf-h1", "nvf-h2"], help="site ids (space or comma separated)")
+    ap.add_argument("--base-sites", nargs="+", default=None,
+                    help="sites that normally run (default: all --sites); extra sites may stay offline")
     ap.add_argument("--hub-url", default=os.environ.get("FLHUB_HUB_URL"))
     ap.add_argument("--admin-kit", required=True, help="NVFlare admin startup kit directory")
     ap.add_argument("--job-dir", required=True, help="exported relay job folder (python -m adapters.nvflare.job)")
     args = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
     sites = [s for item in args.sites for s in item.split(",") if s]
+    base = [s for item in (args.base_sites or []) for s in item.split(",") if s] or None
 
     admin = FlareAdmin(args.admin_kit)
-    adapter = NVFlareAdapter(sites, admin, args.job_dir, HubClient(args.hub_url))
+    adapter = NVFlareAdapter(sites, admin, args.job_dir, HubClient(args.hub_url), base_sites=base)
     server = adapter.build_server(args.host, args.port).start()
     stop = threading.Event()
     for sig in (signal.SIGTERM, signal.SIGINT):
