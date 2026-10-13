@@ -27,3 +27,10 @@ Newest entries at the bottom. Format: `### <UTC timestamp> — S<n> — <title>`
 - Conformance v2 vs central: flower 13/13 (also re-run at 17cdfd1), nvflare 13/13, vantage6 13/13 (payload-64 round 117.5 s); all diffs 0.0; evidence/conformance-v2-*-central.json. Milestones S2-flower #154, S2-nvflare #165, S2-vantage6 #199.
 - Real-path dev run (nvflare+flower, dir0.3, fedadam) = sim; S2-mixed (6 sites, 3 rounds, 8.6 s/round) = sim, hashes equal, milestone #200.
 - S3-frozen 96c44c9 (#210, ~/flhub-runtime/frozen_sha). Frozen paths: flhub_core adapters clients hub configs/stage2 deploy/central. Waiting for the three confirmations, then S4 E4a.
+
+### 2026-10-13 16:30 UTC — S4 — E4a running; hub core restart; disk
+- Confirmations #211-#213 for 96c44c9; S4 started 16:03Z with E4a (scripts/stage2/e4a_sweep.py per scope; purge between sizes; disk/RAM rules).
+- Problem found: the hub-core systemd service still ran stage-1 code (started 12:27Z): no /admin/gc or DELETE /blobs, 512 MiB body cap (would have failed E4a 512 MB inside the hub). Restarted on the frozen code before the 256/512 MB sizes; 530 MiB blob round trip verified (put 1.4 s, get 1.2 s). Lesson: every central service must be restarted after a code change in its package, not only the adapters.
+- Disk: GC of old blobs (584 MB), S3 checkpoints (376 MB), payload checkpoints dropped after each run and after its INV-1 sim (hashes suffice). Free 5-6 GB -> 512 MB on 2-site scopes = testbed disk limit (needs 7 GB); asked owner #214 about the local stage-1 image copy (1.5 GB unique).
+- Results so far: nvflare 1-256 MB ok (9-43 s per run), flower 1-256 MB ok (20-78 s), 12 runs finalized (INV-1 full-sim hash-equal) on W&B; flower bytes on wire ~1.002 x payload. vantage6 running: 32 MB 183 s, 64 MB ~118 s per round (DB mode).
+- Mistake: a wait loop with pgrep -f matched its own command line (stage-1 lesson repeated); killed by PID.
