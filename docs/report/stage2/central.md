@@ -42,7 +42,17 @@ All final runs: `docs/report/stage2/runs.md` (W&B project `AgnosticFL-stage2`). 
 | E1 reference jobs failed at start | KeyError 'pooled'; BrokenProcessPool | partition sizes indexed with the centralized pseudo-site; the local-only worker function lived in `__main__` (spawned workers cannot import it) | 1-line fix + `hub/sim/local.py`, re-freeze 975a949 (#396) | 975a949 | 15 min |
 | a wait loop never ended | background `pgrep -f` loop | the pattern matched the loop's own command line (stage-1 lesson) | wait on a PID file | — | 5 min |
 | frozen SHA recorded before the push | frozen_sha pointed to a pre-rebase SHA | `git pull --rebase` rewrote the local commit | write the frozen SHA after the push | — | 1 min |
+| vantage6 store between experiments | 1.1 GB server DB after E2 (750 tasks of a 209 KB model) | every run row keeps input and result in double base64 (1.78× the payload each) | `purge.sh --vacuum` between experiments and before every E3 run; models ≥ 16 MB are deleted per round by the adapter (ADR-020) | 4c6ab69 | 15 min (a first purge call hit the 10 min tool limit mid-delete; rerun finished in 1.3 min) |
+| E3 checkpoints would pile up | four E3 run dirs before finalize would leave < 3 GB free | finalize applies retention, but sims are not allowed during E3 runs | the E3 driver finalizes each run (INV-1 sim between runs) before the next | 4c6ab69 | — |
+| sysmon summaries of INV-4 re-runs filed under the original runs | `inv4-<run>` files matched by substring | the collector matched names by substring | exact `sysmon-<fw>-<run>` / `<run>-<fw>-sysmon` names | bc5d271 | 2 min |
+| empty stray files in the repo root | 13 zero-byte files named `PASS`, `Done`, `7`, ... (14:03Z) | a mis-quoted shell redirect in an earlier command | removed; never committed (`git status` before every commit) | — | 1 min |
 
 ## 7. Recommendations
 
-*(pending)*
+- **Gate before upload.** Creating the W&B run only after the INV-1 gate passed (`finalize_run.py`) kept the project clean without a single deletion, and made a SIGKILL of the hub (E6d) harmless for the experiment tracker.
+- **Budget the framework's own store, not just the payload.** vantage6 keeps every task's input and result in its server database; a 45 MB model costs about 320 MB per round on a 2-site run unless tasks are deleted after collection. Plan disk per framework from a measured run (here `disk_projection.json`), not from the payload size.
+- **Restart a service after updating its package.** The hub core still ran stage-1 code hours after the stage-2 rollout and would have refused 512 MB blobs.
+- **Keep timing runs free of other CPU load.** A sim with 4 workers on the 4-vCPU central VM changes round times; the post-processing queue (nice 19, at most 2 workers during learning runs, none during timing runs) made that rule automatic.
+- **Tune server learning rates per participation level.** The best aggregator with all sites (FedAvgM, η 1.0) diverged with half of the sites per round (E6c); η 0.3 was stable.
+- **For large models, replay instead of full simulation.** Recomputing 4 rounds from the real run's own checkpoints proves INV-1 at a fraction of the cost of re-training every round.
+- **Make every handshake a bus message with a fixed subject** (RUNLOCK, ARM/ARMED, RUN start/end with round windows, NETEM, E5 EXTRAS): scripts on both sides could wait for each other, and the transcript is the evidence.
