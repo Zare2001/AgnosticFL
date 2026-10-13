@@ -1,0 +1,64 @@
+{
+ "tests": {
+  "round_1": {
+   "seconds": 4.5,
+   "sites": {
+    "nvf-h1": {
+     "max_abs_diff": 0.0,
+     "num_examples": 785,
+     "train_loss": 0.6005063403943541,
+     "client_code_version": "0.1.0+9c6b064c1e96"
+    },
+    "nvf-h2": {
+     "max_abs_diff": 0.0,
+     "num_examples": 785,
+     "train_loss": 0.6181666053024827,
+     "client_code_version": "0.1.0+9c6b064c1e96"
+    }
+   }
+  },
+  "round_2": {
+   "sites": {
+    "nvf-h1": {
+     "max_abs_diff": 0.0,
+     "num_examples": 785,
+     "train_loss": 0.5991830904772327,
+     "client_code_version": "0.1.0+9c6b064c1e96"
+    },
+    "nvf-h2": {
+     "max_abs_diff": 0.0,
+     "num_examples": 785,
+     "train_loss": 0.6168305375014141,
+     "client_code_version": "0.1.0+9c6b064c1e96"
+    }
+   }
+  },
+  "round_4_after_cancel": {
+   "sites": {
+    "nvf-h1": {
+     "max_abs_diff": 0.0,
+     "num_examples": 785,
+     "train_loss": 0.5978525972670051,
+     "client_code_version": "0.1.0+9c6b064c1e96"
+    },
+    "nvf-h2": {
+     "max_abs_diff": 0.0,
+     "num_examples": 785,
+     "train_loss": 0.6184589829414513,
+     "client_code_version": "0.1.0+9c6b064c1e96"
+    }
+   }
+  }
+ },
+ "adapter": {
+  "adapter": "nvflare",
+  "framework": "nvflare",
+  "framework_version": "2.9.0",
+  "protocol": "flhub/0.1"
+ },
+ "sites": [
+  "nvf-h1",
+  "nvf-h2"
+ ],
+ "exitstatus": 0
+}
