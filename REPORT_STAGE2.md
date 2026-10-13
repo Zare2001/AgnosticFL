@@ -117,11 +117,22 @@ Data provisioning (all frameworks) is a data-only step: `python -m flhub_core.da
 
 ## 8. Threats to validity
 
-*(pending)*
+- **Uniform hardware.** All four VMs have the same CPU type (AMD EPYC-Rome, AVX2) and the same pinned versions. Bit-exact equality between hospitals, hub and sim (INV-1 at 0.0) depends on that; on mixed hardware the plan's tolerance fallback (relative ≤ 1e-5) would be needed.
+- **One datacenter network.** The framework VMs talk to central over the cloud provider's internal network (about 0.7 ms RTT); wide-area conditions exist only as netem emulation in E4b, which models rate and delay but not loss, jitter or competing traffic.
+- **Simulated hospitals.** Two hospitals share one 4-vCPU VM per framework, so co-located sites compete for CPU, memory, disk and the VM's link; round times include that contention. Payload results (E4) are bounded by the VMs' 19 GB disks and 31 GiB RAM ("testbed limits", reported separately from framework limits).
+- **One dataset and one tuning split.** All learning results use OrganAMNIST at 28 px; hyperparameters were tuned once, on `dir0.3`, with seed 2026, and several optima sit on the edge of the plan's grid (§2.6), so the aggregator ranking may change with a wider grid.
+- **Sim-based seed statistics.** Seeds 2027 and 2028 of E1/E2 run in `hub.sim` only. This is valid because the real seed-2026 run of the same config is hash-identical to its simulation (INV-1), but it assumes the real system would also have matched for the other seeds.
+- **Partition construction.** With equal site sizes, the Dirichlet partitions saturate (classes run out), so `dir0.1` is barely more skewed than `dir0.3` (§2.4); the realized label histograms, not α, describe the heterogeneity.
+- **Timing granularity.** Per-site completion times come from polling the adapters every 0.25 s and the frameworks' own polling (vantage6 1 s, Flower relay 1 s, NVFlare streaming), so sub-second differences in overhead are not resolved.
 
 ## 9. Limitations, security notes, future work
 
-*(pending)*
+- **Out of scope by the owner's decision (PLAN.md §3)**, so future work: SCAFFOLD and other control-variate methods, robust aggregators (median, trimmed mean, Krum), federated evaluation at the sites, secure aggregation, differential privacy, GPUs.
+- **Plaintext updates at the hub.** The hub core stores every site's weights as plain safetensors blobs (with rolling GC). Anyone with access to central sees all updates; secure aggregation would change that.
+- **TLS gaps (unchanged from stage 1).** NVFlare uses its provisioned mTLS; vantage6 and Flower run without TLS, restricted by the cloud firewall to the four VM IPs.
+- **vantage6 in DB mode is the payload bottleneck.** vantage6 4.15.2 stores task inputs and results as base64 JSON in the server database and rewrites the whole run row for every algorithm log line; the large-result-store knob is not usable in 4.15.2 (ADR-020). A next step is vantage6 5.x or a blob store with streaming.
+- **Single operator.** One VM hosts all framework servers, the hub and the orchestrator; an operator outage stops every framework (E6 tests restarts, not the loss of the VM).
+- **Recommended next steps:** repeat E1–E2 with more seeds on the real system; a wider tuning grid; heterogeneous hardware with the tolerance fallback; real WAN links; 64 px data (the *Could* item of E3); BranchKey or other frameworks through the same flhub/0.2 adapter contract (REPORT.md §14).
 
 ## 10. How the agents ran the campaign
 
