@@ -109,7 +109,28 @@ Data provisioning (all frameworks) is a data-only step: `python -m flhub_core.da
 
 ## 6. RQ4 — Performance (E3, E4, E5, E7)
 
-*(pending)*
+### 6.1 E4a — payload sweep
+
+`payload-<S>` echo models (no compute; round time = transport + framework + hub), 3 rounds, scopes nvflare / vantage6 / flower (2 sites each) and mixed (6 sites); median of rounds 2–3. Every successful run passed INV-1 (hash-equal per round). Full tables: `docs/report/stage2/tables.md`, `docs/report/stage2/e4_bytes.md`.
+
+![e4a](docs/report/stage2/figures/e4a_round_time_vs_payload.png)
+
+| MiB | NVFlare s/round | Flower s/round | vantage6 s/round | mixed s/round |
+|---|---|---|---|---|
+| 1 | 2.5 | 5.8 | 6.3 | 6.5 |
+| 8 | 2.7 | 6.1 | 12.8 | 13.3 |
+| 32 | 2.7 | 7.7 | 60.1 | 58.9 |
+| 64 | 3.7 | 9.1 | 115.3 | 116.2 |
+| 128 | 5.1 | 13.5 | 468.2 | *(disk)* |
+| 256 | 10.3 | 20.6 | *(disk)* | *(disk)* |
+| 512 | *(disk, see extension)* | *(disk, see extension)* | — | — |
+
+- **No framework limit was hit.** Every stop is a *testbed disk limit* of the 19 GB central VM (PLAN.md §7 rule: free ≥ 3 GB + 4 × payload × sites; for vantage6 a measured projection of its database growth). *(pending: the end-of-S4 extension after the owner freed 1.5 GB.)*
+- **Bytes on wire** (interface deltas on the framework VMs ÷ payload moved): NVFlare 1.005–1.06, Flower 1.002–1.005, vantage6 5.4 (64 MB) to 9.1 (128 MB). vantage6 4.15.2 sends the run input (base64 JSON, 1.78× the payload) four times per site and round by design (run list, PATCH response, GET before the result, result PATCH response), and more under load, when its single uwsgi worker drops connections while it rewrites the run row for every algorithm log line (vantage6 section §4).
+- **Scaling.** NVFlare's round time stays near its 2–2.5 s task-polling floor up to 32 MB and grows about linearly beyond (10.3 s at 256 MB). Flower adds about 5.5 s of fixed cost (3 s polling of `send_and_receive`, ClientApp process start) and grows linearly. vantage6 grows superlinearly (doubling 64 → 128 MB costs 4×) because the server is CPU-bound in one process; the mixed scope inherits vantage6's time.
+- **Memory on central** (sysmon peak RSS): the hub core stays at 42–46 MB at every size (blobs are streamed); the orchestrator needs about 8× the payload (2.0 GB at 256 MB, 2 sites), NVFlare's relay job about 10×, Flower's relay ServerApp about 7.6×, vantage6's server and adapter 15–18× (2.3 / 1.9 GB at 128 MB). Central used at most 7.9 GB of 31 GB; the framework VMs stayed below 16 % of RAM.
+
+*(pending: E4b, E3, E5, E7)*
 
 ## 7. RQ5 — Robustness (E6)
 
