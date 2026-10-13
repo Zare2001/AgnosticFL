@@ -49,3 +49,10 @@ Sources: wheels vantage6-server/-node 4.15.2 (PyPI, read only), client/common/cl
 - New scripts: central `purge.sh [--vacuum]` (island 581 MB -> 132 KB, 17 s), `restart_adapter.sh` (conformance/E6d), `native/` (E7); VM `taskdir_gc.sh` (cron every minute; ledger), `extra.sh install|start|stop|status` (configs installed, nodes not started).
 - E7 native (ADR-022): central function `v6_native.fedavg` on the hub-operator node next to the server (`native/run.sh`); island C1 3 rounds: global hashes == hub run in every round (diff 0.0), 8.5 s vs 8.1-8.8 s per round; C2 payload-45: round 1 98.4 s.
 - Adapter: `needs_weights = False`; per-site `vantage6_{create,fetch,store}_s` metrics; per-model-size polling.
+
+### 2026-10-13T16:05Z — S2/S3 — S2-vantage6, netem test, S3-frozen confirmed
+- S2-vantage6 (#199): central conformance v2 13/13 vs the real deployment, diff 0.0 every round (payload-64 117.5 s, DB mode); evidence docs/report/stage2/evidence/conformance-v2-vantage6-central.json. S2-mixed (#200) hash-equal to sim.
+- netem.sh under RUNLOCK #201 (15:56:50-15:57:10Z): wan100 on egress to 145.38.205.58 dports 7601/5050, revert timer first; TCP connect 7601 0.73 -> 20.8 ms, 5050 0.57 -> 20.6 ms, bus 7700 unchanged 0.63 -> 0.68 ms, nodes connected; cleared -> fq_codel default, 0 timers (#209).
+- E6b tool: `inject.sh arm v6-h4 straggle:10 --round 7 --until-round 14` (trigger = node log 'Starting task <id> - flhub-r<N>', tty logs end in \r); island rounds 45-46 throttled 44.6/43.6 s vs 11.5 s.
+- S3-frozen 96c44c9 (#210) confirmed (#211): no diff in flhub_core/clients/vantage6 since a43cef3 (image) or adapters/vantage6/service.py since 890966d (adapter); only new E7 native files. Hospitals: image v6-train:a43cef3f75c0, code_version 0.2.0+fe357a1dbec1.
+- S4 prep on the VM: island down, its images/volumes removed, uv cache pruned -> 5.6 GB free; sysmon (per-node) + run follower + task-folder GC running.
