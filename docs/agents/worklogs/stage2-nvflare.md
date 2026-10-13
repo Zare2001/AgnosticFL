@@ -83,3 +83,8 @@ Server-side candidates if E4a hits a limit on central: comm_config.json `streami
 
 ### 2026-10-13T15:50Z — S2 — relay timings per site result (for RQ4/E4a)
 - The relay adds `nvflare_relay_prep_s` (global model from the hub core into an FLModel), `nvflare_relay_reply_s` (task sent -> reply at the server: NVFlare transport both ways + client work) and `nvflare_relay_store_s` (reply weights into the hub core) to each site's metrics (-> metrics.jsonl site/<id>/...). Weights unchanged. Island payload-128: prep 0.37 s, reply 3.8 s (client echo 0.05 s), store 0.5 s, round 5.65 s.
+
+### 2026-10-13T15:55Z — S2 — ready for the freeze; island stopped
+- Central restarted the NVFlare adapter at 3212150 (#190, HEALTHY after 10 s): relay timings + central's needs_weights=False. Told central NVFlare is final (#194); rollout SHA for the freeze check: 3212150.
+- run_follow.py running (per RUN end: sysmon summary to central, rounds trained, flagged log lines, health); sysmon restarted with an island pattern that cannot match its own command line (it had counted itself as "island").
+- Island processes stopped (clients, server, adapter, hub core; island cron line removed); files kept (~/flhub-island, venvs island/island-hosp/island-s1) for reproductions; to be removed in S5.

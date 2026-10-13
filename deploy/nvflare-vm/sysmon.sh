@@ -6,7 +6,7 @@ set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$HERE/common.sh"
 DIR="${SYSMON_DIR:-$HOME/flhub-runtime/sysmon}"
-procs=("island=flhub-island" "inject=inject_watch\.py")
+procs=("island=flhub-island/(server|sites|hubcore)" "inject=inject_watch\.py")  # pattern must not match its own text
 for s in nvf-h1 nvf-h2 nvf-h7 nvf-h8; do
   procs+=("$s-client=client_train -m \S+/sites/$s( |$)" "$s-job=worker_process -m \S+/sites/$s( |$)")
 done
