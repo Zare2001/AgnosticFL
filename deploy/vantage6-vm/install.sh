@@ -89,4 +89,9 @@ CRON="* * * * * [ -f $RT/nodes.enabled ] && flock -n $RT/watchdog.lock bash $REP
 others="$(crontab -l 2>/dev/null | grep -v 'deploy/vantage6-vm/start.sh' || true)"
 printf '%s\n%s\n' "$others" "$CRON" | sed '/^$/d' | crontab -
 log "watchdog cron entry installed (log $RT/watchdog.log)"
+# --- 7. housekeeping: delete finished per-run task folders the nodes never delete (taskdir_gc.sh) ---
+GC="* * * * * flock -n $RT/taskdir_gc.lock bash $REPO/deploy/vantage6-vm/taskdir_gc.sh >> $RT/taskdir_gc.log 2>&1"
+others="$(crontab -l 2>/dev/null | grep -v 'deploy/vantage6-vm/taskdir_gc.sh' || true)"
+printf '%s\n%s\n' "$others" "$GC" | sed '/^$/d' | crontab -
+log "task-folder GC cron entry installed (log $RT/taskdir_gc.log)"
 log "done; allowed algorithm images: $ALLOWED"
