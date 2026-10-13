@@ -28,3 +28,25 @@ Newest entries at the bottom. Format: `### <UTC timestamp> — <phase> — <titl
 - Lesson: `pkill -f <pattern>` or `pgrep -f` inside a one-line shell command can match and kill the calling shell itself (exit 144) when the pattern also appears in that command line. Kill by PID or use pid files.
 - Evidence: commits 265f5ee, 86998f0, 5a0c5a1, 5b05dbd, 0ac748d; bus msgs #18 (conformance), #19 (orchestrator), #20 (M1-hub milestone).
 - Next: process deploy-requests (P2); write configs/<fw>-only.yaml and the mixed config.
+### 2026-10-13 12:40 UTC — P2 — NVFlare and vantage6 deployed on central
+- What: NVFlare deploy-request #25 (sha b19f888) ran `deploy/central/nvflare/install.sh && start.sh` at e586fc4. Provisioning used server name flhub-central (fed 8002, admin 8003, mTLS). Relay job 9e4f07a2 submitted; adapter on 127.0.0.1:8811. Startup kits for nvf-h1 and nvf-h2 sent encrypted as bus files #1 and #2. Clients connected about 12:36.
+- What: vantage6 deploy-request #32 (sha fc4a41c) ran install at bd800ce. Built and pushed algorithm image localhost:5050/flhub/v6-train:bd800cee7922 (nodes pull 145.38.205.58:5050/...). Entities imported (hub-operator, v6-h3, v6-h4, collaboration flhub). Server 4.15.2 on :7601; adapter on 127.0.0.1:8812. Node API keys sent encrypted as bus file #3. Images pre-pulled (vantage6 server, python:3.11.17-slim-bookworm) to save time.
+- Result: NVFlare deploy-result PASS #29. Conformance vs central :8811: 7 passed in 13.7 s, max_abs_diff 0.0 (rounds 1, 2, 4). 3-round `nvflare-p2` (offline) vs hub.sim on the same sites: max abs weight diff 0.0, EQUIVALENCE PASS, 2-3 s/round. M2-nvflare sent as #36.
+- Result: vantage6 deploy-result PASS #39. Conformance vs central :8812: 7 passed in 26.4 s, diff 0.0. 3-round `vantage6-p2`: 7-8 s/round, equivalence vs sim PASS (diff 0.0). M2-vantage6 sent as #50.
+- Result: requested and received status.sh exit-code fix. Every framework status.sh now exits 1 when a site is offline (vantage6 9c88bca, flower 8b19ca5), so deploy/central/status.sh can aggregate exit codes for the DoD.
+- Evidence: bus msgs #25, #29, #32, #36, #39, #50; bus files #1, #2, #3; commits e586fc4, bd800ce, 9c88bca, 8b19ca5.
+- Next: process the Flower deploy-request (P2).
+
+### 2026-10-13 12:51 UTC — P2 — Flower deployed, M2-flower, M2-mixed
+- What: Flower deploy-request #46 (7f5adec), then 8b19ca5 (status fix and relay poll every 5 s). Ran install and start. SuperLink fleet on 0.0.0.0:9092, HTTP API on 127.0.0.1:9093, adapter on 127.0.0.1:8813, relay run via `flwr run`. Restarted with stop.sh and start.sh at 8b19ca5 (READY after 30 s). No secrets used (insecure, firewall-restricted, ADR-007).
+- Result: deploy-result PASS #49. Conformance vs central :8813: 7 passed in 30.2 s, diff 0.0 (n=784/784). 3-round `flower-p2`: 7-8 s/round, equivalence PASS. M2-flower sent as #54.
+- What: mixed 6-site run `mixed-p2` (configs/final.yaml, 3 rounds, offline). Six sites participated in every round, about 8 s/round.
+- Result: vs hub.sim, max abs weight diff 0.000e+00 in rounds 0-3, acc diff 0.0 pp, EQUIVALENCE PASS. Per-round test metrics identical to the earlier mock run (loss 0.6713 / 0.6948 / 0.6853). `bash deploy/central/status.sh` reports HEALTHY. M2-mixed sent as #55.
+- Evidence: bus msgs #46, #49, #54, #55; commits 7f5adec, 8b19ca5; docs/report/evidence/conformance-{nvflare,vantage6,flower}-central.json and docs/report/evidence/equivalence-mixed-p2.json. Evidence files are committed.
+- Next: P3 freeze (see next entry).
+
+### 2026-10-13 12:55 UTC — P3 — Freeze
+- What: configs/final.yaml frozen at b656577 (30 rounds, plan-default train config, round_retries 1). Froze the config at b656577 and broadcast the freeze as bus msg #56.
+- Result: git diff e586fc4..b656577, bd800ce..b656577 and 8b19ca5..b656577 shows only deploy/<fw>-vm scripts and docs changed. The running central code therefore equals the frozen SHA.
+- Evidence: commit b656577; bus msg #56.
+- Next: wait for the three framework confirmations that clients run the frozen SHA, then run `bash scripts/run_final.sh all`.
