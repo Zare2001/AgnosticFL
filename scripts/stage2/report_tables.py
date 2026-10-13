@@ -39,6 +39,13 @@ def last(run: dict | None, key: str):
     return vals[-1] if vals else None
 
 
+def last_k_mean(run: dict | None, key: str, k: int = 5):
+    if not run:
+        return None
+    vals = [r[key] for r in run["rows"] if key in r and r.get("step", 0) > 0][-k:]
+    return sum(vals) / len(vals) if vals else None
+
+
 def fmt(v, nd=3, pct=False) -> str:
     if v is None:
         return "-"
@@ -85,14 +92,16 @@ def fw_mean(row: dict, suffix: str, fw: str):
 
 
 def learning_table(title: str, names: list[tuple[str, str]], target: float | None) -> list[str]:
-    out = [f"### {title}", "", "| run | n seeds | test acc % | bal acc % | macro AUC % | worst-site acc % | "
-           "site-shaped sd | rounds-to-target (seed 2026) |", "|---|---|---|---|---|---|---|---|"]
+    out = [f"### {title}", "", "| run | n seeds | test acc % (final) | test acc % (mean last 5) | bal acc % | "
+           "macro AUC % | worst-site acc % | site-shaped sd | rounds-to-target (seed 2026) |",
+           "|---|---|---|---|---|---|---|---|---|"]
     for label, name in names:
         rs = seeds(name)
         if not rs:
-            out.append(f"| {label} | 0 | - | - | - | - | - | - |")
+            out.append(f"| {label} | 0 | - | - | - | - | - | - | - |")
             continue
         out.append(f"| {label} | {len(rs)} | {ms([last(r, 'global/test_acc') for r in rs])} | "
+                   f"{ms([last_k_mean(r, 'global/test_acc') for r in rs])} | "
                    f"{ms([last(r, 'global/test_bal_acc') for r in rs])} | {ms([last(r, 'global/test_auc') for r in rs])} | "
                    f"{ms([last(r, 'siteshaped/min_acc') for r in rs])} | "
                    f"{ms([last(r, 'siteshaped/std_acc') for r in rs], pct=False)} | {rounds_to_target(rs[0], target)} |")
