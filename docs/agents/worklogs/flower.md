@@ -41,3 +41,9 @@ Newest entries at the bottom. Format: `### <UTC timestamp> — <phase> — <titl
 - Verified in an isolated throwaway SuperLink (ports 19092/19093/18813): `flwr log <run-id> <conn> --show` shows the relay's log.
 - Wrote `docs/report/flower.md` (final-call #67): scope, design, Flower 1.39 specifics, hospital footprint with exact commands, timeline, problems table, evidence, reproduce steps.
 - Next: report-ready to central; keep SuperNodes up until all-done; then verify DoD items, final entry, `touch ~/.flhub/DONE`.
+
+### 2026-10-13T13:22Z — P4 — all-done: DoD items verified (flower)
+- all-done #84 (1b66a28). Verified on the flower VM: DoD 1 `deploy/flower-vm/status.sh` HEALTHY exit 0 (flw-h5/flw-h6 connected to 145.38.205.58:9092, watchdog enabled); DoD 2 hospital venv = flwr 1.39.0 + torch 2.14.1+cpu + flhub_core only (`import adapters`/`import hub` fail), FAB ClientApp is the standard Message-API pattern; DoD 3/4/5 from central evidence (conformance 7/7 diff 0.0 vs :8813; mixed-6sites 30/30 rounds x 6 sites; equivalence diff 0.0); DoD 7 `git log` 83+ commits all Zare2001, no attribution; pytest green (tests/flower 5 passed where flwr is installed, skipped otherwise); DoD 8 docs/report/flower.md pushed.
+- REPORT.md §5 Flower row made exact (`--insecure`, `--port`, TOML-quoted node config): 0cac28f.
+- Cleanup: offline W&B dirs of island dev runs, island hub core data, island SuperLink state and the island-only venvs (~/venvs/flower-central, ~/venvs/hub) removed; the VM now holds only the hospital side (~/venvs/flower, ~/flhub-data/flw-h5.csv, flw-h6.csv, ~/flhub-runtime/flower) + the repo checkout.
+- SuperNodes keep running (watchdog enabled). `~/.flhub/DONE` created.
