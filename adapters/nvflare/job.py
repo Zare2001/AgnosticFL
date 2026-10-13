@@ -20,12 +20,12 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__fi
 CLIENT_SCRIPT = os.path.join(REPO_ROOT, "clients", "nvflare", "client.py")
 
 
-def build_job(out_root: str, adapter_url: str = "http://127.0.0.1:8811", min_clients: int = 2) -> str:
+def build_job(out_root: str, adapter_url: str = "http://127.0.0.1:8811", hub_url: str = None, min_clients: int = 2) -> str:
     """Exports the relay job folder to <out_root>/flhub-relay and returns its path."""
     out_root = os.path.abspath(os.path.expanduser(out_root))
     job = FedJob(name=JOB_NAME, min_clients=min_clients)
     job.set_app_packages(["adapters"])  # the relay runs from the installed package on the server
-    job.to_server(HubRelayController(adapter_url=adapter_url), id="relay")
+    job.to_server(HubRelayController(adapter_url=adapter_url, hub_url=hub_url), id="relay")
     # A relative script path makes the job ship custom/client.py and run that copy at the
     # hospital; an absolute path would make clients run a local file at that path instead.
     cwd = os.getcwd()
@@ -42,9 +42,10 @@ def main():
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     p.add_argument("--out", required=True, help="directory to export the job folder into")
     p.add_argument("--adapter-url", default="http://127.0.0.1:8811")
+    p.add_argument("--hub-url", default=None, help="hub core URL for the relay (default: adapters.common default)")
     p.add_argument("--min-clients", type=int, default=2)
     a = p.parse_args()
-    print(build_job(a.out, a.adapter_url, a.min_clients))
+    print(build_job(a.out, a.adapter_url, a.hub_url, a.min_clients))
 
 
 if __name__ == "__main__":

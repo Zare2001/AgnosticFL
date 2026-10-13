@@ -1,27 +1,22 @@
 """NVFlare server workflow that relays hub rounds to the NVFlare clients.
 
-Runs inside the NVFlare server job (the long-running "flhub-relay" job). It long-polls the
-NVFlare adapter service on localhost for work, sends the global model to the requested
-clients with the standard ModelController API and posts the client results back.
-
-Besides NVFlare it only needs the stdlib and flhub_core.weights (numpy + safetensors, no torch).
+Runs inside the NVFlare server job "flhub-relay" (one long-running job). It long-polls the
+NVFlare adapter service with adapters.common.RelayClient, sends the global model to the
+requested clients with the standard ModelController API (send_model_and_wait, FULL weights)
+and stores each client's returned weights as a hub-core blob for the adapter.
 """
 
-import base64
-import hashlib
 import json
+import math
 import threading
 import time
-import urllib.error
-import urllib.parse
-import urllib.request
 
-import numpy as np
-
-from flhub_core.weights import from_safetensors, to_safetensors
 from nvflare.apis.fl_constant import FLMetaKey
 from nvflare.app_common.abstract.fl_model import FLModel, ParamsType
 from nvflare.app_common.workflows.model_controller import ModelController
+
+from adapters.common.hubclient import HubError, http_request
+from adapters.common.relay import RelayClient
 
 # FLModel.meta keys shared with clients/nvflare/client.py
 META_TRAIN_CONFIG = "train_config"
@@ -37,163 +32,120 @@ class HubRelayController(ModelController):
     def __init__(
         self,
         adapter_url: str = "http://127.0.0.1:8811",
-        poll_wait_s: int = 20,
+        hub_url: str = None,
+        poll_timeout_s: float = 20.0,
         cancel_poll_s: float = 2.0,
         task_name: str = "train",
     ):
-        """Relay workflow: hub dispatch -> send_model_and_wait -> results back to the adapter.
+        """Relay workflow: hub job -> send_model_and_wait -> client weights back to the adapter.
 
         Args:
-            adapter_url: base URL of the NVFlare adapter service (localhost only).
-            poll_wait_s: long-poll duration for GET /relay/next.
-            cancel_poll_s: how often a running task checks whether it was cancelled.
+            adapter_url: NVFlare adapter service (localhost only).
+            hub_url: hub core URL; None = adapters.common default (127.0.0.1:8800 / $FLHUB_HUB_URL).
+            poll_timeout_s: long-poll duration for the next hub job.
+            cancel_poll_s: how often a running round checks whether the hub cancelled it.
             task_name: NVFlare task name sent to the clients.
         """
         # no persistor: the hub owns the global model; client errors must not end the job
         super().__init__(persistor_id="", ignore_result_error=True)
-        self.adapter_url = adapter_url.rstrip("/")
-        self.poll_wait_s = poll_wait_s
+        self.adapter_url = adapter_url
+        self.hub_url = hub_url
+        self.poll_timeout_s = poll_timeout_s
         self.cancel_poll_s = cancel_poll_s
         self.task_name = task_name
 
-    # ---------------------------------------------------------------- HTTP helpers
-    def _http(self, method: str, path: str, body=None, timeout: float = 30.0):
-        data = None if body is None else json.dumps(body).encode()
-        req = urllib.request.Request(self.adapter_url + path, data=data, method=method)
-        if data is not None:
-            req.add_header("Content-Type", "application/json")
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            return json.loads(resp.read() or b"{}")
-
-    @staticmethod
-    def _fetch_model(url: str, ref: str) -> dict:
-        with urllib.request.urlopen(url, timeout=120) as resp:
-            blob = resp.read()
-        got = "sha256:" + hashlib.sha256(blob).hexdigest()
-        if got != ref:
-            raise RelayError(f"model blob hash mismatch: expected {ref}, got {got}")
-        return from_safetensors(blob)
-
-    # ---------------------------------------------------------------- workflow
-    def _clients(self):
-        return sorted(c.name for c in self.engine.get_clients())
+    def _job_clients(self) -> dict:
+        """{client name: online|offline} for the clients deployed in this job."""
+        names = sorted(c.name for c in self.engine.get_clients())
+        return {n: "offline" if self.get_client_disconnect_time(n) else "online" for n in names}
 
     def run(self):
-        job_id = self.fl_ctx.get_job_id()
-        self.info(f"HubRelayController started (job {job_id}), adapter {self.adapter_url}")
-        failures = 0
+        relay = RelayClient(self.adapter_url, self.hub_url)
+        self.info(f"relay started in job {self.fl_ctx.get_job_id()}; adapter {self.adapter_url}")
+        unreachable_since = None
         while not self.abort_signal.triggered:
-            query = urllib.parse.urlencode(
-                {"job_id": job_id, "clients": ",".join(self._clients()), "wait": self.poll_wait_s}
-            )
             try:
-                item = self._http("GET", f"/relay/next?{query}", timeout=self.poll_wait_s + 15)
-                failures = 0
-            except (urllib.error.URLError, OSError, ValueError) as e:
-                failures += 1
-                if failures == 1 or failures % 30 == 0:
-                    self.warning(f"adapter not reachable ({e}); retrying")
-                time.sleep(2.0)
+                relay.report_sites(self._job_clients())
+            except HubError:
+                pass  # next_job() below waits and reports the problem
+            job = relay.next_job(timeout=self.poll_timeout_s)
+            if job.get("error"):
+                if unreachable_since is None:
+                    unreachable_since = time.monotonic()
+                    self.warning(f"adapter not reachable: {job['error']}; retrying")
                 continue
-
-            kind = item.get("type")
-            if kind == "shutdown":
-                self.info("shutdown requested by adapter; ending relay job")
+            if unreachable_since is not None:
+                self.info(f"adapter reachable again after {time.monotonic() - unreachable_since:.0f}s")
+                unreachable_since = None
+            if job["type"] == "shutdown":
+                self.info("shutdown requested by the adapter; ending the relay job")
                 return
-            if kind == "task":
-                self._run_task(item, job_id)
-        self.info("abort signal received; ending relay job")
+            if job["type"] == "train":
+                self._train(relay, job)
+        self.info("abort signal received; ending the relay job")
 
-    def _run_task(self, item: dict, job_id: str):
-        task_id = item["task_id"]
-        result = {"task_id": task_id, "job_id": job_id, "ok": False, "error": None, "results": []}
+    def _train(self, relay: RelayClient, job: dict):
+        job_id, sites = job["job_id"], list(job["sites"])
         stop_watch = threading.Event()
         try:
-            sites = list(item["sites"])
-            clients = self._clients()
-            missing = [s for s in sites if s not in clients]
-            if missing:
-                raise RelayError(f"sites not in the NVFlare relay job: {missing} (job clients: {clients})")
-
-            weights = self._fetch_model(item["model_url"], item["model_ref"])
+            clients = self._job_clients()
+            absent = [s for s in sites if clients.get(s) != "online"]
+            if absent:
+                raise RelayError(f"sites not online in the NVFlare relay job: {absent} (job clients: {clients})")
             model = FLModel(
                 params_type=ParamsType.FULL,
-                params=weights,
-                current_round=int(item["round"]),
-                meta={META_TRAIN_CONFIG: dict(item.get("train_config") or {})},
+                params=relay.get_model(job),
+                current_round=int(job["round"]),
+                meta={META_TRAIN_CONFIG: dict(job["config"])},
             )
-            watcher = threading.Thread(target=self._watch_cancel, args=(task_id, stop_watch), daemon=True)
-            watcher.start()
-            t0 = time.time()
+            threading.Thread(target=self._watch_cancel, args=(job_id, stop_watch), daemon=True).start()
+            t0 = time.monotonic()
             replies = self.send_model_and_wait(
                 task_name=self.task_name,
                 data=model,
                 targets=sites,
-                timeout=int(item.get("deadline_s") or 0),
+                timeout=max(1, math.ceil(float(job.get("deadline_s") or 0))),
             )
-            self.info(f"task {task_id}: {len(replies)}/{len(sites)} replies in {time.time() - t0:.1f}s")
-
-            got = {}
+            self.info(f"job {job_id}: {len(replies)}/{len(sites)} replies in {time.monotonic() - t0:.1f}s")
+            results = {}
             for reply in replies:
                 site = reply.meta.get("client_name")
-                if site in got:
-                    raise RelayError(f"duplicate reply from {site}")
-                got[site] = self._convert_reply(site, reply)
-            lost = [s for s in sites if s not in got]
+                if site in results or site not in sites:
+                    raise RelayError(f"unexpected or duplicate reply from {site!r}")
+                results[site] = self._to_result(relay, site, reply)
+            lost = [s for s in sites if s not in results]
             if lost:
-                raise RelayError(f"no valid result from {lost} (client error, timeout or cancel)")
-            result["results"] = [got[s] for s in sites]
-            result["ok"] = True
-        except Exception as e:  # report every failure to the adapter, keep the relay alive
-            result["error"] = f"{type(e).__name__}: {e}"
-            self.error(f"task {task_id} failed: {result['error']}")
+                raise RelayError(f"no valid result from {lost} (client error, deadline or cancel)")
+            relay.post_result(job_id, [results[s] for s in sites])
+        except Exception as e:  # report every failure to the hub; keep the relay job alive
+            msg = f"NVFlare relay: {type(e).__name__}: {e}"
+            self.error(f"job {job_id} failed: {msg}")
+            try:
+                relay.post_error(job_id, msg)
+            except HubError as post_exc:  # e.g. 404: the hub already cancelled the task
+                self.warning(f"could not report the failure of {job_id}: {post_exc}")
         finally:
             stop_watch.set()
-        self._post_result(result)
 
-    def _convert_reply(self, site: str, reply: FLModel) -> dict:
-        if reply.params_type != ParamsType.FULL:
-            raise RelayError(f"{site} sent params_type {reply.params_type}, expected FULL")
-        params = {k: np.ascontiguousarray(v, dtype=np.float32) for k, v in reply.params.items()}
+    @staticmethod
+    def _to_result(relay: RelayClient, site: str, reply: FLModel) -> dict:
+        if reply.params_type != ParamsType.FULL or not reply.params:
+            raise RelayError(f"{site} sent params_type {reply.params_type}; FULL weights are required")
         meta = reply.meta or {}
         n = meta.get(META_NUM_EXAMPLES, meta.get(FLMetaKey.NUM_STEPS_CURRENT_ROUND))
         if n is None or int(n) <= 0:
             raise RelayError(f"{site} sent no positive '{META_NUM_EXAMPLES}' in FLModel.meta")
-        return {
-            "site_id": site,
-            "weights_b64": base64.b64encode(to_safetensors(params)).decode("ascii"),
-            "num_examples": int(n),
-            "metrics": {k: float(v) for k, v in (reply.metrics or {}).items()},
-            "client_code_version": meta.get(META_CODE_VERSION),
-        }
+        return relay.result(site, reply.params, int(n), reply.metrics, meta.get(META_CODE_VERSION, "unknown"))
 
-    def _post_result(self, result: dict):
-        # the adapter must learn the outcome; retry until it answers or the job is aborted
-        for attempt in range(1000):
-            try:
-                self._http("POST", "/relay/result", result, timeout=120)
-                return
-            except urllib.error.HTTPError as e:
-                if 400 <= e.code < 500:  # e.g. the adapter restarted and forgot the task
-                    self.warning(f"adapter rejected result of {result['task_id']}: HTTP {e.code}")
-                    return
-                if attempt % 30 == 0:
-                    self.warning(f"posting result of {result['task_id']} failed ({e}); retrying")
-                time.sleep(2.0)
-            except (urllib.error.URLError, OSError, ValueError) as e:
-                if self.abort_signal.triggered:
-                    return
-                if attempt % 30 == 0:
-                    self.warning(f"posting result of {result['task_id']} failed ({e}); retrying")
-                time.sleep(2.0)
-
-    def _watch_cancel(self, task_id: str, stop: threading.Event):
+    def _watch_cancel(self, job_id: str, stop: threading.Event):
+        """Best-effort cancel: once the adapter no longer waits for this job, stop the NVFlare task."""
         while not stop.wait(self.cancel_poll_s):
             try:
-                state = self._http("GET", f"/relay/tasks/{task_id}", timeout=10).get("state")
-            except (urllib.error.URLError, OSError, ValueError):
+                status, body = http_request(f"{self.adapter_url.rstrip('/')}/relay/status", timeout=10)
+                pending = json.loads(body).get("pending", []) if status == 200 else None
+            except (HubError, ValueError):
                 continue
-            if state == "cancelled":
-                self.info(f"task {task_id} cancelled by the hub; cancelling NVFlare tasks")
+            if pending is not None and job_id not in pending:
+                self.info(f"job {job_id} is no longer pending at the hub (cancelled or deadline); cancelling it")
                 self.cancel_all_tasks()
                 return

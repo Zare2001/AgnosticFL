@@ -26,8 +26,8 @@ def main():
         global_model = flare.receive()
         if global_model is None:  # job finished
             break
-        cfg = dict(global_model.meta.get("train_config", {}))
-        cfg["round"] = global_model.current_round
+        # hub train_config (+ "round"); the NVFlare round number is the same hub round
+        cfg = {"round": global_model.current_round, **global_model.meta.get("train_config", {})}
         weights, num_examples, metrics = train(global_model.params, data, TrainConfig.from_dict(cfg))
         print(f"[flhub] {site}: round {cfg['round']} n={num_examples} {metrics}", flush=True)
         flare.send(
