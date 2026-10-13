@@ -168,7 +168,9 @@ class BaseAdapter:
 
     def rpc_tasks_get(self, params: dict) -> dict:
         check_protocol(params)
-        return self.tasks.get(params.get("task_id")).status()
+        task = self.tasks.get(params.get("task_id"))
+        with self.tasks.lock:  # a consistent snapshot of the task and site states
+            return task.status()
 
     def rpc_collect(self, params: dict) -> dict:
         check_protocol(params)
