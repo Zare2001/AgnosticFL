@@ -68,8 +68,8 @@ def wait_for(path: Path, timeout: float = 7200) -> None:
         time.sleep(0.2)
 
 
-def run_dir_of(name: str, timeout: float = 600) -> Path:
-    link = RUNS / f"{name}-latest"
+def run_dir_of(name: str, timeout: float = 600, root: Path = RUNS) -> Path:
+    link = Path(root).expanduser() / f"{name}-latest"
     end = time.time() + timeout
     while time.time() < end:
         if link.exists() and (link.resolve() / "rounds" / "r0000.json").exists():
@@ -91,7 +91,7 @@ def e6d(args) -> int:
     orch = subprocess.Popen([PY, "-m", "hub.orchestrator", "run", "--config", args.config], cwd=REPO, stdout=log,
                             stderr=subprocess.STDOUT)
     try:
-        run_dir = run_dir_of(cfg.name)
+        run_dir = run_dir_of(cfg.name, root=Path(cfg.runs_dir))
         wait_for(run_dir / "rounds" / f"r{args.round:04d}.json")
         time.sleep(args.delay)
         victims = {"orchestrator": [orch.pid]} | {fw: pids(p) for fw, p in ADAPTER_PATTERNS.items()}
@@ -117,6 +117,9 @@ def e6d(args) -> int:
         f"{args.round}; run_dir={run_dir}")
     record({"event": "run", "name": cfg.name, "exp": cfg.experiment, "start": start, "end": end, "rc": rc,
             "status": summary.get("status"), "run_dir": str(run_dir), "injection": "e6d"})
+    if args.dry:
+        print(f"dry run {cfg.name}: rc={rc} status={summary.get('status')} run_dir={run_dir}")
+        return rc
     if rc == 0 and summary.get("status") == "finished":
         enqueue({"type": "real-post", "name": cfg.name, "exp": cfg.experiment, "config": args.config,
                  "run_dir": str(run_dir), "replay": False, "equal_to": args.equal_to,
@@ -155,6 +158,7 @@ def main(argv: list[str] | None = None) -> int:
     d.add_argument("--round", type=int, default=20)
     d.add_argument("--delay", type=float, default=3.0)
     d.add_argument("--equal-to", default="s2-e2-dir0.3-fedavgm")
+    d.add_argument("--dry", action="store_true", help="rehearsal: no post-processing / finalize")
     e = sub.add_parser("e6e")
     e.add_argument("--run", default="s2-e6e-server-restart")
     e.add_argument("--plan", default="after:3:nvflare,mid:6:nvflare,after:9:vantage6,mid:12:vantage6,"

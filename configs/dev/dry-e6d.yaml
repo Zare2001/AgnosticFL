@@ -1,0 +1,8 @@
+# E6d rehearsal (EXPERIMENTS.md §Order step 2; not a final run): dir0.3 + A*, 6 rounds, kill after round 3
+extends: ../stage2/base.yaml
+name: dry-e6d
+experiment: DRY
+aggregator: {name: fedavgm, params: {eta: 1.0, beta: 0.9}}
+rounds: 6
+round_retries: 2
+runs_dir: ~/flhub-runtime/runs-dev
