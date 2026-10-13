@@ -27,3 +27,10 @@ Newest entries at the bottom. Format: `### <UTC timestamp> — <phase> — <titl
 - `hub.orchestrator run --config deploy/flower-vm/island-3r.yaml --wandb offline`: finished, 3 rounds, 6-8 s/round; vs `hub.sim` same config: `equivalence_check` max abs weight diff 0.0 rounds 0-3, acc diff 0.0 pp -> PASS.
 - Problems solved: (1) Flower 1.39 port/API changes (ADR-007); (2) SuperNodes die when an in-memory SuperLink restarts -> persistent `--database` + `supernode.sh` restart loop (tested: same DB keeps ids, wiped DB -> restart in ~10 s, rounds still bit-exact); (3) dead node id still listed online after a SuperNode restart -> non-blocking site-info QUERY, newest node wins; (4) node lost mid-round -> round fails within ~5 s instead of waiting deadline_s; (5) deploy pidfile bug (`cd && setsid ... &` recorded a wrapper pid) fixed.
 - Next: commit + push, M1-flower milestone, deploy-request to central.
+
+### 2026-10-13T12:53Z — P2 — M2-flower on the central VM
+- deploy-request #46 (7f5adec, then 8b19ca5 for status.sh) -> central deploy-result #49 PASS: SuperLink fleet 0.0.0.0:9092 public, HTTP API 127.0.0.1:9093, adapter 127.0.0.1:8813, relay run polling; no secrets needed (insecure, ADR-007).
+- Switched hospitals: stopped the island server side + local hub core, `deploy/flower-vm/start.sh` with the default SuperLink 145.38.205.58:9092 (only config change); both SuperNodes connected (status HEALTHY).
+- Central evidence (#54, M2-flower): conformance vs :8813 7 passed, max_abs_diff 0.0 rounds 1/2/4, n=784/784; `--only flower --rounds 3` run == hub.sim (diff 0.0). M2-mixed (#55): 6 sites, 3 rounds, == sim (diff 0.0).
+- Added: status.sh exits 1 unless both sites online (`--no-sites` opt-out, 8b19ca5); cron watchdog re-runs `deploy/flower-vm/start.sh` every minute while enabled (d0ce5ef; supervisor crash -> back in ~33 s).
+- Next: confirm the frozen SHA for P3, keep SuperNodes up and untouched until M3-final, watch logs.
