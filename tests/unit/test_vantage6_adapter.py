@@ -2,6 +2,7 @@
 
 import base64
 import json
+import threading
 import time
 from types import SimpleNamespace
 
@@ -18,49 +19,69 @@ ORGS = {"v6-h3": 2, "v6-h4": 3}
 
 
 class FakeV6:
-    """Just the parts of vantage6.client.UserClient the adapter uses."""
+    """Just the parts of vantage6.client.UserClient the adapter uses. One vantage6 task per site:
+    `final` maps an organisation id to its final status (default completed) after `polls` polls."""
 
-    def __init__(self, final="completed", polls_until_final=2, tamper=None):
-        self.final, self.polls_until_final, self.tamper = final, polls_until_final, tamper
-        self.created, self.killed, self.polls = [], [], 0
-        self.task = SimpleNamespace(create=self._create, kill=lambda id_: self.killed.append(id_))
-        self.run = SimpleNamespace(from_task=lambda id_: {"data": self._runs()})
-        self.result = SimpleNamespace(from_task=lambda id_: {"data": self._results()})
-        self.node = SimpleNamespace(list=lambda **kw: {"data": [
-            {"organization": {"id": 1}, "status": None},
-            {"organization": {"id": 2}, "status": "online"},
-            {"organization": {"id": 3}, "status": "offline"}]})
+    def __init__(self, final=None, polls=2, tamper=None, down_polls=0):
+        self.final, self.polls_needed, self.tamper = final or {}, polls, tamper
+        self.down_polls = down_polls  # the first status polls fail (server restart)
+        self.lock = threading.Lock()
+        self.created, self.killed, self.deleted, self.polls = {}, [], [], {}
+        self.task = SimpleNamespace(create=self._create, kill=self._kill, delete=self.deleted.append)
+        self.result = SimpleNamespace(from_task=lambda id_: {"data": self._results(id_)})
 
     def _create(self, **kw):
-        self.created.append(kw)
-        return {"id": 7}
+        with self.lock:
+            id_ = 10 + len(self.created)
+            self.created[id_] = kw
+        return {"id": id_}
 
-    def request(self, path):
-        assert path == "task/7/status"
-        self.polls += 1
-        return {"status": self.final if self.polls >= self.polls_until_final else "active"}
+    def _kill(self, id_):
+        self.killed.append(id_)
+        return {"msg": "killed"}
 
-    def _status(self):
-        return self.final if self.polls >= self.polls_until_final else "active"
+    def org(self, id_):
+        (org,) = self.created[id_]["organizations"]
+        return org
 
-    def _runs(self):
-        orgs = self.created[-1]["organizations"]
-        return [{"id": 100 + o, "organization": {"id": o}, "status": self._status(),
-                 "log": f"Traceback ... ValueError: boom at org {o}"} for o in orgs]
+    def status(self, id_):
+        if id_ in self.killed:
+            return "killed by user"
+        if self.polls.get(id_, 0) < self.polls_needed:
+            return "active"
+        return self.final.get(self.org(id_), "completed")
 
-    def _results(self):
-        kwargs = self.created[-1]["input_"]["kwargs"]
+    def request(self, path, params=None, attempts_on_timeout=None):
+        if path == "node":
+            return {"data": [{"organization": {"id": 1}, "status": None},
+                             {"organization": {"id": 2}, "status": "online"},
+                             {"organization": {"id": 3}, "status": "offline"}]}
+        if path == "run":
+            id_ = params["task_id"]
+            return {"data": [{"id": 100 + id_, "status": self.status(id_), "input": "x" * 10,
+                              "log": f"Traceback ... ValueError: boom at org {self.org(id_)}"}]}
+        id_ = int(path.split("/")[1])
+        assert path == f"task/{id_}/status"
+        with self.lock:
+            if self.down_polls:  # what the client returns after attempts_on_timeout connection errors
+                self.down_polls -= 1
+                return {"msg": "Connection error"}
+            self.polls[id_] = self.polls.get(id_, 0) + 1
+        return {"status": self.status(id_)}
+
+    def _results(self, id_):
+        kwargs = self.created[id_]["input_"]["kwargs"]
         raw = base64.b64decode(kwargs["weights_b64"])
-        out = []
-        for org_id, site in kwargs["sites"].items():
-            w = {k: v + np.float32(1) for k, v in from_safetensors(raw).items()}
-            res = {"weights_b64": to_b64(w), "num_examples": 10 * int(org_id), "site_id": site,
-                   "metrics": {"train_loss": 0.5, "train_acc": 0.75}, "organization_id": int(org_id),
-                   "base_model": sha256_ref(raw), "client_code_version": "0.1.0+test"}
-            if self.tamper:
-                res.update(self.tamper)
-            out.append({"run": {"id": 100 + int(org_id)}, "result": json.dumps(res)})
-        return out
+        ((org_id, site),) = kwargs["sites"].items()
+        w = {k: v + np.float32(1) for k, v in from_safetensors(raw).items()}
+        res = {"weights_b64": to_b64(w), "num_examples": 10 * int(org_id), "site_id": site,
+               "metrics": {"train_loss": 0.5, "train_acc": 0.75}, "organization_id": int(org_id),
+               "base_model": sha256_ref(raw), "client_code_version": "0.1.0+test"}
+        res.update(self.tamper or {})
+        return [{"run": {"id": 100 + id_}, "result": json.dumps(res)}]
+
+    def task_of(self, site):
+        return next(i for i, kw in self.created.items() if kw["organizations"] == [ORGS[site]])
 
 
 @pytest.fixture
@@ -95,12 +116,26 @@ def wait_state(client, task_id, timeout=10):
     raise AssertionError("task did not finish")
 
 
+def wait_created(fake, n, timeout=5):
+    end = time.time() + timeout
+    while len(fake.created) < n and time.time() < end:
+        time.sleep(0.01)
+    assert len(fake.created) >= n
+
+
 def model(hub):
     w = {"conv.weight": np.arange(6, dtype=np.float32).reshape(2, 3), "fc.bias": np.zeros(2, np.float32)}
     return hub.put_weights(w), w
 
 
-def test_round_maps_to_one_vantage6_task(hub, monkeypatch):
+def test_db_label():
+    assert service.db_label(None) == "default"
+    assert service.db_label("organamnist-dir0.3") == "organamnist_dir0_3"
+    assert service.db_label("organamnist-iid12") == "organamnist_iid12"
+    assert service.db_label("2d-x") == "v_2d_x"
+
+
+def test_round_maps_to_one_vantage6_task_per_site(hub, monkeypatch):
     fake = FakeV6()
     adapter, srv, client = start(hub, fake, monkeypatch)
     try:
@@ -109,12 +144,14 @@ def test_round_maps_to_one_vantage6_task(hub, monkeypatch):
         ref, w = model(hub)
         task_id = client.dispatch(5, {"ref": ref}, TC, ["v6-h4", "v6-h3"])
         assert wait_state(client, task_id)["state"] == "completed"
-        created = fake.created[0]
-        assert created["organizations"] == [3, 2] and created["collaboration"] == 1
-        assert created["image"] == "reg:5050/flhub/v6-train:abc" and created["databases"] == [{"label": "default"}]
-        kwargs = created["input_"]["kwargs"]
-        assert created["input_"]["method"] == "train" and kwargs["train_config"] == {**TC, "round": 5}
-        assert sha256_ref(base64.b64decode(kwargs["weights_b64"])) == ref  # model bytes sent as-is
+        assert sorted(kw["organizations"][0] for kw in fake.created.values()) == [2, 3]
+        for kw in fake.created.values():
+            assert kw["collaboration"] == 1 and kw["name"] == "flhub-r5"
+            assert kw["image"] == "reg:5050/flhub/v6-train:abc" and kw["databases"] == [{"label": "default"}]
+            kwargs = kw["input_"]["kwargs"]
+            assert kw["input_"]["method"] == "train" and kwargs["train_config"] == {**TC, "round": 5}
+            assert kwargs["sites"] == {str(kw["organizations"][0]): {2: "v6-h3", 3: "v6-h4"}[kw["organizations"][0]]}
+            assert sha256_ref(base64.b64decode(kwargs["weights_b64"])) == ref  # model bytes sent as-is
         envs = client.collect(task_id)
         assert [e["site_id"] for e in envs] == ["v6-h4", "v6-h3"]
         assert [e["num_examples"] for e in envs] == [30, 20]
@@ -122,35 +159,96 @@ def test_round_maps_to_one_vantage6_task(hub, monkeypatch):
             assert e["framework"] == "vantage6" and e["base_model"] == ref
             got = hub.get_weights(e["weights"])
             assert all(np.array_equal(got[k], w[k] + 1) for k in w)
+        assert fake.killed == [] and fake.deleted == []  # small model: tasks kept on the server
     finally:
         srv.stop()
 
 
-def test_failed_run_reports_framework_log(hub, monkeypatch):
-    fake = FakeV6(final="crashed")
+def test_data_variant_selects_the_database_label(hub, monkeypatch):
+    fake = FakeV6()
     adapter, srv, client = start(hub, fake, monkeypatch)
     try:
         ref, _ = model(hub)
-        st = wait_state(client, client.dispatch(1, {"ref": ref}, TC, list(ORGS)))
-        assert st["state"] == "failed"
-        assert "crashed" in st["error"] and "ValueError: boom" in st["error"] and "v6-h3" in st["error"]
-        assert fake.killed == [7]
+        task_id = client.call("dispatch", round=1, model={"ref": ref}, train_config={**TC, "data_variant": "organamnist-dir0.3"},
+                              sites=list(ORGS), data_variant="organamnist-dir0.3")["task_id"]
+        assert wait_state(client, task_id)["state"] == "completed"
+        assert [kw["databases"] for kw in fake.created.values()] == [[{"label": "organamnist_dir0_3"}]] * 2
     finally:
         srv.stop()
 
 
-def test_cancel_kills_vantage6_task(hub, monkeypatch):
-    fake = FakeV6(polls_until_final=10**9)
+def test_failed_site_reports_its_log_and_the_other_site_completes(hub, monkeypatch):
+    fake = FakeV6(final={2: "crashed"})
     adapter, srv, client = start(hub, fake, monkeypatch)
     try:
         ref, _ = model(hub)
         task_id = client.dispatch(1, {"ref": ref}, TC, list(ORGS))
-        end = time.time() + 5
-        while not fake.created and time.time() < end:
-            time.sleep(0.01)
+        st = wait_state(client, task_id)
+        assert st["state"] == "failed" and st["sites"] == {"v6-h3": "failed", "v6-h4": "done"}, st
+        assert "crashed" in st["site_errors"]["v6-h3"] and "ValueError: boom at org 2" in st["site_errors"]["v6-h3"]
+        part = client.call("collect", task_id=task_id, partial=True)
+        assert [e["site_id"] for e in part["envelopes"]] == ["v6-h4"]
+        assert fake.killed == []  # the healthy site's task is left alone
+    finally:
+        srv.stop()
+
+
+def test_cancel_kills_every_vantage6_task(hub, monkeypatch):
+    fake = FakeV6(polls=10**9)
+    adapter, srv, client = start(hub, fake, monkeypatch)
+    try:
+        ref, _ = model(hub)
+        task_id = client.dispatch(1, {"ref": ref}, TC, list(ORGS))
+        wait_created(fake, 2)
+        time.sleep(0.05)
         assert client.cancel(task_id)["state"] == "cancelled"
-        assert fake.killed == [7]
+        assert sorted(fake.killed) == sorted(fake.created)
         assert client.get_task(task_id)["state"] == "cancelled"
+    finally:
+        srv.stop()
+
+
+def test_site_cancel_kills_only_that_site_then_next_dispatch(hub, monkeypatch):
+    fake = FakeV6(polls=20)
+    adapter, srv, client = start(hub, fake, monkeypatch)
+    try:
+        ref, _ = model(hub)
+        task_id = client.dispatch(6, {"ref": ref}, TC, list(ORGS))
+        wait_created(fake, 2)
+        time.sleep(0.05)
+        res = client.call("cancel", task_id=task_id, sites=["v6-h4"])
+        assert res["sites"]["v6-h4"] == "cancelled"
+        assert fake.killed == [fake.task_of("v6-h4")]
+        st = wait_state(client, task_id)
+        assert st["state"] == "cancelled" and st["sites"] == {"v6-h3": "done", "v6-h4": "cancelled"}, st
+        next_id = client.dispatch(7, {"ref": ref}, TC, list(ORGS))  # not -32015
+        assert wait_state(client, next_id)["state"] == "completed"
+    finally:
+        srv.stop()
+
+
+def test_server_outage_only_delays_the_round(hub, monkeypatch):
+    fake = FakeV6(down_polls=6)
+    adapter, srv, client = start(hub, fake, monkeypatch)
+    try:
+        ref, _ = model(hub)
+        st = wait_state(client, client.dispatch(2, {"ref": ref}, TC, list(ORGS)))
+        assert st["state"] == "completed", st
+    finally:
+        srv.stop()
+
+
+def test_large_models_delete_their_vantage6_tasks(hub, monkeypatch):
+    monkeypatch.setattr(service, "PURGE_MIN_MB", 0)
+    fake = FakeV6()
+    adapter, srv, client = start(hub, fake, monkeypatch)
+    try:
+        ref, _ = model(hub)
+        assert wait_state(client, client.dispatch(3, {"ref": ref}, TC, list(ORGS)))["state"] == "completed"
+        end = time.time() + 5
+        while len(fake.deleted) < 2 and time.time() < end:
+            time.sleep(0.01)
+        assert sorted(fake.deleted) == sorted(fake.created)
     finally:
         srv.stop()
 
@@ -163,6 +261,6 @@ def test_result_checks(hub, monkeypatch, tamper, message):
     try:
         ref, _ = model(hub)
         st = wait_state(client, client.dispatch(1, {"ref": ref}, TC, list(ORGS)))
-        assert st["state"] == "failed" and message in st["error"]
+        assert st["state"] == "failed" and all(message in e for e in st["site_errors"].values()), st
     finally:
         srv.stop()
