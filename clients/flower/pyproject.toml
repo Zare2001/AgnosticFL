@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "flhub-flower"
-version = "0.1.0"
+version = "0.2.0"
 description = "AgnosticFL Flower app: standard ClientApp for hospitals and the hub relay ServerApp"
 license = "Apache-2.0"
 # Preinstalled in ~/venvs/flower on every VM (runtime dependency installation is off).
