@@ -13,7 +13,8 @@ FLEET_BIND="${FLOWER_FLEET_BIND:-0.0.0.0:$FLOWER_FLEET_PORT}"
 CONTROL_PORT="$FLOWER_CONTROL_PORT"   # SuperLink HTTP API (control + ServerApp runtime), local only
 ADAPTER_PORT="$ADAPTER_FLOWER_PORT"
 HUB_URL="${FLHUB_HUB_URL:-http://127.0.0.1:$HUB_CORE_PORT}"
-SITES_FLOWER="flw-h5 flw-h6"
+SITES_FLOWER="flw-h5 flw-h6 flw-h11 flw-h12"   # adapter sites; flw-h11/flw-h12 run only during E5
+BASE_SITES_FLOWER="flw-h5 flw-h6"             # status.sh health covers these
 FLWR_HOME_DIR="$RUNTIME/flwr-home"    # SuperLink state + flwr CLI connection config
 export PATH="$VENV/bin:$PATH"         # flower-superexec / flwr-serverapp are found via PATH
 

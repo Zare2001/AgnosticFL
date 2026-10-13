@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Health of the Flower server side: SuperLink ports, adapter, relay run and hospital sites.
-# Exit 0 only when SuperLink, adapter and relay are up and both Flower sites are online.
+# Exit 0 only when SuperLink, adapter and relay are up and the base Flower sites are online
+# (flw-h5, flw-h6; the E5 extras flw-h11/flw-h12 are registered but normally offline).
 #   --no-sites   do not require the sites (e.g. right after deploy, before hospitals connect)
 set -uo pipefail
 . "$(dirname "$0")/common.sh"
@@ -18,7 +19,7 @@ check "superlink HTTP API 127.0.0.1:$CONTROL_PORT" port_open "$CONTROL_PORT"
 check "adapter process" pid_alive "$RUNTIME/run/adapter.pid"
 check "adapter /health on :$ADAPTER_PORT" curl -sf "http://127.0.0.1:$ADAPTER_PORT/health" -o /dev/null
 
-"$VENV/bin/python" - "$ADAPTER_PORT" "$need_sites" <<'PY' || ok=1
+"$VENV/bin/python" - "$ADAPTER_PORT" "$need_sites" $BASE_SITES_FLOWER <<'PY' || ok=1
 import json, sys, urllib.request
 base = f"http://127.0.0.1:{sys.argv[1]}"
 try:
@@ -35,8 +36,9 @@ print(("OK    " if alive else "FAIL  ") + f"relay run polling (last poll {seen} 
 sites = {s["site_id"]: s["status"] for s in disc["sites"]}
 print(f"      discover: {disc['adapter']} flwr {disc['framework_version']}: "
       + ", ".join(f"{k}={v}" for k, v in sites.items()))
-ready = all(v == "online" for v in sites.values())
-print("READY: all Flower sites online" if ready else "NOT READY: waiting for hospital SuperNodes")
+base_sites = sys.argv[3:]
+ready = all(sites.get(s) == "online" for s in base_sites)
+print(f"READY: base Flower sites {' '.join(base_sites)} online" if ready else "NOT READY: waiting for hospital SuperNodes")
 sys.exit(0 if alive and (ready or sys.argv[2] == "0") else 1)
 PY
 [ "$ok" = 0 ] && echo "flower central: HEALTHY" || echo "flower central: UNHEALTHY"

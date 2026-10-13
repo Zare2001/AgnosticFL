@@ -38,6 +38,8 @@ else
       >> "$RUNTIME/logs/adapter.log" 2>&1 < /dev/null &
   echo $! > "$RUNTIME/run/adapter.pid"
   wait_for 20 "adapter :$ADAPTER_PORT" curl -sf "http://127.0.0.1:$ADAPTER_PORT/health" -o /dev/null
+  sleep 1   # an older adapter still holding the port also answers /health: the new one must be alive
+  pid_alive "$RUNTIME/run/adapter.pid" || { echo "adapter exited at start-up (port :$ADAPTER_PORT busy?)" >&2; exit 1; }
   echo "adapter: started (pid $(cat "$RUNTIME/run/adapter.pid"), http://127.0.0.1:$ADAPTER_PORT)"
 fi
 echo "relay run is started by the adapter; check: bash deploy/central/flower/status.sh"
