@@ -31,8 +31,10 @@ except Exception as exc:
     print(f"FAIL  adapter relay status / discover: {exc}")
     sys.exit(1)
 seen = relay["relay_last_poll_s"]
-alive = seen is not None and seen < 45
-print(("OK    " if alive else "FAIL  ") + f"relay run polling (last poll {seen} s ago, pending {relay['pending']})")
+alive = relay.get("relay_alive", seen is not None and seen < 45)
+run = (relay.get("relay") or {}).get("run_id")
+print(("OK    " if alive else "FAIL  ") + f"relay run {run} alive (last poll {seen} s ago, pending {relay['pending']}, "
+      f"fab {relay.get('fab_id')}, flhub_core {(relay.get('relay') or {}).get('code_version')})")
 sites = {s["site_id"]: s["status"] for s in disc["sites"]}
 print(f"      discover: {disc['adapter']} flwr {disc['framework_version']}: "
       + ", ".join(f"{k}={v}" for k, v in sites.items()))

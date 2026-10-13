@@ -91,7 +91,11 @@ class FlowerAdapter(RelayAdapter):
 
     def _route_status(self, req):
         status, body = super()._route_status(req)
-        return status, {**body, "fab_id": self.fab_id, "relay": self.relay_info}
+        return status, {**body, "relay_alive": self.relay_alive(), "fab_id": self.fab_id, "relay": self.relay_info}
+
+    def site_status(self) -> dict[str, str]:
+        # A lost relay's last site report is stale: without a live relay nothing can be dispatched.
+        return super().site_status() if self.relay_alive() else {}
 
     def relay_alive(self) -> bool:
         last = max(self._last_poll, self._last_progress, self._last_beat)
