@@ -414,7 +414,7 @@ git log --format='%an|%cn' | sort | uniq -c                               -> all
 
 **8. Reports are pushed:** `REPORT.md`, `README.md`, `docs/DECISIONS.md` (ADR-001..007), `docs/report/{central,nvflare,vantage6,flower}.md`, `docs/report/bus_transcript.md` and `docs/report/evidence/`.
 
-**9. all-done and DONE files:** central broadcast `all-done` at 13:17 UTC (bus #84). Each framework agent verified its DoD items, pushed its final worklog entry and created `~/.flhub/DONE`:
+**9. all-done and DONE files:** central broadcast `all-done` at 13:18 UTC (bus #84). Each framework agent verified its DoD items, pushed its final worklog entry and created `~/.flhub/DONE`:
 - nvflare: bus #89, db98f0a;
 - flower: bus #91, 65ec7fd;
 - vantage6: bus #93, 4a10727.
