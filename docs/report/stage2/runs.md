@@ -16,3 +16,12 @@ Rows are appended by `scripts/stage2/finalize_run.py` (or by hand for native run
 | s2-e4a-flower-64mb | E4 | real | [run](https://wandb.ai/hpml_surf-surf/AgnosticFL-stage2/runs/5dcdngn5) | 3 | - | - | - | 9.08 | full-sim | 0.000 |  |
 | s2-e4a-flower-128mb | E4 | real | [run](https://wandb.ai/hpml_surf-surf/AgnosticFL-stage2/runs/ipft46le) | 3 | - | - | - | 13.51 | full-sim | 0.000 |  |
 | s2-e4a-flower-256mb | E4 | real | [run](https://wandb.ai/hpml_surf-surf/AgnosticFL-stage2/runs/dxbgmzsm) | 3 | - | - | - | 20.61 | full-sim | 0.000 |  |
+| s2-e4a-vantage6-1mb | E4 | real | [run](https://wandb.ai/hpml_surf-surf/AgnosticFL-stage2/runs/un9as3dt) | 3 | - | - | - | 6.30 | full-sim | 0.000 |  |
+| s2-e4a-vantage6-8mb | E4 | real | [run](https://wandb.ai/hpml_surf-surf/AgnosticFL-stage2/runs/4g8x8z7e) | 3 | - | - | - | 12.80 | full-sim | 0.000 |  |
+| s2-e4a-vantage6-32mb | E4 | real | [run](https://wandb.ai/hpml_surf-surf/AgnosticFL-stage2/runs/rzpzd5yg) | 3 | - | - | - | 60.12 | full-sim | 0.000 |  |
+| s2-e4a-vantage6-64mb | E4 | real | [run](https://wandb.ai/hpml_surf-surf/AgnosticFL-stage2/runs/objmtfr6) | 3 | - | - | - | 115.26 | full-sim | 0.000 |  |
+| s2-e4a-vantage6-128mb | E4 | real | [run](https://wandb.ai/hpml_surf-surf/AgnosticFL-stage2/runs/218ysfhw) | 3 | - | - | - | 468.22 | full-sim | 0.000 |  |
+| s2-e4a-mixed-1mb | E4 | real | [run](https://wandb.ai/hpml_surf-surf/AgnosticFL-stage2/runs/yynkkqdd) | 3 | - | - | - | 6.46 | full-sim | 0.000 |  |
+| s2-e4a-mixed-8mb | E4 | real | [run](https://wandb.ai/hpml_surf-surf/AgnosticFL-stage2/runs/rfof40zg) | 3 | - | - | - | 13.31 | full-sim | 0.000 |  |
+| s2-e4a-mixed-32mb | E4 | real | [run](https://wandb.ai/hpml_surf-surf/AgnosticFL-stage2/runs/ubt4yw0z) | 3 | - | - | - | 58.89 | full-sim | 0.000 |  |
+| s2-e4a-mixed-64mb | E4 | real | [run](https://wandb.ai/hpml_surf-surf/AgnosticFL-stage2/runs/yxt03omg) | 3 | - | - | - | 116.20 | full-sim | 0.000 |  |
