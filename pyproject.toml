@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+# Hub-side code (central VM): hub core, orchestrator, sim, adapters. Install next to flhub_core:
+#   uv pip install -e ./flhub_core -e .
+# Framework venvs install it too, so adapters can import adapters.common. Stdlib-only on purpose.
+[project]
+name = "agnosticfl-hub"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = []
+
+[tool.setuptools.packages.find]
+include = ["hub*", "adapters*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
