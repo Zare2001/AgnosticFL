@@ -39,3 +39,4 @@ build/
 nohup.out
 bus_transcript.md
 !docs/report/bus_transcript.md
+!docs/report/stage2/bus_transcript.md
