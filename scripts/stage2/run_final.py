@@ -73,6 +73,9 @@ def real(args) -> int:
         print("refusing: code is not the frozen SHA")
         return 2
     need = 3.0 + payload_disk_gb(cfg)
+    proj = RUNS / "disk_projection.json"  # measured peak use of a similar run beats the rule of thumb
+    if proj.exists():
+        need = max(need, 3.0 + float(json.loads(proj.read_text()).get(cfg.name, 0.0)))
     if free_gb() < need:
         bus("info", f"S2 testbed disk limit: {cfg.name} needs {need:.1f} GB free, have {free_gb():.1f} GB",
             "Run not started (PLAN.md §7 disk rule).")
