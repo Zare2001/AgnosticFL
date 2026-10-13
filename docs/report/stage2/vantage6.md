@@ -47,7 +47,21 @@ Evidence: vantage6 4.15.2 source (server/node wheels, client, algorithm tools) a
 
 ## 5. Experiments supported
 
-- E4a vantage6 and mixed scopes: _(to be filled from the final runs: round time, failure size, RAM peaks on this VM)_.
+- E4a vantage6 scope (DB mode, 3 rounds, median of rounds 2-3, central RUN end messages #297-#331):
+
+  | payload | median round | vantage6 VM mem peak | largest process RSS |
+  |---|---|---|---|
+  | 1 MB | 6.3 s | — | — |
+  | 8 MB | 12.8 s | — | — |
+  | 32 MB | 60.1 s | — | — |
+  | 64 MB | 115.3 s | 3.3 GB | training containers 1.4 GB, node 1.0 GB |
+  | 128 MB | 468.2 s (r1 536 s) | 5.3 GB | training containers 2.1 GB, node 1.6 GB |
+  | 256 MB | testbed disk limit on central (measured projection: sqlite 1.14 GB + 0.20 GB journal at 128 MB -> ~4 GB at 256 MB, below the 3 GB floor) | | |
+  | 512 MB | testbed disk limit on central | | |
+  | 1024 MB | not storable: sqlite value limit 1e9 bytes < 1.78 x 1024 MiB | | |
+
+  Superlinear above 64 MB: the server is one uWSGI process at 100 % CPU rewriting the run rows per algorithm log line; the nodes log `Connection error... Retrying` (RemoteDisconnected from uWSGI while the worker is blocked) and the vantage6 client retries; every round completed. RAM on the vantage6 VM stays < 7 % per process.
+- E4a mixed scope: _(to be filled)_.
 - E4b: `netem.sh` (egress to central 7601/5050 only; tested under RUNLOCK: connect time 0.73 -> 20.8 ms, bus untouched, cleared to fq_codel): _(results)_.
 - E5: `extra.sh` for v6-h9/v6-h10 (configs installed, keys from central's `add_sites.sh`): _(results)_.
 - E6 (island-tested; final results to be filled):
