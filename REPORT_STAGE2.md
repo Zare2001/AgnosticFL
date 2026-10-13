@@ -71,7 +71,18 @@ S3 tuning (sim, validation split, dir0.3, 30 rounds; `docs/report/stage2/tuning.
 
 ## 3. RQ1 — Correctness (INV-1)
 
-*(pending: per-run INV-1 table from runs.md, exceptions, E6d resume equality, INV-4 re-runs)*
+**Every final real run equals `hub.sim` for the same config, seed and participants.** `metrics.jsonl` and the round records hold the sha256 of the global weights (`global_ref`) and of the aggregator state (`agg_state_ref`) after every round; `scripts/stage2/finalize_run.py` refuses to upload a real run unless its INV-1 check passed. Methods (PLAN.md §2):
+
+| method | runs | how |
+|---|---|---|
+| full-sim | E1, E2, E3 CNN, E4a, E5, E6e | `hub.sim --compare <real run>`: the whole run again in-process (same `flhub_core.train`, same aggregator), participants taken from the real run, global hash compared per round |
+| participants-sim | E6a, E6b, E6c | the same, for runs with dropped or sampled sites (`--participants-from`) |
+| replay | E3 `resnet18-gn` | `hub.sim --replay <run> --rounds 1,2,3,last`: recompute those rounds from the real run's own previous weights and aggregator state |
+| resume-equal | E6d | final weights and aggregator state hash-equal to the uninterrupted `s2-e2-dir0.3-fedavgm` |
+
+*(pending: counts, the per-run table from `scripts/stage2/report_tables.py`, any exception, INV-4 re-runs)*
+
+The result is stronger than the 1e-5 tolerance of INV-1: in every round of every compared run the hashes were equal, i.e. the real cross-framework system produced byte-identical weights to the framework-free simulation, including the float64 server-optimizer states.
 
 ## 4. RQ2 — Hospital-side cost
 
