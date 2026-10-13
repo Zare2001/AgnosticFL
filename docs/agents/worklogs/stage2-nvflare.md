@@ -80,3 +80,6 @@ Server-side candidates if E4a hits a limit on central: comm_config.json `streami
 - native.py now loads the E7 hub config with central's loader (`hub.orchestrator.config`); run named s2-e7-nvflare-native-*; `--rounds` for dry runs only (24b4beb). Island dry run with configs/stage2/e7/s2-e7-nvflare-hub-cnn.yaml, 3 rounds, vs hub orchestrator v2 (`--only nvflare`): native-vs-hub r1 3.0e-8 (aggregation only), r2 6.3e-4, r3 3.4e-2 (SGD amplifies the float32 rounding; one-step aggregation diff <= 6e-8 each round). Evidence e7-native-island.md.
 - Code freeze for NVFlare: since the deployed 05e2b2a only native.py/native/run.sh changed (E7-only, built from central's checkout at run time). Rollout SHA for the S3-frozen check: 24b4beb.
 - sysmon.sh send <run> <from> <to>: summary window -> tools/bus put to central (per-site client/job components).
+
+### 2026-10-13T15:50Z — S2 — relay timings per site result (for RQ4/E4a)
+- The relay adds `nvflare_relay_prep_s` (global model from the hub core into an FLModel), `nvflare_relay_reply_s` (task sent -> reply at the server: NVFlare transport both ways + client work) and `nvflare_relay_store_s` (reply weights into the hub core) to each site's metrics (-> metrics.jsonl site/<id>/...). Weights unchanged. Island payload-128: prep 0.37 s, reply 3.8 s (client echo 0.05 s), store 0.5 s, round 5.65 s.

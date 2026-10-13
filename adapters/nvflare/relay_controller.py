@@ -101,6 +101,7 @@ class HubRelayController(ModelController):
                                                       f"(job clients: {clients})")
         if not sites:
             return
+        t_prep = time.monotonic()
         try:
             params = relay.get_model(job)
         except Exception as e:
@@ -109,8 +110,9 @@ class HubRelayController(ModelController):
             return
         model = FLModel(params_type=ParamsType.FULL, params=params, current_round=rnd,
                         meta={META_TRAIN_CONFIG: dict(job["config"])})
+        timing = {"prep_s": time.monotonic() - t_prep, "sent": {}}  # relay timings, added to each site's metrics
         timeout = max(1, math.ceil(float(job.get("deadline_s") or 0)))
-        inbox = queue.Queue()  # (site, FLModel | None, error | None), filled by NVFlare's result threads
+        inbox = queue.Queue()  # (site, FLModel | None, error | None, t), filled by NVFlare's result threads
         self.set_fl_context(model)
         tasks = {}
         for site in sites:  # one task per site, so that each site can be cancelled on its own
@@ -120,10 +122,11 @@ class HubRelayController(ModelController):
             # send(), not broadcast(): a broadcast task deep-copies the model once per task
             self.send(task=task, fl_ctx=self.fl_ctx, targets=[site], send_order=SendOrder.ANY)
             tasks[site] = task
+            timing["sent"][site] = time.monotonic()
         self.info(f"job {job_id}: round {rnd} sent to {sites} (deadline {timeout}s)")
         t0, settled, next_poll, next_report = time.monotonic(), set(), 0.0, time.monotonic() + SITE_REPORT_S
         while True:
-            self._drain(relay, job_id, inbox, settled, t0)
+            self._drain(relay, job_id, inbox, settled, t0, timing)
             standing = {s: t for s, t in tasks.items() if t.completion_status is None}
             if not standing:
                 break
@@ -141,7 +144,7 @@ class HubRelayController(ModelController):
                 except HubError:
                     pass
             time.sleep(0.1)
-        self._drain(relay, job_id, inbox, settled, t0)
+        self._drain(relay, job_id, inbox, settled, t0, timing)
         for site, t in tasks.items():
             if site not in settled:
                 self._site_error(relay, job_id, site, f"no result from {site}: NVFlare task ended with "
@@ -154,19 +157,22 @@ class HubRelayController(ModelController):
         result = client_task.result
         rc = result.get_return_code() if result is not None else None
         if rc and rc != ReturnCode.OK:
-            inbox.put((site, None, f"{site} replied with NVFlare return code {rc}"))
+            inbox.put((site, None, f"{site} replied with NVFlare return code {rc}", time.monotonic()))
         inner(client_task=client_task, fl_ctx=fl_ctx)
 
     @staticmethod
     def _on_reply(inbox: queue.Queue, site: str, reply: FLModel):
-        inbox.put((site, reply, None))
+        inbox.put((site, reply, None, time.monotonic()))
         return True
 
-    def _drain(self, relay: RelayClient, job_id: str, inbox: queue.Queue, settled: set, t0: float):
-        """Hands the replies received so far to the adapter (outside NVFlare's result threads)."""
+    def _drain(self, relay: RelayClient, job_id: str, inbox: queue.Queue, settled: set, t0: float, timing: dict):
+        """Hands the replies received so far to the adapter (outside NVFlare's result threads), with
+        the relay timings in the site's metrics: prep (global model from the hub core into an FLModel),
+        reply (task sent -> reply received by the server: NVFlare transport both ways + client work),
+        store (reply weights into the hub core)."""
         while True:
             try:
-                site, reply, error = inbox.get_nowait()
+                site, reply, error, t_reply = inbox.get_nowait()
             except queue.Empty:
                 return
             if site in settled:
@@ -178,7 +184,13 @@ class HubRelayController(ModelController):
             try:
                 if reply.meta.get("client_name") != site:
                     raise RelayError(f"reply for {site} came from {reply.meta.get('client_name')!r}")
-                accepted = relay.post_site_result(job_id, self._to_result(relay, site, reply))
+                t_store = time.monotonic()
+                result = self._to_result(relay, site, reply)
+                result["metrics"].update({
+                    "nvflare_relay_prep_s": round(timing["prep_s"], 4),
+                    "nvflare_relay_reply_s": round(t_reply - timing["sent"].get(site, t0), 4),
+                    "nvflare_relay_store_s": round(time.monotonic() - t_store, 4)})
+                accepted = relay.post_site_result(job_id, result)
                 self.info(f"job {job_id}: {site} replied after {time.monotonic() - t0:.1f}s"
                           + ("" if accepted else " (dropped by the adapter)"))
             except Exception as e:
