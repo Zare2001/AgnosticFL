@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # Installs the NVFlare hospitals on this VM (idempotent):
-#  1. venv with the standard NVFlare client + torch + flhub_core (nothing hub-specific).
-#     flhub_core is a fixed copy of $FLHUB_CORE_REF (default stage1-final = 0.1.0), not an
-#     editable link to this checkout: a git pull must not change hospital code. Newer
-#     flhub_core versions reach the hospitals inside the NVFlare job (custom/), like client.py.
-#  2. each hospital's data file ~/flhub-data/<site>.csv (sha256-verified partition)
+#  1. venv with the standard NVFlare client + torch, numpy, safetensors. NO flhub_core: the training
+#     code (client.py + flhub_core) comes with each NVFlare job as custom code (ADR-018); NVFlare
+#     appends a job's custom/ to sys.path, so an installed flhub_core would shadow the job's copy.
+#  2. data, sha256-verified: the stage-1 file <site>.csv and the stage-2 variant files
+#     <variant>-<site>.csv next to it (configs/stage2/partitions manifests), made with this checkout's
+#     flhub_core as a provisioning tool.
 #  3. startup kits from the operator: install.sh [kit.tgz ...]  (default: $NVF_INCOMING/*.tgz)
 #     A kit replaces the site's previous kit; the archive is deleted after installing.
 set -euo pipefail
@@ -15,40 +16,20 @@ command -v uv >/dev/null || { echo "install: uv not found on PATH" >&2; exit 1; 
 [ -x "$NVF_VENV/bin/python" ] || uv venv -q --python "$PYTHON_VERSION" "$NVF_VENV"
 PY="$NVF_VENV/bin/python"
 uv pip install -q --python "$PY" "torch==${TORCH_VERSION}+cpu" --index-url "$TORCH_INDEX_URL"
-core_src=$(mktemp -d)
-git -C "$REPO" archive "${FLHUB_CORE_REF:-stage1-final}" flhub_core | tar -x -C "$core_src"
-uv pip install -q --python "$PY" --reinstall-package flhub-core "nvflare==$NVFLARE_VERSION" \
-  "numpy==$NUMPY_VERSION" "safetensors==$SAFETENSORS_VERSION" "$core_src/flhub_core"
-rm -rf "$core_src"
-echo "install: venv $NVF_VENV: $("$PY" -c 'import nvflare, torch, flhub_core; print("nvflare", nvflare.__version__, "torch", torch.__version__, "flhub_core", flhub_core.code_version())')"
+uv pip install -q --python "$PY" "nvflare==$NVFLARE_VERSION" "numpy==$NUMPY_VERSION" "safetensors==$SAFETENSORS_VERSION"
+if (cd / && "$PY" -c 'import importlib.util as u, sys; sys.exit(0 if u.find_spec("flhub_core") else 1)' 2>/dev/null); then
+  uv pip uninstall -q --python "$PY" flhub-core
+  echo "install: removed flhub_core from $NVF_VENV (it comes with the jobs); restart the clients"
+fi
+echo "install: venv $NVF_VENV: $("$PY" -c 'import nvflare, torch; print("nvflare", nvflare.__version__, "torch", torch.__version__)')"
 
-FLHUB_DATA_DIR="$FLHUB_DATA_DIR" "$PY" -m flhub_core.data materialize --sites $NVF_SITES --out "$FLHUB_DATA_DIR" \
-  | sed 's/^/install: data /'
+nvf_data materialize --sites $NVF_SITES --out "$FLHUB_DATA_DIR" | sed 's/^/install: data /'
+nvf_data materialize --variants all --sites $NVF_SITES --out "$FLHUB_DATA_DIR" \
+  --manifests "$REPO/configs/stage2/partitions" | sed 's/^/install: data /'
 
 kits=("$@")
 if [ ${#kits[@]} -eq 0 ] && compgen -G "$NVF_INCOMING/*.tgz" >/dev/null; then kits=("$NVF_INCOMING"/*.tgz); fi
-mkdir -p "$NVF_SITES_DIR" && chmod 700 "$NVF_SITES_DIR"
-for kit in "${kits[@]}"; do
-  tmp=$(mktemp -d)
-  tar -xzf "$kit" -C "$tmp"
-  site=$(ls "$tmp")
-  if [ "$(wc -w <<<"$site")" != 1 ] || [ ! -f "$tmp/$site/startup/fed_client.json" ]; then
-    echo "install: $kit is not a single NVFlare client kit" >&2; rm -rf "$tmp"; exit 1
-  fi
-  if ! grep -qw -- "$site" <<<"$NVF_SITES"; then
-    echo "install: kit for unexpected site '$site' (expected: $NVF_SITES)" >&2; rm -rf "$tmp"; exit 1
-  fi
-  if nvf_pid_alive "$NVF_SITES_DIR/$site/daemon_pid.fl"; then
-    echo "install: $site is running; stop it first (stop.sh $site)" >&2; rm -rf "$tmp"; exit 1
-  fi
-  rm -rf "${NVF_SITES_DIR:?}/$site"
-  mv "$tmp/$site" "$NVF_SITES_DIR/$site" && rm -rf "$tmp"
-  chmod -R go-rwx "$NVF_SITES_DIR/$site"
-  rm -f "$kit"
-  target=$("$PY" -c 'import json,sys; print(json.load(open(sys.argv[1]))["servers"][0]["service"]["target"])' \
-    "$NVF_SITES_DIR/$site/startup/fed_client.json")
-  echo "install: kit $site -> $NVF_SITES_DIR/$site (server $target)"
-done
+for kit in "${kits[@]}"; do nvf_install_kit "$kit" "$NVF_SITES"; done
 for site in $NVF_SITES; do
   [ -d "$NVF_SITES_DIR/$site/startup" ] || echo "install: no kit yet for $site (waiting for the operator)"
 done
