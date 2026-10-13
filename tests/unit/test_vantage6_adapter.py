@@ -158,6 +158,8 @@ def test_round_maps_to_one_vantage6_task_per_site(hub, monkeypatch):
         assert [e["num_examples"] for e in envs] == [30, 20]
         for e in envs:
             assert e["framework"] == "vantage6" and e["base_model"] == ref
+            assert e["metrics"]["train_loss"] == 0.5 and e["metrics"]["vantage6_fetch_s"] >= 0
+            assert {"vantage6_create_s", "vantage6_store_s"} <= set(e["metrics"])
             got = hub.get_weights(e["weights"])
             assert all(np.array_equal(got[k], w[k] + 1) for k in w)
         assert fake.killed == [] and fake.deleted == []  # small model: tasks kept on the server

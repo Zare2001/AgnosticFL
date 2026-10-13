@@ -71,6 +71,7 @@ class Vantage6Adapter(BaseAdapter):
         self.collab_id: int | None = None
         self.org_ids: dict[str, int] = {}  # site id -> organisation id (registered organisations)
         self.v6_tasks: dict[str, dict[str, int]] = {}  # flhub task id -> {site: vantage6 task id}
+        self._create_s: dict[tuple[str, str], float] = {}  # (flhub task id, site) -> task.create seconds
         self.blob_store = False  # server stores run input/results in a large result store (UUIDs in the DB)
 
     # ---- vantage6 sessions ---------------------------------------------------------------
@@ -186,6 +187,7 @@ class Vantage6Adapter(BaseAdapter):
         label = db_label(task.data_variant)
         input_ = {"method": "train", "kwargs": {"weights_b64": b64, "train_config": client_config,
                                                 "sites": {str(org): site}}}
+        t0 = time.monotonic()
         try:
             created = self._call(lambda c: c.task.create(
                 collaboration=self.collab_id, organizations=[org], name=f"flhub-r{task.round}", image=self.image,
@@ -199,6 +201,7 @@ class Vantage6Adapter(BaseAdapter):
             return
         with self._meta:
             ids[site] = created["id"]
+            self._create_s[(task.task_id, site)] = time.monotonic() - t0
         log.info("%s %s -> vantage6 task %s (%s, database %s)", task.task_id, site, created["id"], self.image, label)
         if task.cancelled or task.site_cancelled(site):  # cancelled while its task was created
             self._kill(created["id"])
@@ -243,6 +246,7 @@ class Vantage6Adapter(BaseAdapter):
                 time.sleep(min(POLL_S, interval))
 
     def _collect_site(self, task, site: str, v6_id: int) -> None:
+        t0 = time.monotonic()
         try:
             items = self._call(lambda c: c.result.from_task(v6_id)["data"], session=f"data-{site}")
         except FrameworkError as exc:  # transient: the next poll tries again
@@ -250,13 +254,14 @@ class Vantage6Adapter(BaseAdapter):
                         v6_id, exc)
             return
         try:
-            self.report_site(task, self._site_result(task, site, v6_id, items))
+            result = self._site_result(task, site, v6_id, items, fetched=time.monotonic() - t0)
+            self.report_site(task, result)
         except FrameworkError as exc:
             self.report_site_error(task, site, str(exc))
         except Exception as exc:
             self.report_site_error(task, site, f"{type(exc).__name__}: {exc}")
 
-    def _site_result(self, task, site: str, v6_id: int, items: list[dict]) -> SiteResult:
+    def _site_result(self, task, site: str, v6_id: int, items: list[dict], fetched: float = 0.0) -> SiteResult:
         if len(items) != 1 or not items[0].get("result"):
             raise FrameworkError(f"{site}: vantage6 task {v6_id} returned {len(items)} results, expected one")
         out = json.loads(items[0]["result"])
@@ -264,9 +269,13 @@ class Vantage6Adapter(BaseAdapter):
             raise FrameworkError(f"{site}: algorithm reports site {out.get('site_id')!r}")
         if out.get("base_model") != task.model_ref:
             raise FrameworkError(f"{site}: trained from {out.get('base_model')}, not {task.model_ref}")
+        t0 = time.monotonic()
         ref = self.hub.put_blob(base64.b64decode(out["weights_b64"]))
-        return SiteResult(site, int(out["num_examples"]), out.get("metrics") or {},
-                          out.get("client_code_version", "unknown"), weights_ref=ref)
+        metrics = dict(out.get("metrics") or {})  # + where the adapter's time went (no numerics change)
+        metrics.update(vantage6_create_s=round(self._create_s.pop((task.task_id, site), 0.0), 3),
+                       vantage6_fetch_s=round(fetched, 3), vantage6_store_s=round(time.monotonic() - t0, 3))
+        return SiteResult(site, int(out["num_examples"]), metrics, out.get("client_code_version", "unknown"),
+                          weights_ref=ref)
 
     def _fail_site(self, task, site: str, v6_id: int, status: str) -> None:
         try:  # the raw run listing (not run.from_task): no decoding of the input it carries
