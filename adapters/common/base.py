@@ -70,6 +70,7 @@ class BaseAdapter:
                     "evaluate": False, "min_round_interval_s": 0,
                     "site_progress": True, "partial_collect": True, "site_cancel": True}
     default_deadline_s = 1800.0
+    needs_weights = True  # False: run_round() ignores `weights` (the adapter fetches the model itself)
 
     def __init__(self, sites: list[str], hub: HubClient | None = None) -> None:
         self.sites = list(sites)
@@ -217,7 +218,7 @@ class BaseAdapter:
         if not self.tasks.start(task):
             return
         try:
-            weights = self.hub.get_weights(task.model_ref)
+            weights = self.hub.get_weights(task.model_ref) if self.needs_weights else None
             results = self.run_round(task, weights, task.client_config) or []
             if task.terminal:  # cancelled, timed out or settled per site meanwhile
                 self._drop_late(task, results)

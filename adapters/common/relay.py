@@ -70,6 +70,7 @@ class _Pending:
 
 class RelayAdapter(BaseAdapter):
     site_status_ttl_s = 90.0
+    needs_weights = False  # the relay fetches the model blob itself (saves a full model read per round)
 
     def __init__(self, sites: list[str], hub: HubClient | None = None) -> None:
         super().__init__(sites, hub)
