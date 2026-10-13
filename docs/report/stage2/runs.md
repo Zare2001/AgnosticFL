@@ -97,3 +97,7 @@ Rows are appended by `scripts/stage2/finalize_run.py` (or by hand for native run
 | s2-e6a-strict | E6 | real | [run](https://wandb.ai/hpml_surf-surf/AgnosticFL-stage2/runs/p1rwqly5) | 20 | 0.7002 | 0.6979 | 0.9451 | 8.87 | full-sim | 0.000 |  |
 | s2-e6a-minsites | E6 | real | [run](https://wandb.ai/hpml_surf-surf/AgnosticFL-stage2/runs/6e3dctcv) | 20 | 0.7054 | 0.7011 | 0.9466 | 8.67 | participants-sim | 0.000 |  |
 | s2-e6b-straggler | E6 | real | [run](https://wandb.ai/hpml_surf-surf/AgnosticFL-stage2/runs/3ubh2t67) | 20 | 0.6662 | 0.6258 | 0.9336 | 20.18 | participants-sim | 0.000 |  |
+| s2-e6c-fedavg | E6 | real | [run](https://wandb.ai/hpml_surf-surf/AgnosticFL-stage2/runs/ibl3471n) | 50 | 0.6606 | 0.6768 | 0.9579 | 8.57 | participants-sim | 0.000 |  |
+| s2-e6c-fedavgm | E6 | real | [run](https://wandb.ai/hpml_surf-surf/AgnosticFL-stage2/runs/cb8855nz) | 50 | 0.0983 | 0.0909 | 0.5000 | 8.10 | participants-sim | 0.000 |  |
+| s2-e6d-resume | E6 | real | [run](https://wandb.ai/hpml_surf-surf/AgnosticFL-stage2/runs/qxocm4yv) | 50 | 0.7833 | 0.7623 | 0.9681 | 9.36 | resume-equal:s2-e2-dir0.3-fedavgm | 0.000 | SIGKILL hub + adapters after r20, resumed |
+| s2-e6e-server-restart | E6 | real | [run](https://wandb.ai/hpml_surf-surf/AgnosticFL-stage2/runs/dswzg31m) | 20 | 0.7002 | 0.6979 | 0.9451 | 9.62 | full-sim | 0.000 |  |
