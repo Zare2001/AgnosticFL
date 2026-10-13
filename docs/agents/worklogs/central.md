@@ -50,3 +50,15 @@ Newest entries at the bottom. Format: `### <UTC timestamp> — <phase> — <titl
 - Result: git diff e586fc4..b656577, bd800ce..b656577 and 8b19ca5..b656577 shows only deploy/<fw>-vm scripts and docs changed. The running central code therefore equals the frozen SHA.
 - Evidence: commit b656577; bus msg #56.
 - Next: wait for the three framework confirmations that clients run the frozen SHA, then run `bash scripts/run_final.sh all`.
+
+### 2026-10-13 13:09 UTC — P3 — M3-final
+- What: `bash scripts/run_final.sh all` at b656577 (clean checkout; the pending worklog edit was stashed so `git_dirty=false`), W&B online, tag `final`, group `final-2026-10-13`.
+- Result: centralized-baseline j5gn5knm 0.8606/0.9279; sim-fedavg-reference kur37gs2 0.8654/0.9247; nvflare-only pavr8q6u 0.8173/0.9224; vantage6-only twk49dhp 0.8638/0.9246; flower-only 011lasv0 0.7580/0.9149; mixed-6sites iehjnc44 0.8654/0.9247 (30/30 rounds, 6/6 sites each round, 8.0 s/round).
+- Evidence: equivalence mixed vs reference max abs weight diff 0.000e+00 in rounds 0-30, acc diff 0.0 pp, identical final model bytes; written to the W&B summary. wandb_cleanup --dedupe --apply: 6 runs, keep 6, delete 0. M3-final bus #66.
+
+### 2026-10-13 13:25 UTC — P4 — Report and close
+- What: final-call #67; per-agent sections received (report-ready #71, #73, #75); subagent examples #77-#79; final status of all VMs #81-#83 (all exit 0); docs/report/central.md, REPORT.md (14 sections), README.md, bus transcript (secret scan: no tokens/keys/PEM), evidence in docs/report/evidence/.
+- Result: DoD 1-8 verified (REPORT.md §12): status healthy on 4 VMs; standard hospital clients; conformance 7/7 x3 vs central; mixed-6sites 30/30 rounds with 6 sites; equivalence PASS; W&B = 6 finished final runs; pytest green in hub/flower/nvflare/v6 venvs; 83 commits all Zare2001, no attribution.
+- Fix along the way: root pytest failed on collection in the hub venv (tests/flower imported flwr) -> importorskip (6626cb3, after an info to flower).
+- Local offline wandb/ dirs of dev runs removed (outside the repo).
+- Next: broadcast all-done, collect DONE confirmations, re-export the transcript, touch ~/.flhub/DONE.
