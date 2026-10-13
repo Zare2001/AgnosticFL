@@ -17,7 +17,7 @@ NVF_HUB_URL="${NVF_HUB_URL:-http://127.0.0.1:$HUB_CORE_PORT}"
 # NVF_EXTRA_SITES (e.g. "nvf-h7 nvf-h8" for E5) are served as well but may stay offline.
 NVF_BASE_SITES="${NVF_BASE_SITES:-$(for s in $SITES; do IFS=: read -r id fw _ <<<"$s"; if [ "$fw" = nvflare ]; then printf '%s ' "$id"; fi; done)}"
 NVF_BASE_SITES="${NVF_BASE_SITES% }"
-NVF_EXTRA_SITES="${NVF_EXTRA_SITES:-}"
+NVF_EXTRA_SITES="${NVF_EXTRA_SITES-nvf-h7 nvf-h8}"  # E5 extras: registered, offline outside E5
 NVF_SITES="${NVF_SITES:-$NVF_BASE_SITES${NVF_EXTRA_SITES:+ $NVF_EXTRA_SITES}}"
 
 NVF_WS="$NVF_RUNTIME/ws"

@@ -95,3 +95,11 @@ class FlareAdmin:
 
     def abort_job(self, job_id: str):
         return self._call(lambda s: s.abort_job(job_id))
+
+    def list_all_jobs(self) -> list:
+        """Every job the server knows (any state), oldest first."""
+        return sorted(self._call(lambda s: s.list_jobs()) or [], key=lambda j: j.get("submit_time", ""))
+
+    def delete_job(self, job_id: str):
+        """Removes a job that is not running from the server's job store."""
+        return self._call(lambda s: s.delete_job(job_id))
