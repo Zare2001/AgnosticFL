@@ -36,9 +36,9 @@ def stage_flhub_core(parent: str) -> str:
     return parent
 
 
-def export_with_client_code(job: FedJob, out_root: str) -> None:
+def export_with_client_code(job: FedJob, out_root: str, targets: list[str] | None = None) -> None:
     """Adds client.py (ScriptRunner, in-process, numpy) and flhub_core as the clients' custom
-    code, then exports the job to out_root."""
+    code (for all clients, or only `targets`), then exports the job to out_root."""
     # A relative script path makes the job ship custom/client.py and run that copy at the
     # hospital (an absolute path would make clients run a local file at that path instead).
     # NVFlare resolves it at export time, so the export runs in the script's directory.
@@ -46,15 +46,23 @@ def export_with_client_code(job: FedJob, out_root: str) -> None:
     with tempfile.TemporaryDirectory(prefix="flhub-job-") as staging:
         os.chdir(os.path.dirname(CLIENT_SCRIPT))
         try:
-            job.to_clients(ScriptRunner(script=os.path.basename(CLIENT_SCRIPT), framework=FrameworkType.NUMPY))
-            job.to_clients(stage_flhub_core(staging))  # a directory: its contents go to custom/
+            stage_flhub_core(staging)
+            for target in targets or [None]:
+                runner = ScriptRunner(script=os.path.basename(CLIENT_SCRIPT), framework=FrameworkType.NUMPY)
+                if target is None:
+                    job.to_clients(runner)
+                    job.to_clients(staging)  # a directory: its contents go to custom/
+                else:
+                    job.to(runner, target)
+                    job.to(staging, target)
             job.export_job(out_root)
         finally:
             os.chdir(cwd)
-    custom = Path(out_root) / job.name / "app" / "custom"
-    missing = [f for f in ("client.py", "flhub_core/__init__.py") if not (custom / f).exists()]
-    if missing:
-        raise RuntimeError(f"job export lacks {missing} in {custom}")
+    apps = [d for d in (Path(out_root) / job.name).iterdir() if d.is_dir() and (d / "config" / "config_fed_client.json").exists()]
+    missing = [f"{d.name}/custom/{f}" for d in apps for f in ("client.py", "flhub_core/__init__.py")
+               if not (d / "custom" / f).exists()]
+    if not apps or missing:
+        raise RuntimeError(f"job export lacks client apps or {missing} in {out_root}/{job.name}")
 
 
 def build_job(out_root: str, adapter_url: str = "http://127.0.0.1:8811", hub_url: str = None, min_clients: int = 1) -> str:
