@@ -1,0 +1,13 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "v6-flhub"
+version = "0.1.0"
+description = "AgnosticFL vantage6 algorithm (train one local round with flhub_core)"
+requires-python = ">=3.11"
+dependencies = ["flhub-core", "vantage6-algorithm-tools"]
+
+[tool.setuptools]
+packages = ["v6_flhub"]

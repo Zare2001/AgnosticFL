@@ -1,0 +1,7 @@
+*
+!flhub_core/pyproject.toml
+!flhub_core/src
+!clients/vantage6/pyproject.toml
+!clients/vantage6/v6_flhub
+**/__pycache__
+**/*.egg-info
