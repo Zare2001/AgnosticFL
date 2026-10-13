@@ -1,0 +1,13 @@
+# NVFlare island (P1, nvflare VM): hub core + NVFlare adapter on this VM, 3 rounds, W&B offline.
+#   python -m hub.orchestrator run --config deploy/central/nvflare/island-3r.yaml --wandb offline
+#   python -m hub.sim --config deploy/central/nvflare/island-3r.yaml --wandb offline   (reference)
+name: nvflare-island-3r
+rounds: 3
+seed: 2026
+train_config: {local_epochs: 1, batch_size: 64, lr: 0.05, momentum: 0.0, seed: 2026}
+hub_url: http://127.0.0.1:8800
+adapters:
+  - {name: nvflare, url: "http://127.0.0.1:8811", sites: [nvf-h1, nvf-h2]}
+deadline_s: 600
+online_wait_s: 120
+tags: [dev, island]
