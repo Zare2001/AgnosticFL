@@ -11,18 +11,23 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import shutil
 import threading
 import traceback
 import urllib.parse
 from collections.abc import Callable
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from typing import Any
 
 from .protocol import INTERNAL_ERROR, INVALID_PARAMS, INVALID_REQUEST, METHOD_NOT_FOUND, PARSE_ERROR, RpcError
 
 log = logging.getLogger("flhub.server")
-MAX_BODY = 512 * 2**20
+# flhub/0.2 raises the cap from 512 MiB so that 1 GB payloads fit (PLAN.md §4.4)
+MAX_BODY = int(os.environ.get("FLHUB_MAX_BODY_MB", "2048")) * 2**20
+CHUNK = 2**20
 
 
 @dataclass
@@ -31,7 +36,9 @@ class Request:
     path: str
     query: dict[str, str]
     headers: Any
-    body: bytes
+    body: bytes | None  # None for streaming routes: read `length` bytes from `stream` instead
+    stream: Any = None
+    length: int = 0
 
     def json(self) -> Any:
         return json.loads(self.body or b"null")
@@ -45,6 +52,7 @@ class RpcServer:
         self.name = name
         self.methods: dict[str, Callable[[dict], Any]] = {}
         self.routes: dict[tuple[str, str], Handler] = {}
+        self.streaming: set[tuple[str, str]] = set()
         self.route("GET", "/health", lambda req: (200, {"ok": True, "name": self.name}))
         server = self
 
@@ -58,9 +66,17 @@ class RpcServer:
                 parsed = urllib.parse.urlsplit(self.path)
                 length = int(self.headers.get("Content-Length") or 0)
                 if length > MAX_BODY:
-                    return self._send(413, {"error": "body too large"}, method)
-                body = self.rfile.read(length) if length else b""
-                req = Request(method, parsed.path, dict(urllib.parse.parse_qsl(parsed.query)), self.headers, body)
+                    self.close_connection = True
+                    return self._send(413, {"error": f"body too large ({length} > {MAX_BODY} bytes)"}, method)
+                key = ("GET" if method == "HEAD" else method, parsed.path)
+                if server.is_streaming(*key):  # handler reads the body itself (large blobs)
+                    self.close_connection = True  # whatever the handler leaves unread must not be parsed
+                    req = Request(method, parsed.path, dict(urllib.parse.parse_qsl(parsed.query)), self.headers,
+                                  None, self.rfile, length)
+                else:
+                    body = self.rfile.read(length) if length else b""
+                    req = Request(method, parsed.path, dict(urllib.parse.parse_qsl(parsed.query)), self.headers,
+                                  body)
                 try:
                     if method == "POST" and parsed.path == "/rpc":
                         status, payload = 200, server.handle_rpc(body)
@@ -76,6 +92,15 @@ class RpcServer:
                 self._send(status, payload, method)
 
             def _send(self, status: int, payload: Any, method: str) -> None:
+                if isinstance(payload, Path):  # stream a file without loading it
+                    self.send_response(status)
+                    self.send_header("Content-Type", "application/octet-stream")
+                    self.send_header("Content-Length", str(payload.stat().st_size))
+                    self.end_headers()
+                    if method != "HEAD":
+                        with open(payload, "rb") as f:
+                            shutil.copyfileobj(f, self.wfile, CHUNK)
+                    return
                 if payload is None:
                     data, ctype = b"", "application/json"
                 elif isinstance(payload, (bytes, bytearray, memoryview)):
@@ -116,8 +141,16 @@ class RpcServer:
     def method(self, name: str, fn: Callable[[dict], Any]) -> None:
         self.methods[name] = fn
 
-    def route(self, method: str, path: str, fn: Handler) -> None:
+    def route(self, method: str, path: str, fn: Handler, stream: bool = False) -> None:
+        """stream=True: the handler gets req.body None and reads req.length bytes from req.stream."""
         self.routes[(method.upper(), path)] = fn
+        if stream:
+            self.streaming.add((method.upper(), path))
+
+    def is_streaming(self, method: str, path: str) -> bool:
+        if (method, path) in self.routes:
+            return (method, path) in self.streaming
+        return any(m == method and p.endswith("*") and path.startswith(p[:-1]) for m, p in self.streaming)
 
     def find_route(self, method: str, path: str) -> Handler | None:
         if (method, path) in self.routes:

@@ -35,7 +35,7 @@ def http_request(url: str, method: str = "GET", body: bytes | None = None,
 
 
 class HubClient:
-    def __init__(self, base_url: str | None = None, timeout: float = 60) -> None:
+    def __init__(self, base_url: str | None = None, timeout: float = 300) -> None:
         self.base_url = (base_url or os.environ.get("FLHUB_HUB_URL", DEFAULT_HUB_URL)).rstrip("/")
         self.timeout = timeout
 
@@ -69,6 +69,21 @@ class HubClient:
     def has_blob(self, ref: str) -> bool:
         status, _ = self._call("HEAD", f"/blobs/{ref}")
         return status == 200
+
+    def delete_blob(self, ref: str) -> bool:
+        """flhub/0.2 blob GC; False if the blob was not there."""
+        status, body = self._call("DELETE", f"/blobs/{ref}")
+        if status not in (200, 404):
+            raise HubError(f"DELETE blob {ref}: HTTP {status} {body[:200]!r}")
+        return status == 200
+
+    def gc(self, older_than_s: float = 0) -> dict:
+        """Delete every blob not written or re-uploaded for `older_than_s` seconds."""
+        status, body = self._call("POST", "/admin/gc", json.dumps({"older_than_s": older_than_s}).encode(),
+                                  "application/json")
+        if status != 200:
+            raise HubError(f"POST /admin/gc: HTTP {status} {body[:200]!r}")
+        return json.loads(body)
 
     def put_weights(self, weights: Mapping[str, np.ndarray]) -> str:
         return self.put_blob(to_safetensors(weights))
