@@ -88,3 +88,7 @@ Server-side candidates if E4a hits a limit on central: comm_config.json `streami
 - Central restarted the NVFlare adapter at 3212150 (#190, HEALTHY after 10 s): relay timings + central's needs_weights=False. Told central NVFlare is final (#194); rollout SHA for the freeze check: 3212150.
 - run_follow.py running (per RUN end: sysmon summary to central, rounds trained, flagged log lines, health); sysmon restarted with an island pattern that cannot match its own command line (it had counted itself as "island").
 - Island processes stopped (clients, server, adapter, hub core; island cron line removed); files kept (~/flhub-island, venvs island/island-hosp/island-s1) for reproductions; to be removed in S5.
+
+### 2026-10-13T16:02Z — S3 — confirmed S3-frozen 96c44c9
+- S2-mixed (#200): 3 rounds, 6 sites, fedadam, hash-equal to sim; NVFlare fan-out 2.3-4.6 s, rounds 8.6 s.
+- S3-frozen 96c44c9 (#210): git diff 3212150..96c44c9 empty for flhub_core, clients/nvflare, adapters/nvflare, adapters/common, deploy/central/nvflare; nvf-h1/h2 in relay job da5a973a with 0.2.0+fe357a1dbec1; HEALTHY, sysmon + run_follow running. Confirmed (#211-ish). Next: S4, E4a nvflare scope first; watch RAM (70 % rule).
