@@ -10,8 +10,7 @@ RT="${V6_RT:-$HOME/flhub-runtime/vantage6}"
 SERVER_URL="$(grep '^V6_SERVER_URL=' "$RT/adapter.env" 2>/dev/null | cut -d= -f2- || true)"
 SERVER_URL="${SERVER_URL:-http://127.0.0.1}"
 VENV="${V6_VENV:-$HOME/venvs/v6}"
-CFG="$HOME/.config/vantage6/server/$NAME.yaml"
-V6_SERVER_IMAGE="${V6_SERVER_IMAGE:-ghcr.io/vantage6/infrastructure/server:$VANTAGE6_VERSION}"
+. "$REPO/deploy/central/vantage6/common.sh"   # CFG, V6_SERVER_IMAGE
 [ -f "$RT/adapter.env" ] && [ -f "$CFG" ] || { echo "run deploy/central/vantage6/install.sh first" >&2; exit 1; }
 log() { echo "[v6-start] $*"; }
 

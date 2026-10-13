@@ -23,10 +23,8 @@ done
 NAME=flhub
 RT="${V6_RT:-$HOME/flhub-runtime/vantage6}"
 VENV="${V6_VENV:-$HOME/venvs/v6}"
-CFG="$HOME/.config/vantage6/server/$NAME.yaml"
 DB_DIR="$HOME/.local/share/vantage6/server/$NAME"
-V6_SERVER_IMAGE="${V6_SERVER_IMAGE:-ghcr.io/vantage6/infrastructure/server:$VANTAGE6_VERSION}"
-V6_SERVER_BIND="${V6_SERVER_BIND:-0.0.0.0}"   # host address the server port is published on
+. "$REPO/deploy/central/vantage6/common.sh"
 SERVER_HOST="$([ "$V6_SERVER_BIND" = 0.0.0.0 ] && echo 127.0.0.1 || echo "$V6_SERVER_BIND")"
 V6_BASE_SITES="v6-h3 v6-h4"
 V6_EXTRA_SITES="${V6_EXTRA_SITES-v6-h9 v6-h10}"   # E5 sites: registered (add_sites.sh), offline outside E5
@@ -58,11 +56,8 @@ fi
 chmod 600 "$RT/secrets.env"
 set -a; . "$RT/secrets.env"; set +a
 
-# --- 3. server config (written by hand: `v6 server new` is interactive only) ---
-mkdir -p "$(dirname "$CFG")"
-(umask 077; V6_SERVER_PORT="$V6_SERVER_PORT" V6_SERVER_IMAGE="$V6_SERVER_IMAGE" V6_SERVER_BIND="$V6_SERVER_BIND" \
-  envsubst '${V6_SERVER_PORT} ${V6_JWT_SECRET} ${V6_SERVER_IMAGE} ${V6_SERVER_BIND}' \
-  < "$REPO/deploy/central/vantage6/server.template.yaml" > "$CFG")
+# --- 3. server config ---
+render_server_config
 docker pull -q "$V6_SERVER_IMAGE" >/dev/null
 log "server config $CFG (image $V6_SERVER_IMAGE)"
 
@@ -89,8 +84,11 @@ fi
 # --- 5. registry and algorithm image ---
 if [ "$ISLAND" = 1 ]; then
   if [ -z "$(docker ps -q --filter name=^flhub-registry$)" ]; then
-    docker rm -f flhub-registry >/dev/null 2>&1 || true
-    docker run -d --restart=always --name flhub-registry -p 127.0.0.1:${REGISTRY_PORT}:5000 "$REGISTRY_IMAGE" >/dev/null
+    if [ -n "$(docker ps -aq --filter name=^flhub-registry$)" ]; then
+      docker start flhub-registry >/dev/null   # keep its volume (the pushed images)
+    else
+      docker run -d --restart=always --name flhub-registry -p 127.0.0.1:${REGISTRY_PORT}:5000 "$REGISTRY_IMAGE" >/dev/null
+    fi
   fi
   PULL_REGISTRY="localhost:$REGISTRY_PORT"
 else
