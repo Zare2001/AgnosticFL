@@ -59,3 +59,9 @@ Newest entries at the bottom. Format: `### <UTC timestamp> — S<n> — <title>`
 - `configs/stage2/e4a/s2-e4a-flower-<S>mb.yaml`, whole Flower path on this VM, 3 rounds each, purge.sh between sizes: 64 MB 8.1-9.5 s/round, 128 MB 13.9-14.4 s, 256 MB 22.6-25.4 s, 512 MB 56.6/45.5/47.5 s; all rounds ok, no knob needed.
 - Peak RSS at 512 MB (sysmon): orchestrator 4.2 GB, relay serverapp 3.2 GB, SuperLink 1.1 GB, adapter 1.0 GB; hospital side 2 ClientApps 4.9 GB, SuperNodes 2.5 GB; ~linear in payload. SuperLink DB+WAL ~4x payload after a run (2082 MiB at 512 MB) -> purge.sh to ~1 MB.
 - Found: `BaseAdapter._work` (adapters/common/base.py:220) downloads the global model for every task although `RelayAdapter.run_round` ignores it: +1.46 s/round and ~1 GB RSS at 512 MB for nvflare and flower. Reported to central (#173) with a suggested fix.
+
+### 2026-10-13T15:50Z — S2 — relay timings, report draft, run follower
+- Relay timings per site result (66e806e): `flower_relay_{prep,push,reply,store}_s` in the client metrics -> metrics.jsonl `site/<id>/...`; island 128 MB: prep 0.2, push 1.6-2.0, reply 9.4-11.2, store 0.5 s of 12.4-14.1 s. Deploy-request #177; central fixed the unused global-model read for relay adapters (a43cef3, #178) and restarts the flower adapter before S2-mixed (that restart also ships 66e806e's FAB).
+- Report draft `docs/report/stage2/flower.md` (80af636; reviewed and corrected: parent-pid monitors are the cause, not the fix; ADR collision = rebase conflict).
+- `deploy/flower-vm/run_follow.py` running (pid in ~/flhub-runtime/flower/follow/follow.pid): for each central `RUN start/RUN end <name> <UTC>` it puts `sysmon-flower-<run>.json` to central and reports flagged SuperNode log lines or unhealthy status (silent when clean); records in follow/runs.jsonl.
+- Next: confirm the S3-frozen SHA (diff empty for flhub_core, clients/flower, adapters/flower; hospitals on the frozen code_version), stop the island before S4, answer ARM requests.
