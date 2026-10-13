@@ -31,9 +31,10 @@ from campaign import ACTIVE, LOGS, PY, REPO, RUNS, bus, enqueue, ensure_dirs, re
 
 ADAPTER_PATTERNS = {"nvflare": "adapters.nvflare.service", "vantage6": "-m adapters.vantage6",
                     "flower": "adapters.flower.service"}
-# command that starts only the adapter again (framework server and hospitals untouched); see bus #156
+# command that starts only the adapter again (framework server and hospitals untouched); bus #156,
+# answers #160 (flower) and #162 (nvflare: start.sh starts only what is not running)
 ADAPTER_START = {
-    "nvflare": "bash deploy/central/nvflare/start_adapter.sh",
+    "nvflare": "bash deploy/central/nvflare/start.sh",
     "vantage6": "bash deploy/central/vantage6/start_adapter.sh",
     "flower": "bash deploy/central/flower/restart.sh adapter",
 }
