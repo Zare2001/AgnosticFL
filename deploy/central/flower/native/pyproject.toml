@@ -1,0 +1,30 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "flhub-native"
+version = "0.2.0"
+description = "AgnosticFL E7 baseline: Flower's own FedAvg strategy with the standard hospital ClientApp, no hub"
+license = "Apache-2.0"
+# run.sh stages this file with flhub_native/, the hospitals' flhub_flower ClientApp and flhub_core.
+dependencies = [
+    "flwr==1.39.0",
+    "numpy",
+    "safetensors",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["flhub_native", "flhub_flower"]
+
+[tool.flwr.app]
+publisher = "agnosticfl"
+
+[tool.flwr.app.components]
+serverapp = "flhub_native.server_app:app"
+clientapp = "flhub_flower.client_app:app"
+
+[tool.flwr.app.config]
+# Set by run.sh: the hub run config (configs/stage2/*.yaml) and the run dir to write.
+config = ""
+out-dir = ""

@@ -1,0 +1,22 @@
+# Flower island dry run of E7 C1 (deploy/flower-vm/island.sh up): the same config through the hub
+#   python -m hub.orchestrator run --config deploy/flower-vm/island-e7-cnn.yaml
+# and natively (Flower's FedAvg, no hub)
+#   FLHUB_FLOWER_VENV=~/venvs/island FLHUB_FLOWER_RUNTIME=~/flhub-runtime/island/server \
+#     bash deploy/central/flower/native/run.sh deploy/flower-vm/island-e7-cnn.yaml <out_dir>
+schema: 2
+name: island-e7-flower-cnn
+experiment: E7
+mode: real
+dataset: organamnist
+partition: iid
+model: cnn-small
+aggregator: {name: fedavg, params: {}}
+train_config: {local_epochs: 1, batch_size: 64, lr: 0.05, momentum: 0.0}
+seed: 2026
+rounds: 20
+sites: [flw-h5, flw-h6]
+deadline_s: 600
+round_retries: 0
+online_wait_s: 120
+eval: {every: 1, site_shaped: true, split: test, threads: 1}
+runs_dir: ~/flhub-runtime/island/runs
