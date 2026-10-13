@@ -66,8 +66,10 @@ class Relay:
         self.poll_timeout_s = poll_timeout_s
         self.query_timeout_s = query_timeout_s
         self.sites: dict[int, dict[str, Any]] = {}  # node_id -> site info
+        self._pending: dict[str, tuple[int, float]] = {}  # query msg id -> (node_id, sent)
         self._query_failed: dict[int, float] = {}  # node_id -> retry-after time
-        self._last_refresh = 0.0
+        self._superseded: set[int] = set()  # nodes replaced by a newer node of the same site
+        self._last_refresh = float("-inf")
 
     # ---------------------------------------------------------------- adapter I/O
     def _post(self, path: str, payload: dict[str, Any], timeout: float) -> dict[str, Any]:
@@ -97,20 +99,36 @@ class Relay:
 
     # ---------------------------------------------------------------- node mapping
     def refresh_nodes(self, force: bool = False) -> None:
-        """Track online nodes; ask new nodes which site they serve."""
+        """Track online nodes and ask new ones which site they serve (never blocks).
+
+        Site-info QUERY messages are pushed once; their replies are collected on later
+        calls, so a node that never answers cannot stall the relay loop.
+        """
         now = time.monotonic()
+        if self._pending:
+            for reply in self.grid.pull_messages(list(self._pending)):
+                nid, _ = self._pending.pop(reply.metadata.reply_to_message_id, (None, 0.0))
+                if nid is not None:
+                    self._accept_site_info(nid, reply)
+            for mid, (nid, sent) in list(self._pending.items()):
+                if now - sent > self.query_timeout_s:
+                    log.warning("site-info query to node %s: no reply in %.0f s", nid, now - sent)
+                    del self._pending[mid]
+                    self._query_failed[nid] = now + QUERY_RETRY_S
         if not force and now - self._last_refresh < NODE_REFRESH_S:
             return
         self._last_refresh = now
         online = set(self.grid.get_node_ids())
         for nid in list(self.sites):
             if nid not in online:
-                log.info("node %s (%s) went offline", nid, self.sites[nid].get("site_id"))
+                log.info("node %s (%s) went offline", nid, self.sites[nid]["site_id"])
                 del self.sites[nid]
+        self._superseded &= online
+        asked = {nid for nid, _ in self._pending.values()}
         new = [
             nid
-            for nid in sorted(online - set(self.sites))
-            if self._query_failed.get(nid, 0.0) <= now
+            for nid in sorted(online - set(self.sites) - asked - self._superseded)
+            if self._query_failed.get(nid, float("-inf")) <= now
         ]
         if not new:
             return
@@ -124,48 +142,58 @@ class Relay:
             )
             for nid in new
         ]
-        replies = self._exchange(msgs, self.query_timeout_s)
-        for nid in new:
-            reply = replies.get(nid)
-            if reply is None or reply.has_error() or SITE_INFO not in reply.content:
-                reason = "no reply" if reply is None else _error_text(reply)
-                log.warning("site-info query to node %s failed: %s", nid, reason)
-                self._query_failed[nid] = time.monotonic() + QUERY_RETRY_S
-                continue
-            info = reply.content[SITE_INFO]
-            self.sites[nid] = {
-                "site_id": str(info["site-id"]),
-                "client_code_version": str(info.get("client-code-version", "")),
-                "flwr_version": str(info.get("flwr-version", "")),
-            }
-            self._query_failed.pop(nid, None)
-            log.info("node %s serves site %s", nid, self.sites[nid]["site_id"])
+        for nid, mid in zip(new, self.grid.push_messages(msgs), strict=False):
+            if mid:
+                self._pending[mid] = (nid, now)
 
-    def _exchange(
-        self,
-        msgs: list[Message],
-        timeout_s: float,
-        on_reply: Any = None,
-        keep_waiting: Any = None,
-    ) -> dict[int, Message]:
-        """Push messages, pull replies until all arrived or the timeout expired.
+    def _accept_site_info(self, nid: int, reply: Message) -> None:
+        if reply.has_error() or SITE_INFO not in reply.content:
+            log.warning("site-info query to node %s failed: %s", nid, _error_text(reply))
+            self._query_failed[nid] = time.monotonic() + QUERY_RETRY_S
+            return
+        info = reply.content[SITE_INFO]
+        site = str(info["site-id"])
+        for other, other_info in list(self.sites.items()):
+            if other != nid and other_info["site_id"] == site:
+                # A restarted SuperNode gets a new id while the old id is still listed
+                # until its heartbeat expires: the node that answered last wins.
+                log.warning("site %s moved from node %s to node %s", site, other, nid)
+                del self.sites[other]
+                self._superseded.add(other)
+        self.sites[nid] = {"site_id": site,
+                           "client_code_version": str(info.get("client-code-version", "unknown"))}
+        self._query_failed.pop(nid, None)
+        log.info("node %s serves site %s", nid, site)
 
-        Returns ``{dst_node_id: reply}``. ``on_reply(node_id, reply)`` is called for
-        every reply as it arrives; ``keep_waiting()`` may stop the wait early.
+    def wait_for_sites(self, sites: list[str], timeout_s: float) -> None:
+        """Give pending site-info queries a moment when a job needs an unmapped site."""
+        end = time.monotonic() + timeout_s
+        self.refresh_nodes(force=True)
+        while time.monotonic() < end:
+            mapped = {info["site_id"] for info in self.sites.values()}
+            if set(sites) <= mapped or not self._pending:
+                return
+            time.sleep(PULL_INTERVAL_S)
+            self.refresh_nodes()
+
+    def _exchange(self, msgs: list[Message], timeout_s: float, on_reply: Any = None,
+                  keep_waiting: Any = None) -> tuple[dict[int, Message], set[int]]:
+        """Push messages, pull replies until all arrived, the timeout expired or
+        ``keep_waiting()`` returned False.
+
+        Returns ``({dst_node_id: reply}, lost)``; ``lost`` are destination nodes that
+        went offline before replying. ``on_reply(node_id, reply)`` runs per reply.
         """
         if not msgs:
-            return {}
+            return {}, set()
         ids = list(self.grid.push_messages(msgs))
-        if len(ids) != len(msgs):
-            raise RuntimeError(f"SuperLink accepted {len(ids)} of {len(msgs)} messages")
-        node_of = {}
-        for msg, mid in zip(msgs, ids, strict=True):
-            if mid:
-                node_of[mid] = msg.metadata.dst_node_id
-            else:
-                log.error("SuperLink did not accept message for node %s", msg.metadata.dst_node_id)
+        if len(ids) != len(msgs) or not all(ids):
+            raise RuntimeError(f"SuperLink accepted {sum(map(bool, ids))} of {len(msgs)} messages")
+        node_of = {mid: msg.metadata.dst_node_id for msg, mid in zip(msgs, ids, strict=True)}
         replies: dict[int, Message] = {}
+        lost: set[int] = set()
         end = time.monotonic() + timeout_s
+        next_check = time.monotonic() + NODE_REFRESH_S
         while node_of and time.monotonic() < end:
             for reply in self.grid.pull_messages(list(node_of)):
                 nid = node_of.pop(reply.metadata.reply_to_message_id, None)
@@ -174,11 +202,17 @@ class Relay:
                 replies[nid] = reply
                 if on_reply is not None:
                     on_reply(nid, reply)
-            if node_of:
-                if keep_waiting is not None and not keep_waiting():
-                    break
-                time.sleep(PULL_INTERVAL_S)
-        return replies
+            if not node_of or (keep_waiting is not None and not keep_waiting()):
+                break
+            if time.monotonic() >= next_check:
+                online = set(self.grid.get_node_ids())
+                for mid, nid in list(node_of.items()):
+                    if nid not in online:
+                        del node_of[mid]
+                        lost.add(nid)
+                next_check = time.monotonic() + NODE_REFRESH_S
+            time.sleep(PULL_INTERVAL_S)
+        return replies, lost
 
     # ---------------------------------------------------------------- training round
     def run_job(self, job: dict[str, Any]) -> None:
@@ -208,7 +242,7 @@ class Relay:
                         for s in job["sites"]], done=True)
             return
 
-        self.refresh_nodes(force=True)
+        self.wait_for_sites(job["sites"], timeout_s=min(self.query_timeout_s, 30.0))
         node_of_site = {info["site_id"]: nid for nid, info in self.sites.items()}
         # The dispatch train_config travels unchanged (flhub_core.TrainConfig keys).
         config = ConfigRecord(
@@ -253,7 +287,7 @@ class Relay:
             return not state["cancel"]
 
         try:
-            replies = self._exchange(msgs, float(job["deadline_s"]), on_reply, keep_waiting)
+            replies, lost = self._exchange(msgs, float(job["deadline_s"]), on_reply, keep_waiting)
         except AdapterGone:
             raise
         except Exception as exc:  # SuperLink/Grid failure: fail the round, keep relay alive
@@ -261,12 +295,15 @@ class Relay:
             report([], [{"site_id": site_of_node[m.metadata.dst_node_id],
                          "error": f"flower grid error: {exc}"} for m in msgs], done=True)
             return
-        missing = [site_of_node[m.metadata.dst_node_id] for m in msgs
-                   if m.metadata.dst_node_id not in replies]
-        final_errors = [] if state["cancel"] else [
-            {"site_id": s, "error": f"no reply from {s} within deadline_s={job['deadline_s']}"}
-            for s in missing
-        ]
+        final_errors = []
+        for m in msgs:
+            nid = m.metadata.dst_node_id
+            if nid in lost:
+                final_errors.append({"site_id": site_of_node[nid],
+                                     "error": f"SuperNode {nid} went offline during the round"})
+            elif nid not in replies and not state["cancel"]:
+                final_errors.append({"site_id": site_of_node[nid], "error":
+                                     f"no reply within deadline_s={job['deadline_s']}"})
         report([], final_errors, done=True)
 
     def _result_from_reply(self, site: str, nid: int, reply: Message, job: dict[str, Any]) -> dict[str, Any]:
