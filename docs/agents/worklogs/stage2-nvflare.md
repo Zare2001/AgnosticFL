@@ -40,3 +40,29 @@ Newest entries at the bottom. Format: `### <UTC timestamp> — S<n> — <title>`
 - `switch_s2.sh` rehearsed on the island in the real hospitals' state (editable 0.1, then pinned copy, stale path in the running clients): data check 12 s, uninstall, stop/start, both sites run the job's 0.2.0+fe357a1dbec1 after 87.5 s; downtime 59 s per site.
 - E5: `provision_extra.sh` (nvflare provision --add-client; same root CA; prod_01/prod_02; no server restart) + `extra.sh install|start|stop|status`; island: 4 sites incl. nvf-h7/h8 run organamnist-iid12 rounds (3 s); `extra.sh stop` leaves the base sites' watchdog on. `purge.sh` deletes finished jobs via the FLARE API (island: 10 jobs) and stale server workspaces.
 - Note: an exception in client.py makes NVFlare abort the whole relay job ("ask to abort job"); the keeper resubmits it.
+
+### 2026-10-13T15:12Z — S1/S2 — NVFlare 2.9.0 payload limits and knobs (E4 research, source-verified)
+How a model travels: the relay's FLModel params (numpy) are serialized with FOBS; `NumpyArrayDecomposer` is a `ViaDownloaderDecomposer`, so every array goes out-of-band through the sender's DownloadService in chunks (not inside the gRPC message). Island relay path with defaults: 128/256/512/1024 MB pass (5/10/17/33 s per round, localhost); no knob needed so far.
+
+| knob | where (file:line) | set in | side | default |
+|---|---|---|---|---|
+| np download chunk size (`np_download_chunk_size`, env `NVFLARE_NP_DOWNLOAD_CHUNK_SIZE`; <= 0 = inline FOBS) | fuel/utils/fobs/decomposers/via_downloader.py:482, app_common/decomposers/numpy_decomposers.py:63-75 | job/app config var | sender (server for the global model, client for results) | 2 MiB |
+| download transaction lifetime (`MSG_ROOT_TTL` = task timeout) | apis/impl/wf_comm_server.py:367; freed when the task leaves (`_release_task_resources`) | relay task timeout = dispatch `deadline_s` | server | deadline |
+| CellNet `max_message_size` (inline messages only) | fuel/f3/comm_config.py:21,83 | `comm_config.json` / `.json.default` in the site workspace | both | MAX_PAYLOAD_SIZE = 2 GiB - 2 MiB - 1 MiB - 16 B |
+| gRPC frame (`MAX_FRAME_SIZE`, max send/recv length) | fuel/f3/drivers/net_utils.py:40, grpc_driver.py:43-44 | code constant | both | 2 GiB - 2 MiB |
+| `streaming_chunk_size` / `streaming_window_size` / `streaming_ack_interval` | fuel/f3/streaming/stream_const.py:23-25 | comm_config.json | both | 1 MiB / 64 MiB / 16 MiB |
+| `streaming_max_blob_size` (env `NVFLARE_STREAMING_MAX_BLOB_SIZE`) | fuel/f3/comm_config.py:22,115 | comm_config.json | both | 4 GiB |
+| `streaming_read_timeout` / `streaming_ack_wait` | fuel/f3/streaming/byte_receiver.py:54, byte_streamer.py:57 | comm_config.json | both | 300 s / 300 s |
+| `get_task_timeout`, `submit_task_result_timeout`, `communication_timeout` | private/fed/client/client_runner.py:163-164, fed_client_base.py:94 | client job config / client args | hospital | None, None, 300 s |
+| broadcast deep copy of task data (one copy per broadcast task) | apis/impl/wf_comm_server.py:308-314 | code | server | relay avoids it: `Controller.send()` per site |
+| `memory_gc_rounds` | job_config/script_runner.py:92, client_api_executor.py:89 | client job config (ScriptRunner) | hospital (job) | 0 (off) |
+| `MALLOC_ARENA_MAX`, `NVFLARE_ENABLE_JEMALLOC_PRELOAD` | kit startup/sub_start.sh | kit env | both | 4, false |
+| job store (`uri_root`) | kit local/resources.json.default, job_manager | server kit | server | /tmp/nvflare/jobs-storage (purge.sh deletes finished jobs) |
+
+Server-side candidates if E4a hits a limit on central: comm_config.json `streaming_read_timeout`/`streaming_ack_wait` (slow links), `streaming_max_blob_size` (> 4 GiB), job-level `np_download_chunk_size` (larger chunks = fewer round trips); hospital-side knobs (client timeouts, memory_gc_rounds) are recorded, not changed.
+
+### 2026-10-13T15:25Z — S2 — E6e restart_server.sh; keeper fix for stale jobs after a server restart
+- `deploy/central/nvflare/restart_server.sh`: restarts only the NVFlare server (kit shutdown.fl + start.sh), returns when 8002/8003 accept again (~14-16 s; the kit daemon acts after its 5 s poll + 5 s grace).
+- Bug found on the island (two restarts ~16 s apart, a round in flight): the job store kept the old relay job as RUNNING while the restarted server did not run it; abort -> "not running", the keeper retried the abort forever and never resubmitted (sites offline > 5 min). Fix: `end_job()` treats "not running" as stale -> delete (NVFlare then answers "still running") -> ignore it and submit a new job; and the keeper ends a job at once when the relay has been silent for 30 s instead of waiting the 60 s shutdown grace (relay contact = polls, job-status polls, site reports). Unit test added (12 passed).
+- Rerun: round 7 in flight during the restarts failed after 46 s (sites offline 30 s), keeper replaced the stale job, strict retry waited 38.5 s for online and completed; round 8 normal. Central's orchestrator v2 waits for online before retries (run.py:168,181).
+- inject.sh: actions straggler-on:<pct> / straggler-off (E6b: on at ARM, off at the site's round-7 task via the log trigger).
