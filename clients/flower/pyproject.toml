@@ -1,0 +1,32 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "flhub-flower"
+version = "0.1.0"
+description = "AgnosticFL Flower app: standard ClientApp for hospitals and the hub relay ServerApp"
+license = "Apache-2.0"
+# Preinstalled in ~/venvs/flower on every VM (runtime dependency installation is off).
+# flhub_core is installed from the AgnosticFL repo, not from PyPI.
+dependencies = [
+    "flwr==1.39.0",
+    "numpy",
+    "safetensors",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["flhub_flower"]
+
+[tool.flwr.app]
+publisher = "agnosticfl"
+
+[tool.flwr.app.components]
+serverapp = "flhub_flower.server_app:app"
+clientapp = "flhub_flower.client_app:app"
+
+[tool.flwr.app.config]
+# Used only by the relay ServerApp on the central VM.
+adapter-url = "http://127.0.0.1:8813"
+poll-timeout-s = 5.0
+query-timeout-s = 60.0
