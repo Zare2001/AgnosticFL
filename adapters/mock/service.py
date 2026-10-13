@@ -13,7 +13,7 @@ import os
 import time
 
 import flhub_core
-from flhub_core.data import SITES, load_site, site_path
+from flhub_core.data import SITES, load_site, materialize, site_path
 from flhub_core.train import train
 
 from adapters.common.base import BaseAdapter, FrameworkError, SiteResult
@@ -27,7 +27,8 @@ class MockAdapter(BaseAdapter):
 
     def __init__(self, sites, data_dir=None, hub: HubClient | None = None, delay_s: float = 0.0) -> None:
         super().__init__(sites, hub)
-        self.paths = {s: site_path(s, data_dir) for s in sites}
+        self.paths = {s: site_path(s, data_dir) if site_path(s, data_dir).exists() else materialize(s, data_dir)
+                      for s in sites}
         self.delay_s = delay_s
         self._data = {}
 
