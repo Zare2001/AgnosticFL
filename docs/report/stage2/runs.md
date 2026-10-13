@@ -101,3 +101,4 @@ Rows are appended by `scripts/stage2/finalize_run.py` (or by hand for native run
 | s2-e6c-fedavgm | E6 | real | [run](https://wandb.ai/hpml_surf-surf/AgnosticFL-stage2/runs/cb8855nz) | 50 | 0.0983 | 0.0909 | 0.5000 | 8.10 | participants-sim | 0.000 |  |
 | s2-e6d-resume | E6 | real | [run](https://wandb.ai/hpml_surf-surf/AgnosticFL-stage2/runs/qxocm4yv) | 50 | 0.7833 | 0.7623 | 0.9681 | 9.36 | resume-equal:s2-e2-dir0.3-fedavgm | 0.000 | SIGKILL hub + adapters after r20, resumed |
 | s2-e6e-server-restart | E6 | real | [run](https://wandb.ai/hpml_surf-surf/AgnosticFL-stage2/runs/dswzg31m) | 20 | 0.7002 | 0.6979 | 0.9451 | 9.62 | full-sim | 0.000 |  |
+| s2-e3-cnn-medium-fedavg | E3 | real | [run](https://wandb.ai/hpml_surf-surf/AgnosticFL-stage2/runs/t17gjzx9) | 50 | 0.8153 | 0.8048 | 0.9772 | 28.77 | full-sim | 0.000 |  |
