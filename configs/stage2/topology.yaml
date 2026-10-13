@@ -1,0 +1,7 @@
+# Central deployment for stage-2 runs: which adapter serves which site (base + E5 extra sites).
+# A run config lists the sites it uses; only those are dispatched and must be online.
+hub_url: http://127.0.0.1:8800
+adapters:
+  nvflare:  {url: "http://127.0.0.1:8811", sites: [nvf-h1, nvf-h2, nvf-h7, nvf-h8]}
+  vantage6: {url: "http://127.0.0.1:8812", sites: [v6-h3, v6-h4, v6-h9, v6-h10]}
+  flower:   {url: "http://127.0.0.1:8813", sites: [flw-h5, flw-h6, flw-h11, flw-h12]}
