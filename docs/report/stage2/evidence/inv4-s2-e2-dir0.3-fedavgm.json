@@ -1,0 +1,269 @@
+{
+ "check": "INV-4",
+ "config": "configs/stage2/e2/s2-e2-dir0.3-fedavgm.yaml",
+ "original": "/home/zpalanciya/flhub-runtime/runs/stage2/s2-e2-dir0.3-fedavgm-20261013T191406Z",
+ "rerun": "/home/zpalanciya/flhub-runtime/runs/inv4/inv4-s2-e2-dir0.3-fedavgm-20261013T223239Z",
+ "mode": "real",
+ "head": "516489ea82d54b8829d224de02d2a9f7187f837f",
+ "rc": 0,
+ "all_equal": true,
+ "rounds": 50,
+ "per_round": [
+  {
+   "round": 0,
+   "global_equal": true,
+   "state_equal": true
+  },
+  {
+   "round": 1,
+   "global_equal": true,
+   "state_equal": true
+  },
+  {
+   "round": 2,
+   "global_equal": true,
+   "state_equal": true
+  },
+  {
+   "round": 3,
+   "global_equal": true,
+   "state_equal": true
+  },
+  {
+   "round": 4,
+   "global_equal": true,
+   "state_equal": true
+  },
+  {
+   "round": 5,
+   "global_equal": true,
+   "state_equal": true
+  },
+  {
+   "round": 6,
+   "global_equal": true,
+   "state_equal": true
+  },
+  {
+   "round": 7,
+   "global_equal": true,
+   "state_equal": true
+  },
+  {
+   "round": 8,
+   "global_equal": true,
+   "state_equal": true
+  },
+  {
+   "round": 9,
+   "global_equal": true,
+   "state_equal": true
+  },
+  {
+   "round": 10,
+   "global_equal": true,
+   "state_equal": true
+  },
+  {
+   "round": 11,
+   "global_equal": true,
+   "state_equal": true
+  },
+  {
+   "round": 12,
+   "global_equal": true,
+   "state_equal": true
+  },
+  {
+   "round": 13,
+   "global_equal": true,
+   "state_equal": true
+  },
+  {
+   "round": 14,
+   "global_equal": true,
+   "state_equal": true
+  },
+  {
+   "round": 15,
+   "global_equal": true,
+   "state_equal": true
+  },
+  {
+   "round": 16,
+   "global_equal": true,
+   "state_equal": true
+  },
+  {
+   "round": 17,
+   "global_equal": true,
+   "state_equal": true
+  },
+  {
+   "round": 18,
+   "global_equal": true,
+   "state_equal": true
+  },
+  {
+   "round": 19,
+   "global_equal": true,
+   "state_equal": true
+  },
+  {
+   "round": 20,
+   "global_equal": true,
+   "state_equal": true
+  },
+  {
+   "round": 21,
+   "global_equal": true,
+   "state_equal": true
+  },
+  {
+   "round": 22,
+   "global_equal": true,
+   "state_equal": true
+  },
+  {
+   "round": 23,
+   "global_equal": true,
+   "state_equal": true
+  },
+  {
+   "round": 24,
+   "global_equal": true,
+   "state_equal": true
+  },
+  {
+   "round": 25,
+   "global_equal": true,
+   "state_equal": true
+  },
+  {
+   "round": 26,
+   "global_equal": true,
+   "state_equal": true
+  },
+  {
+   "round": 27,
+   "global_equal": true,
+   "state_equal": true
+  },
+  {
+   "round": 28,
+   "global_equal": true,
+   "state_equal": true
+  },
+  {
+   "round": 29,
+   "global_equal": true,
+   "state_equal": true
+  },
+  {
+   "round": 30,
+   "global_equal": true,
+   "state_equal": true
+  },
+  {
+   "round": 31,
+   "global_equal": true,
+   "state_equal": true
+  },
+  {
+   "round": 32,
+   "global_equal": true,
+   "state_equal": true
+  },
+  {
+   "round": 33,
+   "global_equal": true,
+   "state_equal": true
+  },
+  {
+   "round": 34,
+   "global_equal": true,
+   "state_equal": true
+  },
+  {
+   "round": 35,
+   "global_equal": true,
+   "state_equal": true
+  },
+  {
+   "round": 36,
+   "global_equal": true,
+   "state_equal": true
+  },
+  {
+   "round": 37,
+   "global_equal": true,
+   "state_equal": true
+  },
+  {
+   "round": 38,
+   "global_equal": true,
+   "state_equal": true
+  },
+  {
+   "round": 39,
+   "global_equal": true,
+   "state_equal": true
+  },
+  {
+   "round": 40,
+   "global_equal": true,
+   "state_equal": true
+  },
+  {
+   "round": 41,
+   "global_equal": true,
+   "state_equal": true
+  },
+  {
+   "round": 42,
+   "global_equal": true,
+   "state_equal": true
+  },
+  {
+   "round": 43,
+   "global_equal": true,
+   "state_equal": true
+  },
+  {
+   "round": 44,
+   "global_equal": true,
+   "state_equal": true
+  },
+  {
+   "round": 45,
+   "global_equal": true,
+   "state_equal": true
+  },
+  {
+   "round": 46,
+   "global_equal": true,
+   "state_equal": true
+  },
+  {
+   "round": 47,
+   "global_equal": true,
+   "state_equal": true
+  },
+  {
+   "round": 48,
+   "global_equal": true,
+   "state_equal": true
+  },
+  {
+   "round": 49,
+   "global_equal": true,
+   "state_equal": true
+  },
+  {
+   "round": 50,
+   "global_equal": true,
+   "state_equal": true
+  }
+ ],
+ "utc": "2026-10-13T22:42:30Z"
+}
