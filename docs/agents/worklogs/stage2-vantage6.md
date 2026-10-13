@@ -1,3 +1,25 @@
 # Stage 2 worklog — vantage6 agent
 
 Newest entries at the bottom. Format: `### <UTC timestamp> — S<n> — <title>` + 2–6 bullets (what, result, evidence, next).
+
+### 2026-10-13T13:52Z — S0 — kickoff: health, disk
+- Read PLAN/EXPERIMENTS/VANTAGE6 role + stage-1 worklog tail. `deploy/vantage6-vm/status.sh` exit 0: v6-h3/v6-h4 connected to http://145.38.205.58:7601 (last task_id 70), watchdog cron active. Images: only `v6-train:bd800cee7922` + node 4.15.2.
+- Disk 8.1 GB free; `docker volume rm` (stage-1 island registry volume 414 MB, 140 empty per-task tmpvols) and `docker builder prune` (2.0 GB) were blocked by auto mode (bus #102 blocker); the owner ran them (#106): 11 GB free.
+- Bus: info #103 (health), #108 (hospital flhub_core is not editable: training code only inside the image; `~/venvs/flhub-data` is a non-editable copy for data materialization).
+
+### 2026-10-13T14:25Z — S1 — payload research (vantage6 4.15.2 source, measured where marked)
+Sources: wheels vantage6-server/-node 4.15.2 (PyPI, read only), client/common/cli in `~/venvs/v6`, server image for runtime checks.
+- Path of one round (DB mode, default): adapter `task.create` -> per org `base64(json.dumps(input))` (client/__init__.py:1854-1884; our input already holds base64 weights => ~1.78x payload per org) -> POST /task body = n_orgs x 1.78x -> `Run.input` Text (server/model/run.py:58-66) -> node `run.list(state=open, include_task)` downloads it, writes `task-<run_id:09d>/input` (1.33x) -> algorithm writes `output` (1.33x) -> node GET `run/<id>` again (input once more, __init__.py ~598 "FIXME") + PATCH `run/<id>` result base64 (1.78x) -> adapter GET /result (n_orgs x 1.78x).
+- `GET /run` always returns `input` and `log` (RunSchema excludes only `result`); no field filter. Per-site progress by run listing costs n_orgs x 1.78x payload per poll in DB mode -> adapter must not list runs every few s for large payloads.
+- Knobs ("knob, file, side, default"):
+  - sqlite TEXT length, SQLITE_MAX_LENGTH in server image sqlite 3.40.1, server, 1e9 bytes: **measured** 999,999,000 ok / 1,000,000,001 rejected (`InterfaceError`). => DB mode max payload ~536 MiB (1.78x <= 1e9); 1024 MB cannot be stored.
+  - `large_result_store: {connection_string, container_name}`, server YAML (server/__init__.py:203-217, service/azure_storage_service.py), server, off: inputs/results go to Azure Blob storage (Azurite emulator works via connection_string), `Run.input/result` hold a UUID, nodes/clients stream via `/blobstream` (chunked POST, streamed GET; common/client/blob_storage.py, node_client.py run.patch). Outer base64 skipped (1.33x). Nodes auto-detect via `/blobstream/status`: no hospital change. Run delete deletes the blobs (after_delete listener). => E4a server-side knob.
+  - uwsgi flags, cli/server/start.py:174-177 (hard-coded), server: `--http :5000 --gevent 1000 --http-websockets --http-chunked-input --http-keepalive --post-buffering 0`; no limit-post/harakiri; `--http-timeout` uwsgi default (60 s socket inactivity) may hit slow large GETs (to verify).
+  - Flask MAX_CONTENT_LENGTH / JSON size checks: none (server resources use request.get_json()).
+  - HTTP timeouts node/client (common/client/client_base.py): none (requests without timeout).
+  - `runs_data_cleanup_days`, server YAML (controller/cleanup.py), server, off: clears result (and optionally input) of completed runs older than N days (>= 1 day: useless within a run).
+  - task-dir cleanup, node (docker/task_manager.py:450), hospital, none: the node NEVER deletes `task-*` folders (input+output = 2.67x payload per site per round) => E4a needs a hospital-side cleanup (ops, ledger) or the VM disk is the limit (sum of E4a sizes x 2.67 x 2 sites x 3 rounds ~ 16 GB per scope).
+  - DELETE /task/<id> (server/resource/task.py:1215-1280), server: kills running runs, deletes runs + subtasks (+ blobs). => adapter knob "delete vantage6 task after collect" keeps the server DB at one round.
+- Node behaviour: algorithm container `vantage6-<node>-run-<run_id>`, labels `vantage6-type=algorithm`, `node=<node>`, `run_id=<id>`; no cpu/mem limits in containers.run => straggler via `docker update --cpus`. Exit code != 0 (SIGKILL 137) -> run `crashed`. On (re)connect the server emits `sync` and the node re-queues all open runs not running locally => a node restart mid-round re-executes its run.
+- Data variants: node DB labels must be Python identifiers (cli/node/start.py:224 `label.isidentifier()`); each file DB is bind-mounted into the node at `/mnt/<label><suffix>`; task picks `databases=[{"label"}]`. Request to central #110 (variant to adapter; train() on concrete data).
+- Memory estimate DB mode 512 MiB: adapter ~6-8 GB, server ~6 GB, each node ~4 GB + algorithm ~4 GB (to measure on the island at <= 128 MB and extrapolate).
