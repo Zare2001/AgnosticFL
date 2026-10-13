@@ -5,6 +5,9 @@ set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$HERE/common.sh"
 export PATH="$NVF_VENV/bin:$PATH"
+mkdir -p "$NVF_SITES_DIR"
+exec 9>"$NVF_SITES_DIR/.start.lock"
+flock -n 9 || { echo "start: another start.sh is running"; exit 0; }
 sites=("$@"); [ ${#sites[@]} -eq 0 ] && read -ra sites <<<"$NVF_SITES"
 declare -A log_from
 
@@ -20,8 +23,9 @@ for site in "${sites[@]}"; do
   lines=0
   if [ -f "$ws/log.txt" ]; then lines=$(wc -l < "$ws/log.txt"); fi
   log_from[$site]=$((lines + 1))
+  # 9>&-: the client must not inherit the start.sh lock
   (cd "$ws" && FLHUB_DATA_PATH="$FLHUB_DATA_DIR/$site.csv" setsid nohup bash startup/start.sh \
-    > "$ws/start.out" 2>&1 < /dev/null &)
+    > "$ws/start.out" 2>&1 < /dev/null 9>&- &)
   echo "start: $site starting (data $FLHUB_DATA_DIR/$site.csv)"
 done
 
@@ -39,4 +43,5 @@ for site in "${sites[@]}"; do
     exit 1
   fi
 done
-echo "start: OK"
+nvf_watchdog_on
+echo "start: OK (watchdog: cron re-runs start.sh every minute until stop.sh)"

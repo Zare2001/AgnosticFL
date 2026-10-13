@@ -5,6 +5,7 @@ set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$HERE/common.sh"
 sites=("$@"); [ ${#sites[@]} -eq 0 ] && read -ra sites <<<"$NVF_SITES"
+nvf_watchdog_off  # otherwise cron would restart the stopped clients
 
 for site in "${sites[@]}"; do
   ws="$NVF_SITES_DIR/$site"
