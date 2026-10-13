@@ -25,7 +25,7 @@ else
     echo "    fed_learn_port: $NVF_FL_PORT"
     echo "    admin_port: $NVF_ADMIN_PORT"
     i=0
-    for site in $NVF_SITES; do
+    for site in $NVF_BASE_SITES; do  # extra sites (E5) are added later by provision_extra.sh
       i=$((i + 1))
       echo "  - name: $site"
       echo "    type: client"
@@ -51,7 +51,7 @@ else
 fi
 
 mkdir -p "$NVF_KITS_OUT" && chmod 700 "$NVF_KITS_OUT"
-for site in $NVF_SITES; do
+for site in $NVF_BASE_SITES; do
   tar -czf "$NVF_KITS_OUT/$site.tgz" -C "$NVF_PROD" "$site"
   chmod 600 "$NVF_KITS_OUT/$site.tgz"
 done

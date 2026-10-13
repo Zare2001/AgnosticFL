@@ -31,7 +31,7 @@ if nvf_pid_alive "$NVF_ADAPTER_PID"; then
 else
   setsid nohup "$NVF_VENV/bin/python" -m adapters.nvflare.service \
     --port "$NVF_ADAPTER_PORT" --hub-url "$NVF_HUB_URL" --admin-kit "$NVF_ADMIN_KIT" \
-    --job-dir "$NVF_JOBS/flhub-relay" --sites "${NVF_SITES// /,}" \
+    --job-dir "$NVF_JOBS/flhub-relay" --sites "${NVF_SITES// /,}" --base-sites "${NVF_BASE_SITES// /,}" \
     >> "$NVF_LOGS/adapter.log" 2>&1 < /dev/null &
   echo $! > "$NVF_ADAPTER_PID"
   echo "start: adapter starting on 127.0.0.1:$NVF_ADAPTER_PORT (log $NVF_LOGS/adapter.log)"

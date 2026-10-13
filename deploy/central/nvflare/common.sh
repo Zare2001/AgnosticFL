@@ -13,9 +13,12 @@ NVF_FL_PORT="${NVF_FL_PORT:-$NVFLARE_FL_PORT}"
 NVF_ADMIN_PORT="${NVF_ADMIN_PORT:-$NVFLARE_ADMIN_PORT}"
 NVF_ADAPTER_PORT="${NVF_ADAPTER_PORT:-$ADAPTER_NVFLARE_PORT}"
 NVF_HUB_URL="${NVF_HUB_URL:-http://127.0.0.1:$HUB_CORE_PORT}"
-# NVFlare hospitals from the topology: "nvf-h1 nvf-h2"
-NVF_SITES="${NVF_SITES:-$(for s in $SITES; do IFS=: read -r id fw _ <<<"$s"; if [ "$fw" = nvflare ]; then printf '%s ' "$id"; fi; done)}"
-NVF_SITES="${NVF_SITES% }"
+# NVFlare hospitals from the topology: "nvf-h1 nvf-h2" (the base sites; status.sh needs them online).
+# NVF_EXTRA_SITES (e.g. "nvf-h7 nvf-h8" for E5) are served as well but may stay offline.
+NVF_BASE_SITES="${NVF_BASE_SITES:-$(for s in $SITES; do IFS=: read -r id fw _ <<<"$s"; if [ "$fw" = nvflare ]; then printf '%s ' "$id"; fi; done)}"
+NVF_BASE_SITES="${NVF_BASE_SITES% }"
+NVF_EXTRA_SITES="${NVF_EXTRA_SITES:-}"
+NVF_SITES="${NVF_SITES:-$NVF_BASE_SITES${NVF_EXTRA_SITES:+ $NVF_EXTRA_SITES}}"
 
 NVF_WS="$NVF_RUNTIME/ws"
 NVF_PROD="$NVF_WS/$NVF_PROJECT/prod_00"
