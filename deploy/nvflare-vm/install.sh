@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # Installs the NVFlare hospitals on this VM (idempotent):
-#  1. venv with the standard NVFlare client + torch + flhub_core (nothing hub-specific)
+#  1. venv with the standard NVFlare client + torch + flhub_core (nothing hub-specific).
+#     flhub_core is a fixed copy of $FLHUB_CORE_REF (default stage1-final = 0.1.0), not an
+#     editable link to this checkout: a git pull must not change hospital code. Newer
+#     flhub_core versions reach the hospitals inside the NVFlare job (custom/), like client.py.
 #  2. each hospital's data file ~/flhub-data/<site>.csv (sha256-verified partition)
 #  3. startup kits from the operator: install.sh [kit.tgz ...]  (default: $NVF_INCOMING/*.tgz)
 #     A kit replaces the site's previous kit; the archive is deleted after installing.
@@ -12,8 +15,11 @@ command -v uv >/dev/null || { echo "install: uv not found on PATH" >&2; exit 1; 
 [ -x "$NVF_VENV/bin/python" ] || uv venv -q --python "$PYTHON_VERSION" "$NVF_VENV"
 PY="$NVF_VENV/bin/python"
 uv pip install -q --python "$PY" "torch==${TORCH_VERSION}+cpu" --index-url "$TORCH_INDEX_URL"
-uv pip install -q --python "$PY" "nvflare==$NVFLARE_VERSION" "numpy==$NUMPY_VERSION" \
-  "safetensors==$SAFETENSORS_VERSION" -e "$REPO/flhub_core"
+core_src=$(mktemp -d)
+git -C "$REPO" archive "${FLHUB_CORE_REF:-stage1-final}" flhub_core | tar -x -C "$core_src"
+uv pip install -q --python "$PY" --reinstall-package flhub-core "nvflare==$NVFLARE_VERSION" \
+  "numpy==$NUMPY_VERSION" "safetensors==$SAFETENSORS_VERSION" "$core_src/flhub_core"
+rm -rf "$core_src"
 echo "install: venv $NVF_VENV: $("$PY" -c 'import nvflare, torch, flhub_core; print("nvflare", nvflare.__version__, "torch", torch.__version__, "flhub_core", flhub_core.code_version())')"
 
 FLHUB_DATA_DIR="$FLHUB_DATA_DIR" "$PY" -m flhub_core.data materialize --sites $NVF_SITES --out "$FLHUB_DATA_DIR" \
