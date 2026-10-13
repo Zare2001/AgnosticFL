@@ -30,8 +30,9 @@ LOG_GLOBS = [Path.home() / "flhub-runtime" / "flower" / "logs",
              Path.home() / "flhub-runtime" / "flower-e5" / "logs"]
 HEAD = re.compile(r"^#(\d+) (\S+) \[([\w-]+)\] (\S+) -> (\S+): (.*)$")
 RUN = re.compile(r"^RUN (start|end) (\S+) (\S+)")
-ANOMALY = re.compile(r"ERROR|Traceback|Exception|exited rc=|Connection attempt failed|UNAUTHENTICATED|"
+ANOMALY = re.compile(r"ERROR|Traceback|Exception|exited rc=|UNAUTHENTICATED|"
                      r"Error:|went offline|NODE_UNAVAILABLE|CLIENT_APP_CRASHED")
+RECONNECT = re.compile(r"Connection attempt failed")  # e.g. after purge.sh restarted the SuperLink
 ANSI = re.compile(r"\x1b\[[0-9;]*m")
 PERF_RUNS = ("s2-e3-", "s2-e4a-", "s2-e4b-", "s2-e5-", "s2-e7-")  # also post VM memory/bytes per run
 SUMMARIES = Path.home() / "flhub-runtime" / "sysmon" / "summaries"
@@ -57,9 +58,9 @@ def log_files() -> list[Path]:
     return [p for d in LOG_GLOBS if d.is_dir() for p in sorted(d.glob("supernode-*.log"))]
 
 
-def scan(offsets: dict[str, int]) -> tuple[list[str], dict[str, int]]:
-    """Anomalous lines appended since `offsets` (per SuperNode log) -> (lines, counts)."""
-    hits, counts = [], {}
+def scan(offsets: dict[str, int]) -> tuple[list[str], dict[str, int], dict[str, int]]:
+    """Lines appended since `offsets` (per SuperNode log) -> (anomalous lines, counts, reconnects)."""
+    hits, counts, reconnects = [], {}, {}
     for path in log_files():
         start = offsets.get(str(path), 0)
         with open(path, "rb") as f:
@@ -68,8 +69,9 @@ def scan(offsets: dict[str, int]) -> tuple[list[str], dict[str, int]]:
         site = path.stem.removeprefix("supernode-")
         bad = [ANSI.sub("", ln).strip() for ln in text.splitlines() if ANOMALY.search(ln)]
         counts[site] = len(bad)
+        reconnects[site] = len(RECONNECT.findall(text))
         hits += [f"{site}: {ln[:160]}" for ln in bad[:4]]
-    return hits, counts
+    return hits, counts, reconnects
 
 
 def post_perf(name: str, start: str, end: str) -> None:
@@ -133,17 +135,20 @@ def main() -> None:
             start = opened["start"] if opened else utc
             proc = subprocess.run(["bash", str(REPO / "deploy" / "flower-vm" / "sysmon.sh"), "summary", name, start, utc],
                                   capture_output=True, text=True, timeout=300)
-            hits, counts = scan(opened["offsets"]) if opened else ([], {})
+            hits, counts, reconnects = scan(opened["offsets"]) if opened else ([], {}, {})
             rec = {"run": name, "start": start, "end": utc, "bus_end": m["id"], "sysmon_rc": proc.returncode,
-                   "sysmon_out": (proc.stdout + proc.stderr).strip()[-300:], "anomalies": counts, "health": health()}
+                   "sysmon_out": (proc.stdout + proc.stderr).strip()[-300:], "anomalies": counts,
+                   "reconnects": reconnects, "health": health()}
             with open(STATE_DIR / "runs.jsonl", "a") as f:
                 f.write(json.dumps(rec) + "\n")
-            print(f"{now()} RUN end {name}: sysmon rc={proc.returncode}, anomalies {counts}, {rec['health']}", flush=True)
+            print(f"{now()} RUN end {name}: sysmon rc={proc.returncode}, anomalies {counts}, reconnects {reconnects}, "
+                  f"{rec['health']}", flush=True)
             if name.startswith(PERF_RUNS):
                 post_perf(name, start, utc)
             if proc.returncode != 0 or any(counts.values()) or not rec["health"].endswith(": HEALTHY"):
                 body = "\n".join([f"sysmon summary rc={proc.returncode}; {rec['health']}",
-                                  f"SuperNode log lines flagged during {start}..{utc}: {counts}"] + hits[:12])
+                                  f"SuperNode log lines flagged during {start}..{utc}: {counts}; "
+                                  f"reconnect retries {reconnects}"] + hits[:12])
                 subprocess.run([BUS, "send", "--to", "central", "--type", "info", "--subject",
                                 f"S4 flower {name}: flagged SuperNode log lines or health", "--body", body],
                                capture_output=True, text=True, timeout=60)
