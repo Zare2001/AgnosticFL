@@ -62,7 +62,16 @@ class FlareAdmin:
 
     def client_jobs(self) -> dict:
         """{client: set of job ids it runs}; probes the clients, so a dead client is missing."""
-        rows = self._call(lambda s: s.get_client_job_status()) or []
+
+        def probe(session):
+            try:
+                return session.get_client_job_status() or []
+            except Exception as e:  # the server answers this when no client is connected at all
+                if "no clients available" in str(e):
+                    return []
+                raise
+
+        rows = self._call(probe)
         jobs = {}
         for row in rows:
             name = row.get("client_name")
