@@ -2,7 +2,7 @@
 # Stop the vantage6 adapter and the vantage6 server on the central VM (idempotent).
 set -euo pipefail
 NAME=flhub
-RT="$HOME/flhub-runtime/vantage6"
+RT="${V6_RT:-$HOME/flhub-runtime/vantage6}"
 if [ -f "$RT/adapter.pid" ]; then
   pid="$(cat "$RT/adapter.pid")"
   if kill -0 "$pid" 2>/dev/null; then kill "$pid"; for _ in $(seq 1 20); do kill -0 "$pid" 2>/dev/null || break; sleep 0.5; done; fi

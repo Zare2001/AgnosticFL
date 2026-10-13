@@ -21,11 +21,15 @@ for arg in "$@"; do
 done
 
 NAME=flhub
-RT="$HOME/flhub-runtime/vantage6"
-VENV="$HOME/venvs/v6"
+RT="${V6_RT:-$HOME/flhub-runtime/vantage6}"
+VENV="${V6_VENV:-$HOME/venvs/v6}"
 CFG="$HOME/.config/vantage6/server/$NAME.yaml"
 DB_DIR="$HOME/.local/share/vantage6/server/$NAME"
 V6_SERVER_IMAGE="${V6_SERVER_IMAGE:-ghcr.io/vantage6/infrastructure/server:$VANTAGE6_VERSION}"
+V6_SERVER_BIND="${V6_SERVER_BIND:-0.0.0.0}"   # host address the server port is published on
+SERVER_HOST="$([ "$V6_SERVER_BIND" = 0.0.0.0 ] && echo 127.0.0.1 || echo "$V6_SERVER_BIND")"
+V6_BASE_SITES="v6-h3 v6-h4"
+V6_EXTRA_SITES="${V6_EXTRA_SITES-v6-h9 v6-h10}"   # E5 sites: registered (add_sites.sh), offline outside E5
 log() { echo "[v6-install] $*"; }
 command -v envsubst >/dev/null || sudo apt-get install -y -q gettext-base >/dev/null
 
@@ -56,8 +60,8 @@ set -a; . "$RT/secrets.env"; set +a
 
 # --- 3. server config (written by hand: `v6 server new` is interactive only) ---
 mkdir -p "$(dirname "$CFG")"
-(umask 077; V6_SERVER_PORT="$V6_SERVER_PORT" V6_SERVER_IMAGE="$V6_SERVER_IMAGE" \
-  envsubst '${V6_SERVER_PORT} ${V6_JWT_SECRET} ${V6_SERVER_IMAGE}' \
+(umask 077; V6_SERVER_PORT="$V6_SERVER_PORT" V6_SERVER_IMAGE="$V6_SERVER_IMAGE" V6_SERVER_BIND="$V6_SERVER_BIND" \
+  envsubst '${V6_SERVER_PORT} ${V6_JWT_SECRET} ${V6_SERVER_IMAGE} ${V6_SERVER_BIND}' \
   < "$REPO/deploy/central/vantage6/server.template.yaml" > "$CFG")
 docker pull -q "$V6_SERVER_IMAGE" >/dev/null
 log "server config $CFG (image $V6_SERVER_IMAGE)"
@@ -113,11 +117,11 @@ fi
 
 # --- 6. adapter settings (no secrets) and the node credentials for the vantage6 agent ---
 cat > "$RT/adapter.env.new" <<EOF
-V6_SERVER_URL=http://127.0.0.1
+V6_SERVER_URL=http://$SERVER_HOST
 V6_SERVER_PORT=$V6_SERVER_PORT
 V6_API_PATH=/api
 V6_COLLABORATION=flhub
-V6_SITES="v6-h3 v6-h4"
+V6_SITES="$V6_BASE_SITES $V6_EXTRA_SITES"
 V6_ALGO_IMAGE=$PULL_REGISTRY/flhub/v6-train:$TAG
 ADAPTER_PORT=$ADAPTER_V6_PORT
 EOF

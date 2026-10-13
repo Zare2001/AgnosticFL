@@ -3,7 +3,7 @@
 allow_drop_all: false
 api_path: /api
 description: AgnosticFL vantage6 server
-ip: 0.0.0.0
+ip: ${V6_SERVER_BIND}
 port: ${V6_SERVER_PORT}
 uri: sqlite:///flhub.sqlite
 jwt_secret_key: ${V6_JWT_SECRET}

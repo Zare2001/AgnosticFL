@@ -6,8 +6,10 @@ REPO="$(cd "$(dirname "$0")/../../.." && pwd)"
 . "$REPO/deploy/topology.env"
 . "$REPO/deploy/versions.env"
 NAME=flhub
-RT="$HOME/flhub-runtime/vantage6"
-VENV="$HOME/venvs/v6"
+RT="${V6_RT:-$HOME/flhub-runtime/vantage6}"
+SERVER_URL="$(grep '^V6_SERVER_URL=' "$RT/adapter.env" 2>/dev/null | cut -d= -f2- || true)"
+SERVER_URL="${SERVER_URL:-http://127.0.0.1}"
+VENV="${V6_VENV:-$HOME/venvs/v6}"
 CFG="$HOME/.config/vantage6/server/$NAME.yaml"
 V6_SERVER_IMAGE="${V6_SERVER_IMAGE:-ghcr.io/vantage6/infrastructure/server:$VANTAGE6_VERSION}"
 [ -f "$RT/adapter.env" ] && [ -f "$CFG" ] || { echo "run deploy/central/vantage6/install.sh first" >&2; exit 1; }
@@ -18,9 +20,9 @@ if [ -z "$(docker ps -q --filter "label=vantage6-type=server" --filter "label=na
   (cd "$HOME" && "$VENV/bin/v6" server start -c "$CFG" --user --image "$V6_SERVER_IMAGE" >"$RT/server-start.log" 2>&1) \
     || { tail -20 "$RT/server-start.log" >&2; exit 1; }
 fi
-for _ in $(seq 1 60); do curl -sf "http://127.0.0.1:$V6_SERVER_PORT/api/version" >/dev/null && break; sleep 1; done
-curl -sf "http://127.0.0.1:$V6_SERVER_PORT/api/version" >/dev/null || { echo "vantage6 server did not come up" >&2; exit 1; }
-log "vantage6 server up: $(curl -s "http://127.0.0.1:$V6_SERVER_PORT/api/version")"
+for _ in $(seq 1 60); do curl -sf "$SERVER_URL:$V6_SERVER_PORT/api/version" >/dev/null && break; sleep 1; done
+curl -sf "$SERVER_URL:$V6_SERVER_PORT/api/version" >/dev/null || { echo "vantage6 server did not come up" >&2; exit 1; }
+log "vantage6 server up: $(curl -s "$SERVER_URL:$V6_SERVER_PORT/api/version")"
 
 # adapter: background process with a pid file; gets only its own password from secrets.env
 if [ -f "$RT/adapter.pid" ] && [ "$RT/adapter.env" -nt "$RT/adapter.pid" ]; then
