@@ -92,3 +92,9 @@ Server-side candidates if E4a hits a limit on central: comm_config.json `streami
 ### 2026-10-13T16:02Z — S3 — confirmed S3-frozen 96c44c9
 - S2-mixed (#200): 3 rounds, 6 sites, fedadam, hash-equal to sim; NVFlare fan-out 2.3-4.6 s, rounds 8.6 s.
 - S3-frozen 96c44c9 (#210): git diff 3212150..96c44c9 empty for flhub_core, clients/nvflare, adapters/nvflare, adapters/common, deploy/central/nvflare; nvf-h1/h2 in relay job da5a973a with 0.2.0+fe357a1dbec1; HEALTHY, sysmon + run_follow running. Confirmed (#211-ish). Next: S4, E4a nvflare scope first; watch RAM (70 % rule).
+
+### 2026-10-13T17:20Z — S4 — E4a done for NVFlare; breakdown and the 2 s latency floor
+- Final runs (runs.md, INV-1 full-sim 0.000): nvflare scope 1/8/32/64/128/256 MB median round 2.52/2.67/2.66/3.67/5.08/10.29 s; 512 MB = central testbed disk limit (#250). Mixed scope 1..64 MB done, 128 MB disk limit (#373); NVFlare fan-out there 1.8-3.8 s, rounds set by vantage6.
+- VM RAM peaks (follower summaries): 256 MB -> 3.48 GB VM, 1.35 GB per client job (70 % rule far away); wire/payload ~1.06 (#254).
+- Breakdown (evidence e4a-breakdown.md, script deploy/nvflare-vm/analysis/e4a_breakdown.py on central's run data, bus files #70/#71): small payloads are dominated by a fixed ~2.3 s NVFlare floor; 256 MB: transfer 6.3 s, hub prep 0.67 s + store 1.0 s.
+- Floor cause (source-verified): server tells clients to wait `task_request_interval` (default 2 s, server_json_config.py:102) before the next task request; client log: 0.55 s at the client per round, 2.04 s until the next task. Server-side latency knob; frozen, so unchanged; affects native E7 equally.
