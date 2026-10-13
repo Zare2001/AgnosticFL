@@ -33,3 +33,9 @@ Newest entries at the bottom. Format: `### <UTC timestamp> — <phase> — <titl
 - DoD 2 cleanup: removed island server config/db/logs, island secrets, ~/venvs/hub, island images (server, algorithm-base, registry, local v6-train/probe), raw dataset; ~/venvs/v6 recreated with vantage6 4.15.2 only. What stays on this VM: Docker (+ insecure-registries entry), ~/venvs/v6 (vantage6 CLI), node image ghcr.io/vantage6/infrastructure/node:4.15.2, node configs ~/.config/vantage6/node/v6-h{3,4}.yaml, node-keys.env, data ~/flhub-data/v6-h{3,4}.csv (+ ~/venvs/flhub-data, simulation only), algorithm image pulled by the nodes.
 - central status.sh now exits 1 when a site is offline (central's request; --no-sites to skip) [9c88bca].
 - Node watchdog: install.sh adds a cron entry that re-runs start.sh every minute while ~/flhub-runtime/vantage6/nodes.enabled exists (start.sh sets, stop.sh clears; flock). Test: `docker kill vantage6-v6-h4-user` -> back and connected after 15 s.
+
+### 2026-10-13T13:15Z — P3/P4 — final runs served; report section
+- Freeze b656577 confirmed (bus #61): `git diff bd800ce b656577 -- flhub_core clients/vantage6` empty; nodes run 145.38.205.58:5050/flhub/v6-train:bd800cee7922 @ sha256:262fe79378fa…(local == registry digest), code 0.1.0+9c6b064c1e96; status.sh OK.
+- M3-final (bus #66): vantage6-only `twk49dhp` acc 0.8638 / AUC 0.9246, 238 s; mixed-6sites `iehjnc44` acc 0.8654 / AUC 0.9247 == sim reference (diff 0.0 rounds 0-30). Each node ran 60 tasks in the final runs, 0 node errors.
+- Island evidence summaries committed (8892003); `docs/report/vantage6.md` written per final-call (#67): footprint, reproduce steps, problems/time lost, DoD 1/2 status output.
+- Next: report-ready; keep nodes up until all-done; then verify DoD items and touch ~/.flhub/DONE.
