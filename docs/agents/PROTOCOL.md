@@ -1,6 +1,6 @@
-# flhub/0.1 — adapter protocol
+# flhub/0.2 — adapter protocol
 
-**Status: FROZEN 2026-10-13 (central).** Reference implementation: `adapters/common/` (server side) and `adapters/common/rpcclient.py` (orchestrator side).
+**Status: flhub/0.1 FROZEN 2026-10-13; flhub/0.2 (stage 2, ADR-008) adds optional fields only (§7).** Reference implementation: `adapters/common/` (server side) and `adapters/common/rpcclient.py` (orchestrator side).
 
 The translation layer between the framework-free orchestrator and one framework. Inspired by MCP: one small, versioned protocol; each framework gets an adapter that speaks it; the orchestrator never contains framework code. Changes need an ADR and a version bump (`flhub/0.2`), announced on the bus.
 
@@ -12,7 +12,7 @@ The translation layer between the framework-free orchestrator and one framework.
 
 ## 2. Methods
 
-All requests: `{"jsonrpc":"2.0","id":<int>,"method":"<name>","params":{...}}`. Every `params` carries `"protocol":"flhub/0.1"`; adapters reject unknown versions with error `-32010`. Responses always use HTTP 200 with a JSON-RPC `result` or `error`.
+All requests: `{"jsonrpc":"2.0","id":<int>,"method":"<name>","params":{...}}`. Every `params` carries `"protocol":"flhub/0.1"` (or `"flhub/0.2"`, §7); adapters reject unknown versions with error `-32010`. Responses always use HTTP 200 with a JSON-RPC `result` or `error`.
 
 ### `discover` → adapter description
 ```json
@@ -21,7 +21,7 @@ All requests: `{"jsonrpc":"2.0","id":<int>,"method":"<name>","params":{...}}`. E
  "capabilities":{"payload":"full_weights","dtypes":["float32"],"max_payload_mb":64,
                  "evaluate":false,"min_round_interval_s":0}}
 ```
-`sites` lists every site the adapter serves. `status` ∈ `online | offline | unknown` (`unknown`: the adapter cannot tell right now, e.g. its relay is not running). An adapter is ready only when all its sites are `online`.
+`sites` lists every site the adapter serves. `status` ∈ `online | offline | unknown` (`unknown`: the adapter cannot tell right now, e.g. its relay is not running). An adapter is ready only when all its sites are `online` (flhub/0.2: only the sites of the run, §7; `max_payload_mb` ≥ 1024).
 
 ### `dispatch` → start one training round on some or all of the adapter's sites
 params:
@@ -104,3 +104,34 @@ Verify the exact API names for the installed versions before coding; update this
 ## 6. Adding a new framework (BranchKey, others)
 
 Implement the 5 methods above in a service on a free local port (simplest: subclass `adapters.common.BaseAdapter` and implement `site_status()` and `run_round()`), keep the hospital side standard for that framework, and pass `tests/conformance/`. Nothing in the orchestrator or hub core may change.
+
+## 7. flhub/0.2 — backward-compatible extensions (stage 2, ADR-008)
+
+flhub/0.2 adds optional request fields and extra response fields only. A 0.2 adapter accepts `protocol` `"flhub/0.1"` and `"flhub/0.2"` and answers each caller in its own version; a 0.1 caller never sends the new fields and ignores the extra ones.
+
+**Version negotiation.** The orchestrator calls `discover` with `"flhub/0.2"`. A 0.1 adapter answers `-32010`; the orchestrator then speaks 0.1 to it (no partial participation for that adapter).
+
+**`discover`** echoes the request's version in `protocol` and adds:
+```json
+"protocols":["flhub/0.1","flhub/0.2"],
+"capabilities":{..., "max_payload_mb":1024, "site_progress":true, "partial_collect":true, "site_cancel":true}
+```
+- **Payload cap**: `max_payload_mb` ≥ 1024. The hub core and `RpcServer` accept bodies up to 2048 MiB (`FLHUB_MAX_BODY_MB`); hub-core blobs are streamed to and from disk.
+- **Readiness per run**: `sites` still lists every registered site with its status. A run needs only the sites in its own `sites` list to be online. A registered but offline site (for example an E5 extra site) must not block a dispatch to the others; an adapter's health check covers its base sites.
+
+**Data variant hint.** `dispatch` takes an optional `"data_variant": "<dataset>-<pid>"` (for example `"organamnist-dir0.3"`). It repeats `train_config["data_variant"]` for adapters that must select the data inside their framework (vantage6 labelled databases); `train_config` stays opaque, and adapters that do not need the hint ignore it. Relay jobs carry it as `"data_variant"`.
+
+**Per-site progress.** `tasks/get` adds `"sites": {site_id: "queued"|"running"|"done"|"failed"|"cancelled"}` and, when a site failed, `"site_errors": {site_id: "<framework error text>"}`. `progress.done` counts the sites that are done (or the framework's own progress, if higher).
+
+**Partial collect.** `collect {"task_id", "partial": true}` is valid in every task state. It returns the envelopes of the sites that are done so far, in dispatch order, plus `"partial": true`, `"state"` and `"sites"`. Without `partial`, `collect` behaves as in 0.1 (only in state `completed`, else `-32013`).
+
+**Per-site cancel.** `cancel {"task_id", "sites": [...]}` cancels those sites that are still queued or running; done and failed sites are unchanged; the other sites go on. `sites` must be a non-empty subset of the task's sites (else `-32602`). The result is `{"task_id", "state", "sites"}`. Without `sites`, `cancel` cancels the whole task as in 0.1.
+- Results that arrive later for a cancelled site are dropped and logged.
+- A task ends once none of its sites is queued or running: `completed` if every site is done, else `failed` if a site failed, else `cancelled`. The deadline (`deadline_s`) marks the sites still active `failed`; done sites keep their envelopes. A whole-task `cancel` ends it `cancelled`.
+- `-32015` applies per site: a dispatch is busy only if one of its sites is still queued or running in another task. So after a partial collect plus a per-site cancel of the remaining sites, the next `dispatch` is accepted at once. The adapter must stop the framework work of the cancelled sites promptly, otherwise the next round of those sites waits behind it.
+
+**Envelopes.** Unchanged, except that `protocol` echoes the version of the dispatch request. Adapters should hand over each site's envelope as soon as that site is done (`BaseAdapter.report_site()`), so that partial collect and per-site progress are meaningful.
+
+**Relay routes (adapter-internal, §5).** Added: `POST /relay/site_result {"job_id","result":{...}}` → `{"accepted": bool}` (one site, as soon as it replied; `false` = dropped because the site was cancelled, failed or already done), `POST /relay/site_error {"job_id","site_id","error"}`, and `GET /relay/job?job_id=` → `{"job_id","state","sites"}` (404 once the adapter forgot the job). A relay should poll `/relay/job` while it waits and stop waiting for, and cancel in the framework, every site that is no longer `running`. `/relay/next` delivers only the job's sites that are still active. A final `POST /relay/result` stays allowed and is harmless after the job ended.
+
+**Hub core (§4).** Added `DELETE /blobs/sha256:<hex>` (200, or 404 if missing) and `POST /admin/gc {"older_than_s": N}` (deletes blobs not written for N seconds) for blob GC during and between runs.

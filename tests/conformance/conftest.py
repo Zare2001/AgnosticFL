@@ -1,15 +1,19 @@
-"""Options and fixtures for the flhub/0.1 adapter conformance suite.
+"""Options and fixtures for the flhub/0.2 adapter conformance suite (v2).
 
     pytest tests/conformance --adapter http://127.0.0.1:8811 [--hub http://127.0.0.1:8800]
-           [--sites nvf-h1 nvf-h2] [--data-dir ~/flhub-data] [--timeout 900] [--report out.json] -v -s
+           [--sites nvf-h1 nvf-h2] [--data-dir ~/flhub-data] [--timeout 900] [--report out.json]
+           [--restart-cmd "bash deploy/central/nvflare/stop.sh && bash deploy/central/nvflare/start.sh"]
+           [--variant organamnist-dir0.3] -v -s
     pytest tests/conformance --adapter mock      # self-test: in-process hub core + mock adapter
 
-Without --adapter the suite is skipped.
+Without --adapter the suite is skipped. --sites defaults to every site the adapter lists;
+pass the base sites explicitly when registered-but-offline extra sites exist.
 """
 
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -31,6 +35,8 @@ def pytest_addoption(parser):
     g.addoption("--timeout", type=float, default=900.0, help="seconds to wait for a round")
     g.addoption("--online-wait", type=float, default=120.0, help="seconds to wait for all sites online")
     g.addoption("--report", default=None, help="write a JSON summary here")
+    g.addoption("--restart-cmd", default=None, help="shell command that restarts the adapter (v2 restart test)")
+    g.addoption("--variant", default=None, help="data_variant for the v2 data-variant round (needs flhub_core 0.2)")
 
 
 def pytest_collection_modifyitems(config, items):
@@ -54,24 +60,66 @@ def opts(request):
     return request.config.option
 
 
-@pytest.fixture(scope="session")
-def endpoints(opts, tmp_path_factory):
-    """(adapter_url, hub_url); starts an in-process hub core + mock adapter for --adapter mock."""
-    if opts.adapter != "mock":
-        yield opts.adapter, opts.hub
-        return
-    from adapters.mock.service import MockAdapter
-    from hub.core.server import HubCore
+MOCK_OFFLINE_SITE = "nvf-h7"  # registered but offline in the self-test
 
-    hub_srv = HubCore(tmp_path_factory.mktemp("hubcore")).build_server("127.0.0.1", 0).start()
-    sites = opts.sites or ["nvf-h1", "nvf-h2"]
-    for s in sites:
-        if not site_path(s, opts.data_dir).exists():
-            materialize(s, opts.data_dir)
-    adapter_srv = MockAdapter(sites, opts.data_dir, HubClient(hub_srv.url)).build_server("127.0.0.1", 0).start()
-    yield adapter_srv.url, hub_srv.url
-    adapter_srv.stop()
-    hub_srv.stop()
+
+class _Mock:
+    """In-process hub core + mock adapter for --adapter mock; restart() replaces the adapter."""
+
+    def __init__(self, opts, root):
+        from hub.core.server import HubCore
+
+        self.opts = opts
+        self.sites = opts.sites or ["nvf-h1", "nvf-h2"]
+        for s in self.sites:
+            if not site_path(s, opts.data_dir).exists():
+                materialize(s, opts.data_dir)
+        self.hub_srv = HubCore(root).build_server("127.0.0.1", 0).start()
+        self.adapter_srv = self._adapter(0)
+
+    def _adapter(self, port):
+        from adapters.mock.service import MockAdapter
+
+        adapter = MockAdapter(self.sites + [MOCK_OFFLINE_SITE], self.opts.data_dir, HubClient(self.hub_srv.url),
+                              site_delay={self.sites[-1]: 1.0}, offline={MOCK_OFFLINE_SITE})
+        return adapter.build_server("127.0.0.1", port).start()
+
+    def restart(self):
+        port = self.adapter_srv.httpd.server_address[1]
+        self.adapter_srv.stop()
+        self.adapter_srv = self._adapter(port)
+
+    def stop(self):
+        self.adapter_srv.stop()
+        self.hub_srv.stop()
+
+
+@pytest.fixture(scope="session")
+def mock_env(opts, tmp_path_factory):
+    if opts.adapter != "mock":
+        yield None
+        return
+    env = _Mock(opts, tmp_path_factory.mktemp("hubcore"))
+    yield env
+    env.stop()
+
+
+@pytest.fixture(scope="session")
+def endpoints(opts, mock_env):
+    """(adapter_url, hub_url); the in-process mock for --adapter mock."""
+    if mock_env is None:
+        return opts.adapter, opts.hub
+    return mock_env.adapter_srv.url, mock_env.hub_srv.url
+
+
+@pytest.fixture(scope="session")
+def restart(opts, mock_env):
+    """Callable that restarts the adapter, or None (restart test skipped)."""
+    if mock_env is not None:
+        return mock_env.restart
+    if not opts.restart_cmd:
+        return None
+    return lambda: subprocess.run(["bash", "-c", opts.restart_cmd], check=True, timeout=600)
 
 
 @pytest.fixture(scope="session")
@@ -95,7 +143,8 @@ def discovered(client):
 
 @pytest.fixture(scope="session")
 def sites(opts, discovered):
-    s = opts.sites or [x["site_id"] for x in discovered["sites"]]
+    s = opts.sites or [x["site_id"] for x in discovered["sites"] if x["site_id"] != MOCK_OFFLINE_SITE
+                       or opts.adapter != "mock"]
     REPORT["sites"] = s
     return s
 
