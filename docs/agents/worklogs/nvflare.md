@@ -29,3 +29,9 @@ Newest entries at the bottom. Format: `### <UTC timestamp> — <phase> — <titl
 - Problem solved: after a hospital client stops, the server keeps it as connected (get_system_info, get_client_disconnect_time) for minutes. Fix: site status uses the FLARE API client probe `get_client_job_status()` (dead client = `no_reply`, ~1 s) AND the relay's view; `run_round` fails fast if a site is offline.
 - Problem solved: a restarted hospital client does not rejoin the running relay job. The keeper sees a connected site outside the job for >= 15 s, asks the relay to shut down gracefully (no round in flight) and submits a new job; verified: offline 5 s after stop, both online again ~50 s after start. Server restart: clients reconnect by themselves, new job, healthy after 20 s.
 - Next: 3-round island run through the orchestrator (waiting for M1-hub), then deploy-request.
+
+### 2026-10-13T12:33Z — P1 — M1-nvflare: island 3-round run equivalent to hub.sim
+- `~/venvs/hub` (island only: orchestrator/sim, wandb 0.30.0 offline) on this VM; config `deploy/central/nvflare/island-3r.yaml` (adapter nvflare :8811, sites nvf-h1/nvf-h2, 3 rounds).
+- `python -m hub.orchestrator run --config deploy/central/nvflare/island-3r.yaml --wandb offline` -> finished, 3 rounds x 2 sites, 3-4 s per round, test acc 0.625 (run dir ~/flhub-runtime/runs/nvflare-island-3r-20261013T123046Z).
+- `python -m hub.sim` with the same config + `scripts/equivalence_check.py` -> max abs weight diff 0.000e+00 in rounds 0-3, acc diff 0.0 pp: EQUIVALENCE PASS.
+- P1 criteria met: conformance 7/7, 3-round island run, idempotent scripts (central: install/start/stop/status, VM: install/start/stop/status). Next: deploy-request to central.
