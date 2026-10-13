@@ -1,0 +1,19 @@
+# Configuration of the final runs (PROJECT_PLAN.md §6 P3). FROZEN once announced on the bus.
+#   mixed-6sites          python -m hub.orchestrator run --config configs/final.yaml --name mixed-6sites
+#   nvflare-only (etc.)   python -m hub.orchestrator run --config configs/final.yaml --only nvflare --name nvflare-only
+#   sim-fedavg-reference  python -m hub.sim --config configs/final.yaml
+#   centralized-baseline  python -m hub.sim --config configs/final.yaml --mode centralized
+name: mixed-6sites
+rounds: 30
+seed: 2026
+train_config: {local_epochs: 1, batch_size: 64, lr: 0.05, momentum: 0.0, seed: 2026}
+hub_url: http://127.0.0.1:8800
+adapters:
+  - {name: nvflare,  url: "http://127.0.0.1:8811", sites: [nvf-h1, nvf-h2]}
+  - {name: vantage6, url: "http://127.0.0.1:8812", sites: [v6-h3, v6-h4]}
+  - {name: flower,   url: "http://127.0.0.1:8813", sites: [flw-h5, flw-h6]}
+deadline_s: 1800
+online_wait_s: 600
+poll_interval_s: 1.0
+round_retries: 1
+wandb: {project: AgnosticFL}

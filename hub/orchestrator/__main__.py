@@ -1,5 +1,9 @@
 """python -m hub.orchestrator run --config configs/<name>.yaml [--wandb offline|online|disabled]
-                                 [--name N] [--tags final ...] [--group G] [--rounds N] [--runs-dir D]"""
+                                 [--name N] [--tags final ...] [--group G] [--rounds N] [--runs-dir D]
+                                 [--only nvflare ...]
+
+--only restricts the run to some adapters of the config, e.g. the single-framework final runs use
+configs/final.yaml with --only nvflare, so every final run shares one training config."""
 
 from __future__ import annotations
 
@@ -28,9 +32,15 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--group")
     r.add_argument("--rounds", type=int)
     r.add_argument("--runs-dir")
+    r.add_argument("--only", nargs="+", metavar="ADAPTER", help="use only these adapters of the config")
     args = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
     cfg = load_config(args.config, rounds=args.rounds, runs_dir=args.runs_dir)
+    if args.only:
+        unknown = set(args.only) - {a.name for a in cfg.adapters}
+        if unknown:
+            ap.error(f"--only: no adapters {sorted(unknown)} in {args.config}")
+        cfg.adapters = [a for a in cfg.adapters if a.name in args.only]
     hub = HubClient(cfg.hub_url)
     hub.health()
     from flhub_core.model import init_weights
