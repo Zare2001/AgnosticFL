@@ -99,6 +99,7 @@ E4a and E4b on the real system: (S4 results).
 | `node_port` returned 1 for a non-last site | `straggler.sh` aborted after stopping the site (island) | `set -e` with `x=$(f)` and a failing last command | `return 0` | 7d6d1b8 | 10 min |
 | SuperLink DB stays at peak size | DB 135 MB with 99 % free pages and 138 MB WAL after payload-64 | SQLite keeps freed pages | `purge.sh` (VACUUM) between E4a sizes | 6ba8981 | — |
 | ADR number collision | rebase conflict in `docs/DECISIONS.md` | parallel agents picked the same number | renumbered after pull (ADR-016, ADR-017) | de5d913 | 10 min |
+| adapter restart on central took 97 s instead of ~30 s | an intermediate relay run (3704…) was no longer RUNNING when the SuperNodes got its site-info query | a stale-FAB relay was removed through the adapter's single global shutdown flag, which the new relay could take; the launcher then waited out its 60 s cooldown | the relay sends its fab id with every poll; only a stale relay gets `shutdown`, its beats get no liveness credit | 17cdfd1 | 20 min |
 | `pgrep` matched itself while measuring | timeline empty | pattern matched the sampler's own command line | anchored pattern | — | 5 min |
 
 ## 7. Recommendations
