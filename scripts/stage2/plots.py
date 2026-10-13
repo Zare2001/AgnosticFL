@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 import statistics
 from pathlib import Path
 
@@ -368,25 +369,57 @@ def fig_e5(out: Path) -> None:
 
 
 def fig_e6_timeline(out: Path, name: str = "s2-e6a-strict") -> None:
+    from datetime import datetime
+
     run = load(name)
     if run is None:
         print("e6_timeline: run missing")
         return
+
+    def sec(utc: str) -> float:
+        return datetime.fromisoformat(utc.rstrip("Z") + "+00:00").timestamp()
+
     recs = [r for r in run.records() if r.get("round", 0) > 0]
-    t0 = min(np.datetime64(r["utc_start"][:-1]) for r in recs)
+    t0 = min(sec(r["utc_start"]) for r in recs)
+    t_end = max(sec(r["utc_end"]) for r in recs) - t0
     fig, ax = plt.subplots(figsize=(8, 3.8))
     for r in recs:
-        a = (np.datetime64(r["utc_start"][:-1]) - t0) / np.timedelta64(1, "s")
-        b = (np.datetime64(r["utc_end"][:-1]) - t0) / np.timedelta64(1, "s")
+        a, b = sec(r["utc_start"]) - t0, sec(r["utc_end"]) - t0
         color = SERIES[7] if r.get("failures") else (SERIES[3] if r.get("dropped") else SERIES[0])
         ax.barh(r["round"], b - a, left=a, color=color, height=0.7)
-    for e in run.path.joinpath("injections.jsonl").read_text().splitlines() if (run.path / "injections.jsonl").exists()             else []:
-        ev = json.loads(e)
-        ax.axvline((np.datetime64(ev["utc"][:-1]) - t0) / np.timedelta64(1, "s"), color=TEXT2, lw=0.8, ls=":")
+    marks = []  # (begin s, back s, label)
+    path = run.path / "injections.jsonl"
+    if path.exists():  # central's injections (E6d, E6e)
+        evs = [json.loads(x) for x in path.read_text().splitlines()]
+        for ev in evs:
+            if ev["action"] == "server_restart_begin":
+                back = next((x for x in evs if x["action"] == "server_restart_end"
+                             and x["framework"] == ev["framework"] and x["round"] == ev["round"]), ev)
+                marks.append((sec(ev["utc"]) - t0, sec(back["utc"]) - t0, f"{ev['framework']} restart ({ev['kind']})"))
+            elif ev["action"] == "sigkill":
+                back = next((x for x in evs if x["action"] == "resume"), ev)
+                marks.append((sec(ev["utc"]) - t0, sec(back["utc"]) - t0, "SIGKILL hub + adapters"))
+    else:  # the framework agents' injections, announced on the bus
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from e6_table import bus_injections
+
+        for i in bus_injections():
+            if -60 <= i["t"] - t0 <= t_end:
+                what = i["subject"].split(" at ")[0].replace("E6 inject ", "")
+                marks.append((i["t"] - t0, i["t"] - t0, what))
+    for a, b, label in marks:
+        if b > a:
+            ax.axvspan(a, b, color=TEXT2, alpha=0.15, lw=0)
+        ax.axvline(a, color=TEXT2, lw=0.8, ls=":")
+        top = a > t_end / 2  # the bars run from top left to bottom right: label where they are not
+        ax.text(a, 0.97 if top else 0.03, f" {label}", transform=ax.get_xaxis_transform(), rotation=90, fontsize=7,
+                va="top" if top else "bottom", ha="right", color=TEXT2)
     ax.invert_yaxis()
-    ax.set_xlabel("seconds since the start of round 1")
+    ax.yaxis.set_major_locator(plt.MaxNLocator(integer=True))
+    ax.set_xlabel("seconds since the start of round 1 (grey: component down)")
     ax.set_ylabel("round")
-    ax.set_title(f"E6: {name} timeline (red = failed attempt then retried, yellow = sites dropped)", loc="left")
+    ax.set_title(f"E6: {name} (blue: round; red: failed attempt, then retried; yellow: sites dropped)", loc="left",
+                 fontsize=9)
     save(fig, f"e6_timeline_{name}", out)
 
 

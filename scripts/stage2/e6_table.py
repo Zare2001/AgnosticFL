@@ -2,10 +2,13 @@
 
     python scripts/stage2/e6_table.py [--out docs/report/stage2/e6.md]
 
-Injections come from the bus ('E6 inject ...' messages, sent by the framework agents' inject.sh and by
-central's inject_central.py) inside each E6 run's window; detection = first failed attempt or dropped
-site after the injection (run events.jsonl, round records); recovery = end of the round that was hit
-(the round completed, after retries if strict). Straggler on/off messages are not injections of that
+Framework-side injections come from the bus ('E6 inject ...' info messages from the framework agents'
+inject.sh) inside each E6 run's window: detection = first failed attempt or dropped site after the
+injection (run events.jsonl); recovery = end of the round that was hit (completed, after retries if
+strict). Central's own injections (E6d, E6e) come from <run>/injections.jsonl, which also records
+when the component was back (resume; restart_server.sh end): recovery = end of the first round that
+completed after that, detection = first failed attempt in between ('-': the hub waited or the round
+had already finished). Straggler on/off messages are not injections of that
 kind: E6b is summarized per planned straggler window instead (campaign_e6.sh: nvf-h2 rounds 1-6,
 v6-h4 rounds 7-13, flw-h6 rounds 14-20 at 10 % CPU). The per-run table lists retried rounds and
 dropped site-rounds from the round records, and the INV-1 result from finalized.json.
@@ -46,6 +49,28 @@ def bus_injections(since: int = 97) -> list[dict]:
             found.append({"id": int(m.group(1)), "from": m.group(4), "subject": m.group(5),
                           "t": ts(u.group(1)) if u else ts(m.group(2)[:19] + "Z")})
     return found
+
+
+def central_injections(rd: Path) -> list[dict]:
+    """Central's own injections (inject_central.py) from <run>/injections.jsonl, with the time the
+    component was back: E6d resume, E6e server restart end."""
+    path = rd / "injections.jsonl"
+    if not path.exists():
+        return []
+    recs = [json.loads(x) for x in path.read_text().splitlines()]
+    out = []
+    for r in recs:
+        if r["action"] == "sigkill":
+            up = next((ts(x["utc"]) for x in recs if x["action"] == "resume"), ts(r["utc"]))
+            out.append({"t": ts(r["utc"]), "t_up": up, "kind": "sigkill",
+                        "subject": f"SIGKILL orchestrator + 3 adapters after round {r['after_round']} at {r['utc']}"})
+        elif r["action"] == "server_restart_begin":
+            end = next((x for x in recs if x["action"] == "server_restart_end" and x["framework"] == r["framework"]
+                        and x["round"] == r["round"]), None)
+            out.append({"t": ts(r["utc"]), "t_up": ts(end["utc"]) if end else ts(r["utc"]), "kind": r["kind"],
+                        "subject": f"restart {r['framework']} server ({r['kind']} round {r['round']}) at {r['utc']}, "
+                                   f"back after {end['seconds'] if end else '?'} s"})
+    return out
 
 
 def load_run(name: str) -> tuple[Path | None, list[dict]]:
@@ -95,8 +120,9 @@ def main(argv: list[str] | None = None) -> int:
         inv1 = json.loads(fin.read_text()).get("inv1_method", "-") if fin.exists() else "pending"
         events = [json.loads(x) for x in (rd / "events.jsonl").read_text().splitlines()] \
             if (rd / "events.jsonl").exists() else []
-        mine = [i for i in inj if t0 - 120 <= i["t"] <= t1]
-        if not mine:
+        central = central_injections(rd)
+        mine = [i for i in inj if t0 - 120 <= i["t"] <= t1 and i["from"] != "central"]
+        if not mine and not central:
             retried = sum(1 for r in recs if r.get("failures"))
             dropped = sum(len(r.get("dropped") or {}) for r in recs)
             lines.append(f"| {name} | none | | | | | {retried} rounds retried | {dropped} | none | {inv1} |")
@@ -111,6 +137,16 @@ def main(argv: list[str] | None = None) -> int:
             rec = ts(hit["utc_end"]) - i["t"]
             lines.append(f"| {name} | {i['subject'][:70]} | {i['from']} | {hit['round']} | "
                          f"{'-' if det is None else f'{det:.1f}'} | {rec:.1f} | {len(fails) + 1} | "
+                         f"{len(hit.get('dropped') or {})} | none | {inv1} |")
+        for i in central:
+            # the first round that completes after the component is back carries the recovery
+            hit = next((r for r in recs if ts(r["utc_end"]) >= i["t_up"]), None)
+            if hit is None:
+                continue
+            fails = [ts(f["utc"]) for r in recs for f in r.get("failures") or [] if i["t"] <= ts(f["utc"]) <= ts(hit["utc_end"])]
+            det = "n/a (hub killed)" if i["kind"] == "sigkill" else (f"{min(fails) - i['t']:.1f}" if fails else "-")
+            lines.append(f"| {name} | {i['subject']} | central | {hit['round']} | {det} | "
+                         f"{ts(hit['utc_end']) - i['t']:.1f} | {len(hit.get('failures') or []) + 1} | "
                          f"{len(hit.get('dropped') or {})} | none | {inv1} |")
     lines += ["", "| run | rounds | rounds retried | failed attempts | dropped site-rounds | median round s (r>=2) | "
               "max round s | INV-1 method | INV-1 max diff |", "|---|---|---|---|---|---|---|---|---|"]
