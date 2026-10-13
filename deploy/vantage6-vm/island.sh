@@ -13,7 +13,7 @@ export V6_RT="$HOME/flhub-runtime/v6-island" V6_VENV="$HOME/venvs/island"
 export V6_SERVER_BIND="${V6_SERVER_BIND:-172.17.0.1}"
 NODES="isl-h3:v6-h3 isl-h4:v6-h4"     # island node name : organisation (= site id)
 NODE_VENV="$HOME/venvs/v6"            # the standard node CLI
-V6_NODE_IMAGE="${V6_NODE_IMAGE:-ghcr.io/vantage6/infrastructure/node:$VANTAGE6_VERSION}"
+. "$REPO/deploy/vantage6-vm/common.sh"
 log() { echo "[v6-island] $*"; }
 
 hubcore_up() {
@@ -24,31 +24,22 @@ hubcore_up() {
   echo "hub core did not come up, see $V6_RT/hubcore.log" >&2; return 1
 }
 
-nodes_up() {
+nodes_up() {  # (re)render the island node configs, start missing nodes, wait until connected
   set -a; . "$V6_RT/v6-nodes.env"; set +a
   local allowed extra="node_extra_hosts:"$'\n'"  host.docker.internal: host-gateway"
   allowed="^localhost:$REGISTRY_PORT/flhub/v6-train(:[A-Za-z0-9._-]+)?(@sha256:[a-f0-9]{64})?\$"
   for pair in $NODES; do
     local node="${pair%%:*}" site="${pair##*:}" var
     var="V6_API_KEY_$(echo "$site" | tr 'a-z-' 'A-Z_')"
-    (umask 077; V6_API_KEY="${!var}" V6_SERVER_URL="http://host.docker.internal" V6_SERVER_PORT="$V6_SERVER_PORT" \
-      V6_TASK_DIR="$HOME/.local/share/vantage6/node/$node" V6_DATA_FILE="$HOME/flhub-data/$site.csv" V6_DATA_TYPE=csv \
-      V6_NODE_IMAGE="$V6_NODE_IMAGE" V6_ALLOWED_ALGORITHMS="$allowed" V6_SITE="$node" V6_EXTRA_CONFIG="$extra" \
-      envsubst '${V6_API_KEY} ${V6_SERVER_URL} ${V6_SERVER_PORT} ${V6_TASK_DIR} ${V6_DATA_FILE} ${V6_DATA_TYPE} ${V6_NODE_IMAGE} ${V6_ALLOWED_ALGORITHMS} ${V6_SITE} ${V6_EXTRA_CONFIG}' \
-      < "$REPO/deploy/vantage6-vm/node.template.yaml" > "$HOME/.config/vantage6/node/$node.yaml")
+    render_node_config "$node" "$site" "${!var}" "http://host.docker.internal" "$allowed" "$extra"
     if [ -z "$(docker ps -q --filter "name=^vantage6-$node-user$")" ]; then
       (cd "$HOME" && "$NODE_VENV/bin/v6" node start -n "$node" --user >/dev/null)
       log "started island node $node (organisation $site)"
     fi
   done
   for pair in $NODES; do
-    local node="${pair%%:*}" last=""
-    for _ in $(seq 1 90); do
-      last="$(docker logs "vantage6-$node-user" 2>&1 | grep -E 'Websocket connection established|Connected to the /tasks|Disconnected from the server' | tail -1 || true)"
-      case "$last" in *Disconnected*|"") sleep 1 ;; *) break ;; esac
-    done
-    case "$last" in *Disconnected*|"") echo "island node $node not connected" >&2; return 1 ;; esac
-    log "island node $node connected"
+    wait_connected "${pair%%:*}"
+    log "island node ${pair%%:*} connected"
   done
 }
 

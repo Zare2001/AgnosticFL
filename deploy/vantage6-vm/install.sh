@@ -15,7 +15,7 @@ RT="$HOME/flhub-runtime/vantage6"
 VENV="$HOME/venvs/v6"
 DATA_VENV="$HOME/venvs/flhub-data"
 KEYS="$RT/node-keys.env"
-V6_NODE_IMAGE="${V6_NODE_IMAGE:-ghcr.io/vantage6/infrastructure/node:$VANTAGE6_VERSION}"
+. "$REPO/deploy/vantage6-vm/common.sh"
 ISLAND=0; KEYS_IN=""
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -60,21 +60,14 @@ PY
   fi
 fi
 
-# --- 3. hospital data (simulation only: a real hospital already has its file) ---
+# --- 3. hospital data (simulation only: a real hospital already has its files) ---
+# the stage-1 file <site>.csv and every stage-2 variant <variant>-<site>.csv, written once by the
+# repo's flhub_core data module (numpy only) and checked against the committed manifests
 if [ ! -x "$DATA_VENV/bin/python" ]; then uv venv -q --python "$PYTHON_VERSION" "$DATA_VENV"; fi
 uv pip install -q --python "$DATA_VENV/bin/python" "numpy==$NUMPY_VERSION"
-uv pip install -q --python "$DATA_VENV/bin/python" --no-deps "$REPO/flhub_core"   # data module needs numpy only
-for s in $SITES; do
-  if [ ! -f "$HOME/flhub-data/$s.csv" ]; then "$DATA_VENV/bin/python" -m flhub_core.data materialize --sites "$s"; fi
-done
-"$DATA_VENV/bin/python" - $SITES <<'PY'
-import hashlib, sys
-from flhub_core.data import PARTITION_SHA256, site_path
-for s in sys.argv[1:]:
-    got = hashlib.sha256(site_path(s).read_bytes()).hexdigest()
-    assert got == PARTITION_SHA256[s], f"{s}: data file sha256 {got} != pinned {PARTITION_SHA256[s]}"
-    print(f"[v6-vm-install] data {site_path(s)} sha256 ok")
-PY
+materialize() { PYTHONPATH="$REPO/flhub_core/src" "$DATA_VENV/bin/python" -m flhub_core.data materialize --out "$V6_DATA_DIR" "$@"; }
+materialize --sites $SITES >/dev/null
+materialize --variants all --sites $SITES --manifests "$REPO/configs/stage2/partitions" | sed 's/^/[v6-vm-install] data /'
 
 # --- 4. node API keys (from the operator, never in git) ---
 if [ -n "$KEYS_IN" ]; then install -m 600 "$KEYS_IN" "$KEYS" && rm -f "$KEYS_IN"; fi
@@ -82,17 +75,12 @@ if [ -n "$KEYS_IN" ]; then install -m 600 "$KEYS_IN" "$KEYS" && rm -f "$KEYS_IN"
 set -a; . "$KEYS"; set +a
 
 # --- 5. one standard node config per hospital (`v6 node new` is interactive only) ---
-mkdir -p "$HOME/.config/vantage6/node"
 ALLOWED="^$(echo "$REGISTRY" | sed 's/\./\\./g')/flhub/v6-train(:[A-Za-z0-9._-]+)?(@sha256:[a-f0-9]{64})?\$"
 for s in $SITES; do
   var="V6_API_KEY_$(echo "$s" | tr 'a-z-' 'A-Z_')"
   [ -n "${!var:-}" ] || { echo "$KEYS has no $var" >&2; exit 1; }
-  (umask 077; V6_API_KEY="${!var}" V6_SERVER_URL="$SERVER_URL" V6_SERVER_PORT="$V6_SERVER_PORT" \
-    V6_TASK_DIR="$HOME/.local/share/vantage6/node/$s" V6_DATA_FILE="$HOME/flhub-data/$s.csv" V6_DATA_TYPE=csv \
-    V6_NODE_IMAGE="$V6_NODE_IMAGE" V6_ALLOWED_ALGORITHMS="$ALLOWED" V6_SITE="$s" V6_EXTRA_CONFIG="$EXTRA" \
-    envsubst '${V6_API_KEY} ${V6_SERVER_URL} ${V6_SERVER_PORT} ${V6_TASK_DIR} ${V6_DATA_FILE} ${V6_DATA_TYPE} ${V6_NODE_IMAGE} ${V6_ALLOWED_ALGORITHMS} ${V6_SITE} ${V6_EXTRA_CONFIG}' \
-    < "$REPO/deploy/vantage6-vm/node.template.yaml" > "$HOME/.config/vantage6/node/$s.yaml")
-  log "node config ~/.config/vantage6/node/$s.yaml -> $SERVER_URL:$V6_SERVER_PORT"
+  render_node_config "$s" "$s" "${!var}" "$SERVER_URL" "$ALLOWED" "$EXTRA"
+  log "node config ~/.config/vantage6/node/$s.yaml -> $SERVER_URL:$V6_SERVER_PORT ($(node_databases "$s" | grep -c label) databases)"
 done
 echo "$([ "$ISLAND" = 1 ] && echo island || echo central)" > "$RT/node-mode"
 

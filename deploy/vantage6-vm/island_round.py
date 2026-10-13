@@ -2,7 +2,7 @@
 outcome and timing, e.g. to exercise deploy/vantage6-vm/inject.sh and straggler.sh.
 
     ~/venvs/island/bin/python deploy/vantage6-vm/island_round.py --rounds 3 4 [--sites v6-h3 v6-h4]
-        [--adapter http://127.0.0.1:8812] [--deadline 600]
+        [--model payload-64] [--variant organamnist-dir0.3] [--adapter http://127.0.0.1:8812] [--deadline 600]
 """
 
 from __future__ import annotations
@@ -28,14 +28,23 @@ def main() -> None:
     ap.add_argument("--sites", nargs="+", default=["v6-h3", "v6-h4"])
     ap.add_argument("--adapter", default="http://127.0.0.1:8812")
     ap.add_argument("--deadline", type=float, default=600)
+    ap.add_argument("--model", default=None, help="flhub_core model id (default: the stage-1 model)")
+    ap.add_argument("--variant", default=None, help="data variant <dataset>-<pid>")
     args = ap.parse_args()
     client, hub = AdapterClient(args.adapter), HubClient()
-    w = init_weights(2026)
+    cfg = dict(TRAIN_CONFIG)
+    if args.model:
+        cfg["model"] = args.model
+    if args.variant:
+        cfg["data_variant"] = args.variant
+    w = init_weights(2026, model=args.model) if args.model else init_weights(2026)
     hub.put_spec(spec(w))
     ref = hub.put_weights(w)
     for rnd in args.rounds:
         t0 = time.monotonic()
-        task_id = client.dispatch(rnd, {"ref": ref}, TRAIN_CONFIG, args.sites, args.deadline)
+        extra = {"data_variant": args.variant} if args.variant else {}
+        task_id = client.call("dispatch", round=rnd, model={"ref": ref}, train_config=cfg, sites=args.sites,
+                              deadline_s=args.deadline, **extra)["task_id"]
         print(f"{utc()} round {rnd}: dispatched {task_id}", flush=True)
         last = None
         while True:

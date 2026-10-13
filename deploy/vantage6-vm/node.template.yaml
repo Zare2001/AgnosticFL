@@ -6,10 +6,12 @@ api_path: /api
 server_url: ${V6_SERVER_URL}
 port: ${V6_SERVER_PORT}
 task_dir: ${V6_TASK_DIR}
+# one database per data variant (label = variant with non-identifier characters -> '_', ADR-014)
 databases:
-- label: default
-  uri: ${V6_DATA_FILE}
-  type: ${V6_DATA_TYPE}
+${V6_DATABASES}
+# do not publish the node config: for CSV databases it lists every column name (785 per file),
+# which the 4.15.2 server deletes row by row on every node (re)connect (ADR-014)
+share_config: false
 encryption:
   enabled: false
   private_key: null
