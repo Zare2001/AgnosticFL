@@ -33,6 +33,11 @@ log = logging.getLogger("flhub.adapter.vantage6")
 FAILED = {"failed", "start failed", "non-existing Docker image", "crashed", "killed by user", "not allowed",
           "unknown error"}
 POLL_S = 1.0
+# In DB mode (no large result store) every status call makes the server load the run row with its
+# input (~1.78x the model) from sqlite, so poll each site less often for large models:
+# interval = model MB / POLL_MB_PER_S, at least POLL_S, at most POLL_MAX_S.
+POLL_MB_PER_S = 16.0
+POLL_MAX_S = 30.0
 # delete a round's vantage6 tasks (input and results live in the server DB) once the round is
 # settled if the model is at least this large: keeps the server DB at one round for E3/E4/E7
 PURGE_MIN_MB = float(os.environ.get("V6_PURGE_MIN_MB", "16"))
@@ -65,6 +70,7 @@ class Vantage6Adapter(BaseAdapter):
         self.collab_id: int | None = None
         self.org_ids: dict[str, int] = {}  # site id -> organisation id (registered organisations)
         self.v6_tasks: dict[str, dict[str, int]] = {}  # flhub task id -> {site: vantage6 task id}
+        self.blob_store = False  # server stores run input/results in a large result store (UUIDs in the DB)
 
     # ---- vantage6 sessions ---------------------------------------------------------------
     def _login(self):
@@ -150,7 +156,7 @@ class Vantage6Adapter(BaseAdapter):
 
     def run_round(self, task, weights, client_config):
         model = self.hub.get_blob(task.model_ref)  # exact bytes of the round model
-        self._call(lambda c: None)  # make sure the session and organisation ids exist
+        self.blob_store = bool(self._call(lambda c: c.check_if_blob_store_enabled()))  # may change (E4a knob)
         b64 = base64.b64encode(model).decode("ascii")
         ids = self.v6_tasks.setdefault(task.task_id, {})
         workers = [threading.Thread(target=self._create, args=(task, site, b64, client_config, ids), daemon=True)
@@ -160,8 +166,9 @@ class Vantage6Adapter(BaseAdapter):
         for w in workers:
             w.join()
         del b64
+        interval = POLL_S if self.blob_store else min(POLL_MAX_S, max(POLL_S, len(model) / 2**20 / POLL_MB_PER_S))
         try:
-            self._follow(task, ids)
+            self._follow(task, ids, interval)
         finally:
             if len(model) >= PURGE_MIN_MB * 2**20:
                 self._delete(task, ids)
@@ -195,9 +202,9 @@ class Vantage6Adapter(BaseAdapter):
         if task.cancelled or task.site_cancelled(site):  # cancelled while its task was created
             self._kill(created["id"])
 
-    def _follow(self, task, ids: dict[str, int]) -> None:
-        """Poll every active site's vantage6 task; report each result or failure as it happens.
-        A vantage6 server outage (E6e restart) only delays this: the deadline still applies."""
+    def _follow(self, task, ids: dict[str, int], interval: float) -> None:
+        """Poll every active site's vantage6 task every `interval` s; report each result or failure as
+        it happens. A vantage6 server outage (E6e restart) only delays this: the deadline still applies."""
         fetching: dict[str, threading.Thread] = {}
         outage = None
         while not task.cancelled:
@@ -229,7 +236,10 @@ class Vantage6Adapter(BaseAdapter):
                     self._fail_site(task, site, ids[site], status)
             for site in [s for s, t in fetching.items() if not t.is_alive()]:
                 del fetching[site]
-            time.sleep(POLL_S)
+            end = time.monotonic() + interval
+            while time.monotonic() < end and not task.cancelled and (not fetching or all(
+                    t.is_alive() for t in fetching.values())):
+                time.sleep(min(POLL_S, interval))
 
     def _collect_site(self, task, site: str, v6_id: int) -> None:
         try:

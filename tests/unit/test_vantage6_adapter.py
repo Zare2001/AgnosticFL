@@ -28,6 +28,7 @@ class FakeV6:
         self.lock = threading.Lock()
         self.created, self.killed, self.deleted, self.polls = {}, [], [], {}
         self.task = SimpleNamespace(create=self._create, kill=self._kill, delete=self.deleted.append)
+        self.check_if_blob_store_enabled = lambda: False
         self.result = SimpleNamespace(from_task=lambda id_: {"data": self._results(id_)})
 
     def _create(self, **kw):
