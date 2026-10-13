@@ -34,3 +34,10 @@ Newest entries at the bottom. Format: `### <UTC timestamp> — <phase> — <titl
 - Central evidence (#54, M2-flower): conformance vs :8813 7 passed, max_abs_diff 0.0 rounds 1/2/4, n=784/784; `--only flower --rounds 3` run == hub.sim (diff 0.0). M2-mixed (#55): 6 sites, 3 rounds, == sim (diff 0.0).
 - Added: status.sh exits 1 unless both sites online (`--no-sites` opt-out, 8b19ca5); cron watchdog re-runs `deploy/flower-vm/start.sh` every minute while enabled (d0ce5ef; supervisor crash -> back in ~33 s).
 - Next: confirm the frozen SHA for P3, keep SuperNodes up and untouched until M3-final, watch logs.
+
+### 2026-10-13T13:12Z — P3/P4 — M3-final, report
+- Final runs (central, #66, b656577, W&B tag final): flower-only 011lasv0 acc 0.7580 / AUC 0.9149 (221 s); mixed-6sites iehjnc44 acc 0.8654 / AUC 0.9247, 30/30 rounds, 6/6 sites each round; mixed == sim-fedavg-reference, max abs weight diff 0.0 rounds 0-30.
+- SuperNodes untouched during the finals; no ERROR lines in either SuperNode log; status HEALTHY (13:10Z).
+- Verified in an isolated throwaway SuperLink (ports 19092/19093/18813): `flwr log <run-id> <conn> --show` shows the relay's log.
+- Wrote `docs/report/flower.md` (final-call #67): scope, design, Flower 1.39 specifics, hospital footprint with exact commands, timeline, problems table, evidence, reproduce steps.
+- Next: report-ready to central; keep SuperNodes up until all-done; then verify DoD items, final entry, `touch ~/.flhub/DONE`.
