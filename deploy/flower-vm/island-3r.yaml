@@ -1,0 +1,13 @@
+# Flower island (P1, flower VM only): local hub core :8800 + local Flower server side
+# (deploy/central/flower with FLOWER_FLEET_BIND=127.0.0.1:9092) + the two SuperNodes.
+#   python -m hub.orchestrator run --config deploy/flower-vm/island-3r.yaml --wandb offline
+name: flower-island-3r
+rounds: 3
+seed: 2026
+train_config: {local_epochs: 1, batch_size: 64, lr: 0.05, momentum: 0.0, seed: 2026}
+hub_url: http://127.0.0.1:8800
+adapters:
+  - {name: flower, url: "http://127.0.0.1:8813", sites: [flw-h5, flw-h6]}
+deadline_s: 600
+online_wait_s: 120
+tags: [dev]
