@@ -65,3 +65,8 @@ Newest entries at the bottom. Format: `### <UTC timestamp> — S<n> — <title>`
 - Report draft `docs/report/stage2/flower.md` (80af636; reviewed and corrected: parent-pid monitors are the cause, not the fix; ADR collision = rebase conflict).
 - `deploy/flower-vm/run_follow.py` running (pid in ~/flhub-runtime/flower/follow/follow.pid): for each central `RUN start/RUN end <name> <UTC>` it puts `sysmon-flower-<run>.json` to central and reports flagged SuperNode log lines or unhealthy status (silent when clean); records in follow/runs.jsonl.
 - Next: confirm the S3-frozen SHA (diff empty for flhub_core, clients/flower, adapters/flower; hospitals on the frozen code_version), stop the island before S4, answer ARM requests.
+
+### 2026-10-13T16:05Z — S3 — 97 s restart explained and fixed; S3-frozen 96c44c9 confirmed
+- 97 s adapter restart (central 15:45Z): central's adapter.log confirmed it: the exiting old relay's last beat (old fab) set the adapter's single global shutdown flag; the new relay 3704... polled 1.3 s after its start and took it; launcher cooldown 60 s -> relay 18236... Fix 17cdfd1: the relay sends its fab id with every poll, only a stale relay is answered `shutdown`, stale beats get `leave` and no liveness credit (tests/flower 11 passed incl. stale + fresh relays; island restart 34.2/29.2 s). Deployed by central (fab-id 2c9803ea5884).
+- S3-frozen 96c44c9 (#210). Confirm #213: (a) `git diff 17cdfd1 96c44c9 -- flhub_core clients/flower adapters/flower deploy/central/flower` empty; (b) SuperNodes on FAB agnosticfl.flhub-flower.0.2.0.6345f77d, flhub_core 0.2.0+fe357a1dbec1 (both sites); (c) HEALTHY, sysmon pid 163931, run follower pid 236748.
+- Island shut down (`island.sh down`) before S4; 29 GB RAM available. Phase S4.
