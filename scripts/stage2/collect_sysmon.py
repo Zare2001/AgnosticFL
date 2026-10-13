@@ -2,8 +2,8 @@
 
     python scripts/stage2/collect_sysmon.py [--since 98]
 
-Every bus file whose name starts with a final run name (e.g. s2-e1-iid-fedavg-nvflare-sysmon.json)
-is stored as <run_dir>/sysmon/<file name>, unless it is there already.
+Every bus file whose name contains a final run name (s2-e1-iid-fedavg-nvflare-sysmon.json,
+sysmon-flower-s2-e1-iid-fedavg.json) is stored as <run_dir>/sysmon/<file name>, unless it is there already.
 """
 
 from __future__ import annotations
@@ -33,7 +33,8 @@ def main(argv: list[str] | None = None) -> int:
         if not m or not m.group(4).endswith(".json"):
             continue
         file_id, fname = m.group(3), m.group(4)
-        run = next((n for n in names if fname.startswith(n + "-")), None)
+        stem = fname[:-len(".json")]
+        run = next((n for n in names if stem.endswith(n) or stem.startswith(n + "-") or f"-{n}-" in stem), None)
         if run is None:
             continue
         dest = (RUNS / f"{run}-latest").resolve() / "sysmon" / fname
