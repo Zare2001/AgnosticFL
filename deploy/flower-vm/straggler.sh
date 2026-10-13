@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
 # E6b straggler on the flower VM: throttle ONE hospital SuperNode's CPU (EXPERIMENTS.md E6b).
+#   bash deploy/flower-vm/straggler.sh prepare <site>     restart it inside its scope, no limit yet
 #   bash deploy/flower-vm/straggler.sh on <site> <cpu%>   e.g. on flw-h5 10
 #   bash deploy/flower-vm/straggler.sh off <site>         remove the limit (no restart)
 #   bash deploy/flower-vm/straggler.sh release <site>     restart the SuperNode normally (end state)
 #   bash deploy/flower-vm/straggler.sh status
-# The first `on` restarts the site's supervisor (supernode.sh) inside the user systemd scope
-# flhub-straggler-<site>.scope with CPUQuota (new SuperNode id; the relay maps it within ~15 s, so
-# do it before the run). Every process of that SuperNode, including each per-message flwr-clientapp,
-# inherits the scope's cgroup. Later on/off only change CPUQuota (systemctl set-property, instant).
+# `prepare` (or the first `on`) restarts the site's supervisor (supernode.sh) inside the user systemd
+# scope flhub-straggler-<site>.scope (new SuperNode id; the relay maps it within ~15 s, so do it before
+# the run). Every process of that SuperNode, including each per-message flwr-clientapp, inherits the
+# scope's cgroup. Later on/off only change CPUQuota (systemctl set-property, instant), e.g. armed
+# with inject.sh straggler-on:<cpu%> at a hub round.
 # The watchdog lock is held while the supervisor is swapped, so the cron watchdog never interferes.
 set -euo pipefail
 . "$(dirname "$0")/common.sh"
@@ -26,8 +28,9 @@ cpu_max() { cat "/sys/fs/cgroup/user.slice/user-$(id -u).slice/user@$(id -u).ser
 start_site() {  # start_site <site> [scoped cpu%]: start the supervisor, optionally inside the scope
   local site="$1" pct="${2:-}" port pidf="$RUNTIME/run/supernode-$1.pid"
   port="$(node_port "$site")"
-  if [ -n "$pct" ]; then
-    setsid nohup systemd-run --user --scope --quiet --unit "$(unit "$site")" -p "CPUQuota=${pct}%" \
+  if [ -n "$pct" ]; then  # "max" = inside the scope without a limit
+    local quota=(-p "CPUQuota=${pct}%"); [ "$pct" = max ] && quota=()
+    setsid nohup systemd-run --user --scope --quiet --unit "$(unit "$site")" "${quota[@]}" \
         bash "$REPO/deploy/flower-vm/supernode.sh" "$site" "$port" \
         >> "$RUNTIME/logs/supernode-$site.log" 2>&1 < /dev/null 9>&- &
   else
@@ -47,9 +50,19 @@ swap() {  # swap <site> [cpu%]: restart the site's supervisor under the watchdog
 
 cmd="${1:-}"; site="${2:-}"
 case "$cmd" in
-  on|off|release) [ -n "$(node_port "$site")" ] || { echo "unknown site '$site' (sites: $NODES)" >&2; exit 2; } ;;
+  prepare|on|off|release) [ -n "$(node_port "$site")" ] || { echo "unknown site '$site' (sites: $NODES)" >&2; exit 2; } ;;
 esac
 case "$cmd" in
+  prepare)
+    if in_scope "$site"; then
+      log "$site: already in $(unit "$site") (cpu.max $(cpu_max "$site"))"
+    else
+      swap "$site" max
+      sleep 1
+      in_scope "$site" || { log "$site: FAILED to start inside $(unit "$site")"; exit 1; }
+      log "$site: restarted inside $(unit "$site") without a CPU limit (pid $(cat "$RUNTIME/run/supernode-$site.pid"))"
+    fi
+    ;;
   on)
     pct="${3:?cpu% (e.g. 10)}"
     if in_scope "$site"; then
@@ -84,5 +97,5 @@ case "$cmd" in
       if in_scope "$s"; then echo "$s: in $(unit "$s"), cpu.max $(cpu_max "$s")"; else echo "$s: normal"; fi
     done
     ;;
-  *) echo "usage: $0 on <site> <cpu%> | off <site> | release <site> | status" >&2; exit 2 ;;
+  *) echo "usage: $0 prepare <site> | on <site> <cpu%> | off <site> | release <site> | status" >&2; exit 2 ;;
 esac

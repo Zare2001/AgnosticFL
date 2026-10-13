@@ -29,6 +29,7 @@ if pid_alive "$pidf"; then
   kill -0 "$pid" 2>/dev/null && kill -9 "$pid"
 fi
 bash "$(dirname "$0")/start.sh"
+echo "$(date -u +%FT%T.%3NZ) $part up again after $(awk "BEGIN{printf \"%.1f\", $(date +%s.%N) - $t0}") s"
 for _ in $(seq 180); do
   now_run="$(relay_run)"
   if [ -n "$now_run" ] && [ "$now_run" != "$before" ] && bash "$(dirname "$0")/status.sh" >/dev/null 2>&1; then
