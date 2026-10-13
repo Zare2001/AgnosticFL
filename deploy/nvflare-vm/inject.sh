@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # E6 fault injection for the NVFlare hospitals on this VM (PLAN.md §8, EXPERIMENTS.md E6).
-#   inject.sh arm <site> <kill|kill-job|restart> --round N [--after S]
+#   inject.sh arm <site> <kill|kill-job|restart|straggler-on:<cpu%>|straggler-off> --round N [--after S]
 #   inject.sh disarm [<site>]
 #   inject.sh status
 # arm starts a one-shot watcher that follows the site's client log. Round N has started when the
@@ -11,6 +11,7 @@
 #             daemon restarts the client, the cron watchdog covers a dead daemon
 #   kill-job  SIGKILL only the training (job worker) process; the client process stays up
 #   restart   the kit's standard restart: touch restart.fl, the daemon restarts the client
+#   straggler-on:<cpu%> / straggler-off   straggler.sh on|off for this site (E6b; no restart)
 # A watcher that never fires gives up after --max-wait (default 6 h). Results: $NVF_INJECT_DIR.
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -46,13 +47,15 @@ case "$cmd" in
     done
     [[ "$round" =~ ^[0-9]+$ && "$round" -ge 1 ]] || { echo "inject: --round N (N >= 1) is required" >&2; exit 2; }
     [[ "$after" =~ ^[0-9]+([.][0-9]+)?$ ]] || { echo "inject: --after must be seconds" >&2; exit 2; }
-    case "$action" in kill|kill-job|restart) ;; *) echo "inject: unknown action $action" >&2; exit 2 ;; esac
+    [[ "$action" =~ ^(kill|kill-job|restart|straggler-on:[0-9]+|straggler-off)$ ]] \
+      || { echo "inject: unknown action $action" >&2; exit 2; }
     ws="$NVF_SITES_DIR/$site"
     [ -f "$ws/startup/fed_client.json" ] || { echo "inject: no NVFlare site $site in $NVF_SITES_DIR" >&2; exit 1; }
     disarm_site "$site" >/dev/null
     log="$NVF_INJECT_DIR/$site-$(date -u +%Y%m%dT%H%M%SZ).log"
     setsid nohup python3 "$HERE/inject_watch.py" --ws "$ws" --site "$site" --action "$action" --round "$round" \
       --after "$after" --max-wait "$max_wait" --state "$NVF_INJECT_DIR/$site.armed" --bus "$NVF_INJECT_BUS" \
+      --straggler "$HERE/straggler.sh" \
       > "$log" 2>&1 < /dev/null &
     pid=$!
     printf 'pid=%s\nsite=%s\naction=%s\nround=%s\nafter=%s\narmed_at=%s\nlog=%s\n' \

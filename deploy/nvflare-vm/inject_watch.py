@@ -90,6 +90,12 @@ def act(args) -> dict:
     client = read_pid(os.path.join(ws, "pid.fl"))
     workers = worker_pids(ws)
     done = {"action": args.action, "client_pid": client, "worker_pids": workers}
+    if args.action.startswith("straggler-"):
+        cmd = ["bash", args.straggler, "off", args.site] if args.action == "straggler-off" else \
+            ["bash", args.straggler, "on", args.site, args.action.split(":", 1)[1]]
+        out = subprocess.run(cmd, capture_output=True, text=True)
+        done.update(rc=out.returncode, output=(out.stdout + out.stderr).strip()[-400:])
+        return done
     if args.action == "restart":
         open(os.path.join(ws, "restart.fl"), "w").close()
         return done
@@ -135,6 +141,7 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     for a in ("--ws", "--site", "--action", "--state", "--bus"):
         ap.add_argument(a, required=True)
+    ap.add_argument("--straggler", default="straggler.sh")
     ap.add_argument("--round", type=int, required=True)
     ap.add_argument("--after", type=float, default=0.0)
     ap.add_argument("--max-wait", type=float, default=21600.0)
@@ -174,7 +181,7 @@ def main() -> None:
     done = act(args)
     say(f"FIRED {args.action} at {when}: {json.dumps(done)}")
     os.unlink(args.state)
-    rec = watch_recovery(args, done, t_act)
+    rec = {} if args.action.startswith("straggler-") else watch_recovery(args, done, t_act)
     with open(os.path.join(os.path.dirname(args.state), f"{args.site}.result.json"), "w") as f:
         json.dump({"site": args.site, "round": args.round, "after_s": args.after, "fired_at": when,
                    **done, "recovery": rec}, f, indent=1)
