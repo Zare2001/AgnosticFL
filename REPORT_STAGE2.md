@@ -75,7 +75,33 @@ S3 tuning (sim, validation split, dir0.3, 30 rounds; `docs/report/stage2/tuning.
 
 ## 4. RQ2 — Hospital-side cost
 
-*(pending: ledger, git diff --stat of clients/ and adapters/, rollout comparison)*
+**Code a hospital executes did not change.** `git diff --stat stage1-final..HEAD -- clients/` (the full output is in `docs/report/stage2/ledger.md`):
+
+| path | lines | runs where | why |
+|---|---|---|---|
+| `clients/nvflare/` | 0 | hospital | — |
+| `clients/vantage6/` | 0 | hospital (algorithm image) | — |
+| `clients/flower/flhub_flower/client_app.py`, `records.py` | 0 | hospital (ClientApp in the FAB) | — |
+| `clients/flower/flhub_flower/server_app.py` | 313 | central only (relay ServerApp in the same FAB) | flhub/0.2 per-site posts and cancel, relay timings, stale-relay fix |
+| `clients/flower/pyproject.toml` | 4 | FAB metadata | version 0.2.0, `fab-id` run config |
+
+So switching the aggregator (E2), the data (E1), the model (E3), partial participation and resume (E6) needed **0 changed lines** in the hospital glue of all three frameworks (INV-2). FedProx's μ lives in `flhub_core` and reaches the sites inside `train_config`. What did reach the hospitals is one library update, `flhub_core` 0.1 → 0.2, plus data provisioning and, for vantage6, one node-config change.
+
+**Rollout of `flhub_core` 0.2 per framework** (ledger rows; bus #151, #161, #172, #187):
+
+| | NVFlare | vantage6 | Flower |
+|---|---|---|---|
+| channel | job custom code (`custom/flhub_core` in the relay job) | new algorithm image tag `v6-train:a43cef3f75c0` in the operator's registry | FAB (`flhub_core` packed next to the ClientApp) |
+| central side | rebuild + resubmit relay job (`install.sh`, `start.sh`) | build + push image (98 s), adapter restart (2 s) | `restart.sh adapter`: new FAB + relay run (29.6 s) |
+| one-time hospital steps | 3: data provisioning; remove the venv's `flhub_core` (NVFlare appends `custom/` to `sys.path`, so a venv copy would shadow the job's); 1 client restart | 2: data provisioning; node config with one CSV database per data variant + 1 node restart (~20 s) | 1: data provisioning |
+| hospital downtime | 50.3 s per site (82.6 s switch) | ~20 s (config switch) | 0 |
+| client restarts | 1 | 1 (config, not code) | 0 |
+| later `flhub_core` updates | 0 hospital steps (next job) | 0 (next image tag; nodes pull on the first task) | 0 (next FAB) |
+| lines changed in hospital code | 0 | 0 | 0 |
+
+Data provisioning (all frameworks) is a data-only step: `python -m flhub_core.data materialize --variants all --sites <sites> --manifests configs/stage2/partitions` writes nine sha256-verified CSV files per base site (about 110–150 MB); the E5 extra sites get `organamnist-iid12` only. NVFlare and Flower keep their stage-1 data path (`<dir>/<site>.csv`); `load_site()` finds the variant files next to it. vantage6 receives a DataFrame from the node, so each variant is a labelled node database chosen per task by the dispatch hint `data_variant`.
+
+*(pending: E5 extra-site setup costs, final ledger row count)*
 
 ## 5. RQ3 — Learning under heterogeneity (E1, E2, E3)
 
