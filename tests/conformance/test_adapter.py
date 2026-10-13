@@ -46,7 +46,8 @@ def wait_terminal(client, task_id, timeout):
 
 def run_round(client, model_ref, hub, rnd, sites, timeout, train_config=TRAIN_CONFIG):
     t0 = time.time()
-    task_id = client.dispatch(rnd, {"ref": model_ref, "url": hub.blob_url(model_ref)}, train_config, sites)
+    task_id = client.dispatch(rnd, {"ref": model_ref, "url": hub.blob_url(model_ref)}, train_config, sites,
+                              data_variant=train_config.get("data_variant"))
     assert time.time() - t0 < 5, "dispatch must return within 5 s"
     st = wait_terminal(client, task_id, timeout)
     assert st["state"] == "completed", f"round {rnd} ended {st['state']}: {st['error']}"
@@ -248,6 +249,37 @@ def test_adapter_restart_between_rounds(client, hub, sites, site_data, global_mo
     task_id, _ = run_round(client, ref, hub, 10, sites, opts.timeout)
     results = check_envelopes(client.collect(task_id), hub, 10, ref, w0, sites, site_data)
     REPORT["tests"]["round_10_after_restart"] = {"online_after_s": round(back, 1), "sites": results}
+
+
+def test_payload_64_echo(client, hub, sites, site_data, opts):
+    """One payload-64 round: 64 MiB in 16 tensors each way per site; the echo must be exact."""
+    from flhub_core.model import init_weights
+
+    cfg = {**TRAIN_CONFIG, "model": "payload-64"}
+    w0 = init_weights(2026, "payload-64")
+    ref = hub.put_weights(w0)
+    task_id, seconds = run_round(client, ref, hub, 11, sites, opts.timeout, train_config=cfg)
+    results = check_envelopes(client.collect(task_id), hub, 11, ref, w0, sites, site_data, train_config=cfg)
+    REPORT["tests"]["payload_64_round_11"] = {"seconds": round(seconds, 1), "sites": results}
+
+
+def test_data_variant_round(client, hub, sites, opts):
+    """One round on a stage-2 data variant (--variant): sites resolve it to the provisioned partition."""
+    if not opts.variant:
+        pytest.skip("needs --variant <dataset>-<pid>")
+    from flhub_core.data import dataset_info, parse_variant, variant_site_data
+    from flhub_core.model import init_weights
+
+    cfg = {**TRAIN_CONFIG, "data_variant": opts.variant}
+    w0 = init_weights(2026, "cnn-small", dataset_info(parse_variant(opts.variant)[0]).num_classes)
+    ref = hub.put_weights(w0)
+    data = variant_site_data(opts.variant, sites)
+    task_id, seconds = run_round(client, ref, hub, 12, sites, opts.timeout, train_config=cfg)
+    envs = client.collect(task_id)
+    results = check_envelopes(envs, hub, 12, ref, w0, sites, data, train_config=cfg)
+    for env in envs:
+        assert env["metrics"].get("data_fp") == int(data[env["site_id"]].fingerprint[:8], 16), env["metrics"]
+    REPORT["tests"]["variant_round_12"] = {"variant": opts.variant, "seconds": round(seconds, 1), "sites": results}
 
 
 if __name__ == "__main__":

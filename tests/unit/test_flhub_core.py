@@ -55,7 +55,8 @@ def test_from_arrays_validates_and_fingerprints():
     with pytest.raises(ValueError):
         D.from_arrays(np.full((2, D.NUM_FEATURES), 256), np.zeros(2))
     with pytest.raises(ValueError):
-        D.from_arrays(np.zeros((2, D.NUM_FEATURES)), np.array([0, 2]))
+        D.from_arrays(np.zeros((2, D.NUM_FEATURES)), np.array([0, 2]), num_classes=2)
+    assert len(D.from_arrays(np.zeros((2, D.NUM_FEATURES)), np.array([0, 10]))) == 2  # 11-class data
 
 
 def test_csv_roundtrip_and_dataframe(tmp_path):
