@@ -38,6 +38,7 @@ CLIENT_JOBS_TTL_S = 5.0
 REJOIN_AFTER_S = 15.0  # a connected site outside the relay job for this long triggers a job restart
 SHUTDOWN_GRACE_S = 60.0  # then abort the old job if it did not end by itself
 SUBMIT_GRACE_S = 30.0  # submit once every base site is connected, or this long after the first one
+RELAY_DEAD_S = 30.0  # no contact from the relay for this long: its job is dead, end it without a shutdown wait
 OFFLINE_FAIL_S = 30.0  # a site of a running round that is offline this long fails (the others go on)
 SITE_WATCH_S = 5.0
 
@@ -58,6 +59,8 @@ class NVFlareAdapter(RelayAdapter):
         self._outside_since: dict[str, float] = {}
         self._restart_asked: float | None = None
         self._first_connected: float | None = None
+        self._relay_contact = 0.0  # last relay request of any kind (next, job status, site report)
+        self._stale: set[str] = set()  # jobs the job store lists as active but the server does not run
 
     # ---- site status ---------------------------------------------------------------------
     def client_jobs(self, max_age_s: float | None = None) -> dict[str, set[str]] | None:
@@ -124,12 +127,32 @@ class NVFlareAdapter(RelayAdapter):
                 log.warning("relay job check failed: %s", exc)
             stop.wait(KEEPER_PERIOD_S)
 
+    def relay_contact_s(self) -> float | None:
+        """Seconds since the relay last contacted the adapter (polls, job status, site reports)."""
+        seen = [t for t in (self._relay_contact, self._last_poll) if t]
+        return time.monotonic() - max(seen) if seen else None
+
+    def end_job(self, job_id: str) -> None:
+        """Aborts a relay job. A job the job store still lists as running but the server does not run
+        (left over from a server restart: abort fails with 'not running') is deleted or ignored."""
+        try:
+            self.admin.abort_job(job_id)
+        except Exception as exc:
+            if "not running" not in str(exc):
+                raise
+            log.warning("relay job %s is stale (%s); deleting it from the job store", job_id, exc)
+            self._stale.add(job_id)
+            try:
+                self.admin.delete_job(job_id)
+            except Exception as exc2:
+                log.warning("could not delete stale job %s (%s); ignoring it", job_id, exc2)
+
     def keep_once(self) -> None:
         """Submit the relay job if none is active; restart it when a connected site is outside it."""
-        active = self.admin.active_jobs(JOB_NAME)
+        active = [j for j in self.admin.active_jobs(JOB_NAME) if j["job_id"] not in self._stale]
         for old in active[1:]:
             log.warning("aborting extra relay job %s", old["job_id"])
-            self.admin.abort_job(old["job_id"])
+            self.end_job(old["job_id"])
         if not active:
             self._restart_asked = None
             self._outside_since.clear()
@@ -153,10 +176,13 @@ class NVFlareAdapter(RelayAdapter):
             self.relay_job_id = job["job_id"]
             log.info("relay job %s is %s", self.relay_job_id, job["status"])
         if self._restart_asked is not None:
-            if time.monotonic() - self._restart_asked > SHUTDOWN_GRACE_S:
-                log.warning("relay job %s did not end after shutdown; aborting it", self.relay_job_id)
-                self.admin.abort_job(self.relay_job_id)
+            contact = self.relay_contact_s()
+            dead = contact is None or contact > RELAY_DEAD_S
+            if dead or time.monotonic() - self._restart_asked > SHUTDOWN_GRACE_S:
+                log.warning("relay job %s did not end after shutdown (relay %s); aborting it", self.relay_job_id,
+                            "silent" if dead else "alive")
                 self._restart_asked = None
+                self.end_job(self.relay_job_id)
             return
         if job["status"] != "RUNNING":
             return  # scheduled; waits for its clients
@@ -193,6 +219,14 @@ class NVFlareAdapter(RelayAdapter):
                 self.admin.abort_job(job["job_id"])
         except Exception as exc:
             log.warning("could not check/abort relay jobs: %s", exc)
+
+    def _route_job(self, req):
+        self._relay_contact = time.monotonic()
+        return super()._route_job(req)
+
+    def _route_sites(self, req):
+        self._relay_contact = time.monotonic()
+        return super()._route_sites(req)
 
     def _route_status(self, req):
         status, body = super()._route_status(req)

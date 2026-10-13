@@ -26,22 +26,28 @@ class FakeAdmin:
     def __init__(self):
         self.jobs = []  # dicts like FLARE API list_jobs() rows
         self.clients = {}  # client -> set of job ids (missing client = no reply)
-        self.submitted, self.aborted = [], []
+        self.submitted, self.aborted, self.deleted, self.ghosts = [], [], [], set()
 
     def active_jobs(self, name):
         return [j for j in reversed(self.jobs) if j["status"] in ("SUBMITTED", "RUNNING")]
 
     def submit_job(self, job_dir):
-        job_id = f"job-{len(self.jobs) + 1}"
+        job_id = f"job-{len(self.submitted) + 1}"  # unique, like NVFlare's job uuids
         self.jobs.append({"job_id": job_id, "job_name": "flhub-relay", "status": "RUNNING"})
         self.submitted.append(job_id)
         return job_id
 
     def abort_job(self, job_id):
+        if job_id in self.ghosts:  # listed as RUNNING, unknown to the server's job runner
+            raise RuntimeError(f"server internal error: Job {job_id} is not running.")
         for j in self.jobs:
             if j["job_id"] == job_id:
                 j["status"] = "FINISHED:ABORTED"
         self.aborted.append(job_id)
+
+    def delete_job(self, job_id):
+        self.jobs = [j for j in self.jobs if j["job_id"] != job_id]
+        self.deleted.append(job_id)
 
     def client_jobs(self):
         return {c: set(j) for c, j in self.clients.items()}
@@ -202,3 +208,17 @@ def test_job_that_ignores_shutdown_is_aborted(adapter, monkeypatch):
     adapter.keep_once()  # grace over, job still running -> abort
     adapter.keep_once()  # nothing active -> new job
     assert adapter.admin.aborted == ["job-1"] and adapter.admin.submitted == ["job-1", "job-2"]
+
+
+def test_stale_job_after_server_restart_is_replaced(adapter, monkeypatch):
+    """After a server restart the job store can list the old relay job as RUNNING although the
+    server does not run it (abort: 'not running'): the keeper deletes it and submits a new one."""
+    monkeypatch.setattr(service, "REJOIN_AFTER_S", 0.0)
+    adapter.keep_once()
+    adapter.admin.ghosts.add("job-1")
+    adapter.admin.clients = {"nvf-h1": set(), "nvf-h2": set()}  # reconnected, in no job
+    adapter.keep_once()  # outside the job -> shutdown asked; the relay is silent (never polled)
+    adapter.keep_once()  # relay silent -> end the job at once: abort fails -> delete
+    assert adapter.admin.deleted == ["job-1"]
+    adapter.keep_once()  # nothing active -> new job
+    assert adapter.admin.submitted == ["job-1", "job-2"] and adapter.relay_job_id == "job-2"
