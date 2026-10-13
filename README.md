@@ -2,13 +2,13 @@
 
 Framework-agnostic federated learning hub. Hospitals keep their own federated learning framework (**NVFlare**, **vantage6** or **Flower**) and run its standard client, unchanged; one central hub runs plain, weighted **FedAvg** across all of them. Per framework, a server-side **adapter** makes the hub look like a normal part of that framework, and speaks one small protocol (`flhub/0.1`, JSON-RPC) to a framework-free orchestrator.
 
-Results, evidence and the full build story: [`REPORT.md`](REPORT.md). Protocol: [`docs/agents/PROTOCOL.md`](docs/agents/PROTOCOL.md). Decisions: [`docs/DECISIONS.md`](docs/DECISIONS.md).
+**Result**: in a 30-round run with 6 hospitals (2 NVFlare, 2 vantage6, 2 Flower), the federated model reaches 86.5 % test accuracy / 0.925 AUC on PneumoniaMNIST, on par with centralized training on the pooled data (86.1 % / 0.928). It is bit-identical (max weight difference 0.0 in every round) to a framework-free FedAvg simulation. Results, evidence and the full build story: [`REPORT.md`](REPORT.md). Protocol: [`docs/agents/PROTOCOL.md`](docs/agents/PROTOCOL.md). Decisions: [`docs/DECISIONS.md`](docs/DECISIONS.md).
 
 ## Architecture
 
 ```
  central VM (145.38.205.58)
- ┌───────────────────────────────────────────────────────────────────────────┐
+ ┌─────────────────────────────────────────────────────────────────────────────┐
  │ ORCHESTRATOR  hub/orchestrator   rounds · FedAvg · global eval · W&B        │
  │ HUB CORE      hub/core :8800     blob store (sha256-addressed) · model spec │
  └───────▲─────────────────────▲─────────────────────▲─────────────────────────┘
@@ -19,7 +19,7 @@ Results, evidence and the full build story: [`REPORT.md`](REPORT.md). Protocol: 
  │ ModelController│    │                │    │ ServerApp      │
  ├────────────────┤    ├────────────────┤    ├────────────────┤
  │ NVFlare server │    │ vantage6 server│    │ Flower         │
- │ :8002 (mTLS)   │    │ :7601 + reg 5050│   │ SuperLink :9092│
+ │ :8002 (mTLS)   │    │ :7601, reg 5050│    │ SuperLink :9092│
  └───────▲────────┘    └───────▲────────┘    └───────▲────────┘
  hospitals: NVFlare clients    vantage6 nodes          Flower SuperNodes
             nvf-h1, nvf-h2     v6-h3, v6-h4            flw-h5, flw-h6

@@ -47,10 +47,10 @@ Federated training across three frameworks matches centralized training on the p
 
 ```
  central VM 145.38.205.58 (operator)
- ┌──────────────────────────────────────────────────────────────────────────────────┐
+ ┌──────────────────────────────────────────────────────────────────────────────────────┐
  │ ORCHESTRATOR  hub/orchestrator     rounds · FedAvg (float64, site order) · eval · W&B│
  │ HUB CORE      hub/core 127.0.0.1:8800   sha256 blob store · model spec (systemd)     │
- └─────────▲──────────────────────────▲──────────────────────────▲────────────────────┘
+ └─────────▲──────────────────────────▲──────────────────────────▲──────────────────────┘
            │ flhub/0.1 JSON-RPC (localhost; weights by blob ref)
  ┌─────────┴─────────┐      ┌─────────┴─────────┐      ┌─────────┴─────────┐
  │ NVFlare adapter   │      │ vantage6 adapter  │      │ Flower adapter    │
@@ -400,7 +400,7 @@ project hpml_surf-surf/AgnosticFL: 6 runs, keep 6, delete 0
   KEEP mixed-6sites iehjnc44 | flower-only 011lasv0 | vantage6-only twk49dhp | nvflare-only pavr8q6u |
        sim-fedavg-reference kur37gs2 | centralized-baseline j5gn5knm   (state=finished, tags=['final'], group final-2026-10-13)
 ```
-No development run was ever logged online: all P1/P2 runs used `--wandb offline` and `disabled`.
+All P1/P2 runs used `--wandb offline` or `disabled`. The W&B project did not exist at 12:29 UTC (checked through the W&B API) and was created by the first final run.
 
 **7. `main` is green; every commit is by Zare2001 with no AI attribution.**
 ```
