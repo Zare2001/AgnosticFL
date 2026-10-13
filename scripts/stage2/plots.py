@@ -169,7 +169,240 @@ def fig_e2_dir01(out: Path) -> None:
     save(fig, "e2_dir01_accuracy_vs_round", out)
 
 
-FIGURES = {"e1_acc": fig_e1_acc, "e1_final": fig_e1_final, "e2_grid": fig_e2_grid, "e2_dir01": fig_e2_dir01}
+# ---- performance ------------------------------------------------------------------------------------
+FRAMEWORKS = ["nvflare", "vantage6", "flower"]
+PREFIX = {"nvf": "nvflare", "v6": "vantage6", "flw": "flower"}
+
+
+def fw_of(site: str) -> str:
+    return PREFIX.get(site.split("-")[0], "?")
+
+
+def med(values: list[float]) -> float | None:
+    values = [v for v in values if v is not None]
+    return statistics.median(values) if values else None
+
+
+def rounds_from(run: Run, first: int = 2) -> list[dict]:
+    return [m for m in run.metrics if m.get("step", 0) >= first and "round/duration_s" in m]
+
+
+def site_keys(row: dict, suffix: str) -> dict[str, float]:
+    return {k.split("/")[1]: v for k, v in row.items() if k.startswith("site/") and k.endswith("/" + suffix)}
+
+
+def breakdown(run: Run) -> dict[str, dict[str, float]]:
+    """Per framework: median over rounds >= 2 of mean train time, mean overhead, plus hub agg/eval."""
+    out = {}
+    rows = rounds_from(run)
+    for fw in FRAMEWORKS:
+        train = [statistics.mean([v for s, v in site_keys(r, "train_time_s").items() if fw_of(s) == fw] or [np.nan])
+                 for r in rows]
+        over = [statistics.mean([v for s, v in site_keys(r, "overhead_s").items() if fw_of(s) == fw] or [np.nan])
+                for r in rows]
+        if any(np.isfinite(train)):
+            out[fw] = {"train": float(np.nanmedian(train)), "overhead": float(np.nanmedian(over)),
+                       "agg": med([r["round/agg_s"] for r in rows]), "eval": med([r["round/eval_s"] for r in rows])}
+    return out
+
+
+def fig_e3_breakdown(out: Path) -> None:
+    a_star = "fedavgm"
+    names = [("cnn-small", "s2-e1-dir0.3-fedavg"), ("cnn-medium", "s2-e3-cnn-medium-fedavg"),
+             ("resnet18-gn", "s2-e3-resnet18-gn-fedavg")]
+    data = [(model, breakdown(r)) for model, n in names if (r := load(n))]
+    if len(data) < 2:
+        print("e3_breakdown: E3 runs missing")
+        return
+    fig, axes = plt.subplots(1, len(data), figsize=(4 * len(data), 3.8), sharey=False)
+    axes = np.atleast_1d(axes)
+    parts = [("train", SERIES[0], "local training"), ("overhead", SERIES[1], "transport + framework + adapter"),
+             ("agg", SERIES[2], "hub aggregation"), ("eval", SERIES[3], "hub evaluation")]
+    for ax, (model, bd) in zip(axes, data):
+        x = np.arange(len(bd))
+        bottom = np.zeros(len(bd))
+        for key, color, label in parts:
+            vals = np.array([bd[fw][key] or 0 for fw in bd])
+            ax.bar(x, vals, bottom=bottom, color=color, width=0.6, label=label, edgecolor=SURFACE, linewidth=1)
+            bottom += vals
+        ax.set_xticks(x, list(bd))
+        ax.set_title(model, loc="left")
+        ax.set_ylabel("seconds per round (median, rounds >= 2)")
+    axes[0].legend(fontsize=7, loc="upper left")
+    fig.suptitle(f"E3: round-time breakdown per framework and model (fedavg; A* = {a_star} in the run table)",
+                 x=0.01, ha="left")
+    save(fig, "e3_round_time_breakdown", out)
+
+
+def e4a_points(scope: str) -> list[tuple[float, float | None, Run | None]]:
+    pts = []
+    for size in [1, 8, 32, 64, 128, 256, 512, 1024]:
+        run = load(f"s2-e4a-{scope}-{size}mb")
+        if run is None:
+            continue
+        ok = run.summary.get("status") == "finished"
+        t = med([m["round/duration_s"] for m in rounds_from(run)]) if ok else None
+        pts.append((size, t, run))
+    return pts
+
+
+def fig_e4a_time(out: Path) -> None:
+    scopes = ["nvflare", "vantage6", "flower", "mixed"]
+    data = {s: e4a_points(s) for s in scopes}
+    if not any(data.values()):
+        print("e4a_time: no E4a runs yet")
+        return
+    fig, ax = plt.subplots(figsize=(7, 4.4))
+    for scope in scopes:
+        good = [(x, t) for x, t, _ in data[scope] if t is not None]
+        bad = [x for x, t, _ in data[scope] if t is None]
+        if good:
+            ax.plot([g[0] for g in good], [g[1] for g in good], "o-", color=FW_COLOR[scope], label=scope, ms=5)
+        for x in bad:
+            ax.plot([x], [good[-1][1] if good else 1], "x", color=FW_COLOR[scope], ms=10, mew=2)
+    ax.set_xscale("log", base=2)
+    ax.set_yscale("log")
+    ax.set_xlabel("payload per site and direction (MiB)")
+    ax.set_ylabel("round time, median of rounds 2-3 (s)")
+    ax.set_title("E4a: round time vs payload (x = failed size)", loc="left")
+    ax.legend(fontsize=8)
+    save(fig, "e4a_round_time_vs_payload", out)
+
+
+def sysmon_peak(run: Run, component_prefix: str) -> float | None:
+    peaks = []
+    for f in (run.path / "sysmon").glob("*.json"):
+        d = json.loads(f.read_text())
+        for name, p in (d.get("procs") or {}).items():
+            if name.startswith(component_prefix):
+                peaks.append(p["rss_mb_peak"])
+    return max(peaks) if peaks else None
+
+
+def fig_e4a_rss(out: Path) -> None:
+    comps = [("hub-core", "hub core"), ("adapter-", "adapters"), ("nvflare-server", "NVFlare server"),
+             ("v6-server", "vantage6 server"), ("flower-superlink", "Flower SuperLink")]
+    pts = {c: [] for c, _ in comps}
+    for size in [1, 8, 32, 64, 128, 256, 512]:
+        run = load(f"s2-e4a-mixed-{size}mb")
+        if run is None:
+            continue
+        for c, _ in comps:
+            v = sysmon_peak(run, c)
+            if v is not None:
+                pts[c].append((size, v))
+    if not any(pts.values()):
+        print("e4a_rss: no sysmon data yet")
+        return
+    fig, ax = plt.subplots(figsize=(7, 4.2))
+    for i, (c, label) in enumerate(comps):
+        if pts[c]:
+            ax.plot([p[0] for p in pts[c]], [p[1] for p in pts[c]], "o-", color=SERIES[i], label=label, ms=4)
+    ax.set_xscale("log", base=2)
+    ax.set_yscale("log")
+    ax.set_xlabel("payload (MiB)")
+    ax.set_ylabel("peak RSS on central (MB)")
+    ax.set_title("E4a (mixed scope): peak memory of the central components", loc="left")
+    ax.legend(fontsize=8)
+    save(fig, "e4a_peak_rss_vs_payload", out)
+
+
+RATES = {"wan1g": 1000.0, "wan100": 100.0, "wan20": 20.0}
+
+
+def fig_e4b(out: Path) -> None:
+    runs = {p: load(f"s2-e4b-{p}") for p in ["none", "wan1g", "wan100", "wan20"]}
+    if not any(runs.values()):
+        print("e4b: no runs yet")
+        return
+    payload_mbit = 45 * 2**20 * 8 / 1e6
+    fig, ax = plt.subplots(figsize=(7.5, 4.2))
+    width = 0.25
+    profiles = [p for p in runs if runs[p]]
+    x = np.arange(len(profiles))
+    for i, fw in enumerate(FRAMEWORKS):
+        vals = [med([m.get(f"adapter/{fw}/fanout_s") for m in rounds_from(runs[p])]) for p in profiles]
+        ax.bar(x + (i - 1) * width, [v or 0 for v in vals], width=width * 0.9, color=FW_COLOR[fw], label=fw)
+        for j, p in enumerate(profiles):
+            if p in RATES:
+                bound = 4 * payload_mbit / RATES[p] * (4 / 3 if fw == "vantage6" else 1)
+                ax.plot([x[j] + (i - 1) * width - width * 0.45, x[j] + (i - 1) * width + width * 0.45], [bound, bound],
+                        color=TEXT, lw=1.5)
+    ax.set_xticks(x, profiles)
+    ax.set_ylabel("dispatch -> last result per framework (s)")
+    ax.set_title("E4b: payload-45 fan-out time vs the bandwidth lower bound (black line)", loc="left")
+    ax.legend(fontsize=8)
+    save(fig, "e4b_measured_vs_bound", out)
+
+
+def fig_e5(out: Path) -> None:
+    runs = {n: load(f"s2-e5-{n}sites") for n in (6, 12)}
+    if not all(runs.values()):
+        print("e5: runs missing")
+        return
+    fig, ax = plt.subplots(figsize=(6.5, 4.0))
+    x = np.arange(2)
+    width = 0.2
+    for i, fw in enumerate(FRAMEWORKS):
+        vals = [med([m.get(f"adapter/{fw}/fanout_s") for m in rounds_from(runs[n])]) or 0 for n in (6, 12)]
+        ax.bar(x + (i - 1.5) * width, vals, width=width * 0.9, color=FW_COLOR[fw], label=f"{fw} fan-out")
+    rt = [med([m["round/duration_s"] for m in rounds_from(runs[n])]) for n in (6, 12)]
+    ax.bar(x + 1.5 * width, rt, width=width * 0.9, color=SERIES[6], label="round time")
+    ax.set_xticks(x, ["6 sites", "12 sites"])
+    ax.set_ylabel("seconds (median, rounds >= 2)")
+    ax.set_title("E5: round time and per-framework fan-out, 6 vs 12 sites", loc="left")
+    ax.legend(fontsize=8)
+    save(fig, "e5_scaling", out)
+
+
+def fig_e6_timeline(out: Path, name: str = "s2-e6a-strict") -> None:
+    run = load(name)
+    if run is None:
+        print("e6_timeline: run missing")
+        return
+    recs = [r for r in run.records() if r.get("round", 0) > 0]
+    t0 = min(np.datetime64(r["utc_start"][:-1]) for r in recs)
+    fig, ax = plt.subplots(figsize=(8, 3.8))
+    for r in recs:
+        a = (np.datetime64(r["utc_start"][:-1]) - t0) / np.timedelta64(1, "s")
+        b = (np.datetime64(r["utc_end"][:-1]) - t0) / np.timedelta64(1, "s")
+        color = SERIES[7] if r.get("failures") else (SERIES[3] if r.get("dropped") else SERIES[0])
+        ax.barh(r["round"], b - a, left=a, color=color, height=0.7)
+    for e in run.path.joinpath("injections.jsonl").read_text().splitlines() if (run.path / "injections.jsonl").exists()             else []:
+        ev = json.loads(e)
+        ax.axvline((np.datetime64(ev["utc"][:-1]) - t0) / np.timedelta64(1, "s"), color=TEXT2, lw=0.8, ls=":")
+    ax.invert_yaxis()
+    ax.set_xlabel("seconds since the start of round 1")
+    ax.set_ylabel("round")
+    ax.set_title(f"E6: {name} timeline (red = failed attempt then retried, yellow = sites dropped)", loc="left")
+    save(fig, f"e6_timeline_{name}", out)
+
+
+def fig_e7(out: Path) -> None:
+    rows = []
+    for fw in FRAMEWORKS:
+        for cfg in ("cnn", "payload"):
+            hub, nat = load(f"s2-e7-{fw}-hub-{cfg}"), load(f"s2-e7-{fw}-native-{cfg}")
+            if hub and nat:
+                rows.append((f"{fw}\n{cfg}", med([m["round/duration_s"] for m in rounds_from(hub)]),
+                             med([m.get("round/duration_s") for m in rounds_from(nat)])))
+    if not rows:
+        print("e7: runs missing")
+        return
+    fig, ax = plt.subplots(figsize=(8, 4.0))
+    x = np.arange(len(rows))
+    ax.bar(x - 0.18, [r[2] or 0 for r in rows], width=0.34, color=SERIES[2], label="native FedAvg")
+    ax.bar(x + 0.18, [r[1] or 0 for r in rows], width=0.34, color=SERIES[0], label="hub path")
+    ax.set_xticks(x, [r[0] for r in rows])
+    ax.set_ylabel("median round time (s, rounds >= 2)")
+    ax.set_title("E7: native FedAvg vs the hub path per framework", loc="left")
+    ax.legend(fontsize=8)
+    save(fig, "e7_native_vs_hub", out)
+
+
+FIGURES = {"e1_acc": fig_e1_acc, "e1_final": fig_e1_final, "e2_grid": fig_e2_grid, "e2_dir01": fig_e2_dir01,
+           "e3": fig_e3_breakdown, "e4a_time": fig_e4a_time, "e4a_rss": fig_e4a_rss, "e4b": fig_e4b, "e5": fig_e5,
+           "e6": fig_e6_timeline, "e7": fig_e7}
 
 
 def main(argv: list[str] | None = None) -> int:
