@@ -68,6 +68,8 @@ def process(job: dict, workers: int) -> str:
     name, kind = job["name"], job["type"]
     log = LOGS / f"{name}.post.log"
     notes = ["--notes", job.get("notes", "")] if job.get("notes") else []
+    if job.get("exp") == "E7" and kind == "real-post":
+        notes += ["--no-retention"]  # the native-vs-hub comparison needs every round of the E7 hub runs
     if kind == "real-post":
         run_dir = job["run_dir"]
         if job.get("equal_to"):
