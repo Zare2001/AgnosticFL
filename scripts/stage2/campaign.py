@@ -19,7 +19,8 @@ LOGS = RUNS / "logs"
 ACTIVE = RUNS / "ACTIVE_RUN"
 CAMPAIGN = RUNS / "campaign.jsonl"
 FROZEN = Path.home() / "flhub-runtime" / "frozen_sha"
-FROZEN_PATHS = ["flhub_core", "adapters", "clients", "hub", "configs/stage2", "scripts/stage2", "deploy/central"]
+# what a final run executes (PLAN.md §5); report/finalize tooling in scripts/ may still be fixed
+FROZEN_PATHS = ["flhub_core", "adapters", "clients", "hub", "configs/stage2", "deploy/central"]
 NO_SIM_EXPERIMENTS = {"E3", "E4", "E5", "E7"}  # PLAN.md §6 CPU hygiene
 
 
