@@ -74,3 +74,9 @@ Server-side candidates if E4a hits a limit on central: comm_config.json `streami
 - netem.sh test under RUNLOCK #149: wan1g 15:24:16Z, revert timer first, 190 pkts on the netem band (dst :8002 only), cleared 15:24:57Z, fq_codel back, 0 timers; released (#158).
 - E5 kits installed (extra.sh install; archives deleted); data iid12 present; sites stay down until E5.
 - Replied to central #136 (E6 schedule: e6a kill --after 0.5; e6b straggler on at ARM + straggler-off at round 7; e6e restart_server.sh) and #156 (adapter-only restart = start.sh). Asked central to pull 05e2b2a + stop/start before conformance v2.
+
+### 2026-10-13T15:35Z — S2 — S2-nvflare (central #165); E7 config integration
+- S2 S2-nvflare (bus #165): conformance v2 vs central 13/13, diff 0.0 every round (subset, partial + site cancel + next dispatch 2.7 s, offline extras, restart -> online 30 s, payload-64, organamnist-dir0.3); evidence docs/report/stage2/evidence/conformance-v2-nvflare-central.json.
+- native.py now loads the E7 hub config with central's loader (`hub.orchestrator.config`); run named s2-e7-nvflare-native-*; `--rounds` for dry runs only (24b4beb). Island dry run with configs/stage2/e7/s2-e7-nvflare-hub-cnn.yaml, 3 rounds, vs hub orchestrator v2 (`--only nvflare`): native-vs-hub r1 3.0e-8 (aggregation only), r2 6.3e-4, r3 3.4e-2 (SGD amplifies the float32 rounding; one-step aggregation diff <= 6e-8 each round). Evidence e7-native-island.md.
+- Code freeze for NVFlare: since the deployed 05e2b2a only native.py/native/run.sh changed (E7-only, built from central's checkout at run time). Rollout SHA for the S3-frozen check: 24b4beb.
+- sysmon.sh send <run> <from> <to>: summary window -> tools/bus put to central (per-site client/job components).

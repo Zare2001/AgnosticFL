@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Runs scripts/sysmon.py on the NVFlare VM through S4: sysmon.sh {start|stop|status}
+# Runs scripts/sysmon.py on the NVFlare VM through S4: sysmon.sh {start|stop|status|send <run> <from> <to>}
 # Per-site components (client process, job process) for the real hospitals; island processes
 # (~/flhub-island) are kept apart so they never count as NVFlare hospitals.
 set -euo pipefail
@@ -21,5 +21,10 @@ case "${1:-status}" in
     fi ;;
   stop) pkill -f "^python3 scripts/sysmon\.py run" && echo "sysmon: stopped" || echo "sysmon: not running" ;;
   status) running && echo "sysmon: running" || echo "sysmon: NOT running"; python3 "$REPO/scripts/sysmon.py" status --dir "$DIR" ;;
-  *) echo "usage: $0 {start|stop|status}" >&2; exit 2 ;;
+  send)  # sysmon.sh send <run name> <RUN start UTC> <RUN end UTC>: window summary -> central
+    [ $# -eq 4 ] || { echo "usage: $0 send <run> <from UTC> <to UTC>" >&2; exit 2; }
+    out="$DIR/summaries/$2-nvflare-sysmon.json"; mkdir -p "$DIR/summaries"
+    python3 "$REPO/scripts/sysmon.py" summarize --dir "$DIR" --from "$3" --to "$4" --run "$2" -o "$out"
+    "$REPO/tools/bus" put "$out" --to central ;;
+  *) echo "usage: $0 {start|stop|status|send <run> <from> <to>}" >&2; exit 2 ;;
 esac
