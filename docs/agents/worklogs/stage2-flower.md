@@ -27,3 +27,8 @@ Newest entries at the bottom. Format: `### <UTC timestamp> — S<n> — <title>`
 - Island, 4 rounds, round_retries 2: kill-node r2+3s -> SuperNode back 11.1 s, round failed 26 s after kill (relay: replaced node), retry ok (39 s round); kill (ClientApp) -> Flower CLIENT_APP_CRASHED "ClientApp stopped responding" after 58.1 s, retry ok (70 s round); restart -> NODE_UNAVAILABLE 1.2 s after SIGTERM, back 11.6 s (34 s round). All final global_ref = clean run sha256:f5c8f670… (retries bit-exact).
 - Straggler 10 %: rounds 43-50 s vs 8 s, same weights; SuperNode start at 10 % takes ~20 s (do `on` before the run); set-property 25 % / off / release verified (cpu.max 25000 100000 -> infinity -> normal cgroup).
 - Bug fixed before commit: `node_port` returned 1 for non-last sites (set -e abort after stop).
+
+### 2026-10-13T14:52Z — S1/S2 prep — data provisioned, E5 scripts, 0.2 FAB rollout on the island
+- Data: all stage-2 variants for flw-h5/flw-h6 + organamnist-iid12 for flw-h11/flw-h12 in `~/flhub-data/<variant>-<site>.csv`, sha256-verified against the manifests (44 s, 258 MB; 14 GB free). Ledger row.
+- E5: `deploy/flower-vm/extra.sh start|stop|status` (runtime `~/flhub-runtime/flower-e5`, ports 9096/9097, own cron line); start.sh accepts variant-only sites.
+- Rollout rehearsal on the island: adapter restart -> FAB with flhub_core 0.2.0+fe357a1dbec1; island SuperNodes (hospital venv, 0.1.0 pinned) report 0.2.0+fe357a1dbec1, no SuperNode restart. Conformance v2 incl. payload-64 echo (10.5 s) and variant round organamnist-dir0.3 (7.0 s): 12 passed, diff 0.0; variant round organamnist-iid12 on flw-h5/h6/h11/h12: 2880 examples each, diff 0.0 (9.5 s).
