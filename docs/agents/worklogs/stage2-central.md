@@ -20,3 +20,10 @@ Newest entries at the bottom. Format: `### <UTC timestamp> — S<n> — <title>`
 - finalize_run.py (gates real/sim/reference/native, W&B AgnosticFL-stage2 only, runs.md row, retention, blob GC; tested dry-run + offline). sysmon.py (stdlib /proc, hourly JSONL, summarize; running on central since 14:47Z). netem.sh tested live (bus #125/#126) and cleared.
 - Training cost per site-round on OrganAMNIST (5,761 samples, 1 thread): cnn-small 1.6 s, cnn-medium 11.4 s, resnet18-gn ~3.6 min.
 - Commits 20f9421..56074ba. Next: S1-core broadcast, then S2 deploy-requests in arrival order.
+
+### 2026-10-13 16:01 UTC — S2/S3 — rollouts, S2-mixed, tuning, freeze
+- S3 tuning grid (scripts/stage2/tune.py, 21 sims, val split): lr 0.1; fedavgm 1.0 (0.914), fedadam 0.03 (0.906), fedprox 0.01 (0.903), fedadagrad 0.03 (0.885), fedyogi 0.03 (0.879); A* = fedavgm. Several optima on the grid edge (tuning.md notes). Configs: base.yaml + 98 run configs (extends), make_configs.py --check clean.
+- Deploys: nvflare #141 (f76942c, kits h7/h8 bus #4/#5, hospital switch 82.6 s / 50 s offline per site) + keeper fix 05e2b2a + 3212150; flower #144 (FAB rollout 29.6 s, 0 hospital steps) + #177 + 17cdfd1 (stale-relay fix of a 97 s restart); vantage6 #174 (image v6-train:a43cef3f75c0 built+pushed in 98 s, E5 orgs/nodes, keys bus #6), adapter at 890966d. needs_weights fix in adapters/common (a43cef3, flower finding #173).
+- Conformance v2 vs central: flower 13/13 (also re-run at 17cdfd1), nvflare 13/13, vantage6 13/13 (payload-64 round 117.5 s); all diffs 0.0; evidence/conformance-v2-*-central.json. Milestones S2-flower #154, S2-nvflare #165, S2-vantage6 #199.
+- Real-path dev run (nvflare+flower, dir0.3, fedadam) = sim; S2-mixed (6 sites, 3 rounds, 8.6 s/round) = sim, hashes equal, milestone #200.
+- S3-frozen 96c44c9 (#210, ~/flhub-runtime/frozen_sha). Frozen paths: flhub_core adapters clients hub configs/stage2 deploy/central. Waiting for the three confirmations, then S4 E4a.
