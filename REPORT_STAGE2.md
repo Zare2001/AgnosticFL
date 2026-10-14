@@ -164,7 +164,19 @@ Hyperparameters from S3 (tuned on `dir0.3`, validation split): fedavgm η 1.0 (�
 - **No aggregator reaches 80.5 % on `dir0.1` within 50 rounds**, and only fedavgm and fedyogi come close on `dir0.3` (the target is 95 % of centralized accuracy). Label skew remains the dominant effect; the choice of server optimizer recovers part of it.
 - **Changing the aggregator is a hub-only change.** All 15 E2 configurations ran on the same hospital deployment as E1, with no restart, no data change and 0 changed lines in `clients/` between them. FedProx's μ reaches the clients inside the opaque `train_config`, and every adapter forwards it unchanged (§4).
 
-*(pending: E3)*
+### 5.3 E3 — model scale (accuracy)
+
+`dir0.3`, seed 2026, real system. INV-1: full simulation for the CNNs, replay of rounds 1, 2, 3 and the last round for `resnet18-gn`, all hash-equal.
+
+| model | parameters | MiB per update | rounds | FedAvg final acc % (worst site) | FedAvgM (A*) final acc % (worst site) | test acc at round 20, FedAvg |
+|---|---|---|---|---|---|---|
+| `cnn-small` (E1/E2) | 52,203 | 0.2 | 50 | 77.0 (54.3) | 78.3 (63.8) | 70.0 |
+| `cnn-medium` | 1,676,779 | 6.4 | 50 | **81.5** (63.3); target 80.5 % reached at round 36 | 11.1: diverged at round 9 | 73.7 |
+| `resnet18-gn` | 11,173,323 | 42.6 | 20 | 42.7 (15.3) | *(pending)* | 42.7 |
+
+- **The wider CNN pays off within 50 rounds.** `cnn-medium` gains 4.5 pp over `cnn-small` with FedAvg and is the only `dir0.3` run of the campaign that reaches the target (round 36).
+- **ResNet-18 needs more rounds than the budget allows.** After 20 rounds of one local epoch, `resnet18-gn` is at 42.7 % and still rising (15.1, 26.1, 41.5 and 42.7 % at rounds 5, 10, 15 and 20). PLAN.md §7 caps a `resnet18-gn` run at about 3 h on these CPUs; this run took 2.1 h, including a 30 min stall (§6.3).
+- **The S3 server step does not transfer to the larger model.** FedAvgM with η 1.0 and β 0.9, best for `cnn-small`, reaches 50 % at round 7 with `cnn-medium` and then collapses to chance level (11.1 %, test loss 2.5) from round 9 on. `hub.sim` reproduces the collapse bit for bit, so it is the optimizer, as with partial participation in E6c. Server learning rates have to be tuned per model.
 
 ## 6. RQ4 — Performance (E3, E4, E5, E7)
 
@@ -189,7 +201,43 @@ Hyperparameters from S3 (tuned on `dir0.3`, validation split): fedavgm η 1.0 (�
 - **Scaling.** NVFlare's round time stays near its 2–2.5 s task-polling floor up to 32 MB and grows about linearly beyond (10.3 s at 256 MB). Flower has about 5.5 s of fixed cost per round (relay and SuperNode message handling, a ClientApp process per message; breakdown in the flower section) and grows linearly. vantage6 grows superlinearly (doubling 64 → 128 MB costs 4×) because the server is CPU-bound in one process; the mixed scope inherits vantage6's time.
 - **Memory on central** (sysmon peak RSS): the hub core stays at 42–46 MB at every size (blobs are streamed); the orchestrator needs about 8× the payload (2.0 GB at 256 MB, 2 sites), NVFlare's relay job about 10×, Flower's relay ServerApp about 7.6×, vantage6's server and adapter 15–18× (2.3 / 1.9 GB at 128 MB). Central used at most 7.9 GB of 31 GB; the framework VMs stayed below 16 % of RAM.
 
-*(pending: E4b, E3, E5, E7)*
+### 6.2 E4b — bandwidth sensitivity
+
+*(pending)*
+
+### 6.3 E3 — round time and model size
+
+![e3](docs/report/stage2/figures/e3_round_time_breakdown.png)
+
+Median over rounds ≥ 2 (seconds; train and overhead are the mean of the framework's two sites; evaluation runs on central every round for the CNNs and every 5 rounds for `resnet18-gn`). Full table, including FedAvgM: `docs/report/stage2/tables.md`.
+
+| model (FedAvg) | NVFlare train / overhead | vantage6 train / overhead | Flower train / overhead | hub aggregation | hub evaluation | round |
+|---|---|---|---|---|---|---|
+| `cnn-small` (0.2 MiB) | 0.7 / 1.6 | 1.8 / 7.2 | 1.6 / 5.6 | 0.001 | 1.9 | 9.1 |
+| `cnn-medium` (6.4 MiB) | 11.7 / 1.9 | 13.5 / 14.1 | 13.9 / 6.3 | 0.025 | 14.6 | 28.8 |
+| `resnet18-gn` (42.6 MiB) | 214.0 / 2.7 | 225.3 / 42.0 | 223.3 / 10.9 | 0.133 | 105.6 | 268.0 |
+
+- **Training dominates as the model grows, and the framework cost does not vanish equally.** The overhead per site and round (transport, framework and adapter) is 1.6 → 1.9 → 2.7 s for NVFlare, 5.6 → 6.3 → 10.9 s for Flower and 7.2 → 14.1 → 42.0 s for vantage6. As a share of the framework's fan-out time it falls from 56 % to 1 % (NVFlare), 72 % to 5 % (Flower) and 79 % to 16 % (vantage6). vantage6 sets the round time for every model.
+- **vantage6's overhead grows during a run** when its tasks stay in the server database: with `cnn-medium` from 8.7 s at round 3 to 12.4 s at round 21 (tasks below 16 MB are kept; the server reads full run rows when it reports a task's status, vantage6 section §4). With `resnet18-gn` the adapter deletes each round's tasks, and the overhead stays flat.
+- **The hub is not the bottleneck.** Aggregation stays below 0.15 s even for 11 M parameters in float64. Global evaluation on the 17,778 test images costs 1.9 s, 14.6 s and 106 s, on the hub's own CPU and outside the hospitals' path; `resnet18-gn` evaluates every 5 rounds for that reason.
+- **Resources** (sysmon, `tables.md`): during `resnet18-gn` the framework VMs ran at 30–33 % mean CPU (two single-threaded trainings on 4 vCPUs), with peak RSS of 1.0–1.1 GB per training process (2.1 GB for vantage6's algorithm container) and at most 4.1 GB used per VM. Central peaked at 6.3 GB, of which the orchestrator took 1.7 GB.
+- **One stall, recovered by the hub.** In `s2-e3-resnet18-gn-fedavg` round 10, v6-h3's result never arrived. A hospital-side cron job (task-folder clean-up, vantage6 section) deleted the output in the second between the training container's exit and the node reading it. vantage6 reuses task ids after the adapter's per-round delete, and the reused folder kept its old modification time. The round failed at its 1800 s deadline and the retry succeeded; the cron job was removed (ledger).
+
+### 6.6 Cost model
+
+`scripts/stage2/cost_model.py` fits, per framework, fan-out time = a + b·P on the E4a echo sweeps (P = payload in MiB; least squares on relative residuals) and predicts the learning runs as a + b·P_model + max_k train_k (`docs/report/stage2/cost_model.md`):
+
+| framework | a (s) | b (s/MiB) | R² | prediction error, E1/E2 `cnn-small` | `cnn-medium` | `resnet18-gn` |
+|---|---|---|---|---|---|---|
+| NVFlare | 2.24 | 0.021 | 0.91 | +4 to +6 % | 0 to +4 % | 0 % |
+| Flower | 5.67 | 0.054 | 1.00 | −8 to −7 % | −3 to −1 % | −1 % |
+| vantage6 (fit on 1–64 MiB) | 4.13 | 1.49 | 0.96 | −38 to −31 % | −4 to −3 % | +9 % |
+
+*(pending: E4b rows, resnet18-gn FedAvgM)*
+
+The model explains NVFlare and Flower within 8 % across a 200× range of model sizes: a fixed cost per round plus a small per-MiB cost plus the slowest site's training. vantage6's per-MiB cost is 30–70× higher, and its growth beyond 64 MiB is superlinear (E4a). Its small-model error has two parts (vantage6 #705): the straight line underestimates vantage6's fixed cost per task, which is 6.3 s measured at 1 MiB (container start, task and result round trips), and real training adds about 0.8 s per task that the echo runs do not have (reading the site's CSV database into a DataFrame, a slower container exit after a torch run).
+
+*(pending: E5, E7)*
 
 ## 7. RQ5 — Robustness (E6)
 
