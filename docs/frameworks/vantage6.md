@@ -309,7 +309,7 @@ Comparison with the other frameworks: [`cost-and-efficiency.md`](../cost-and-eff
 | E7 baseline tooling (`adapters/vantage6/native.py`, `deploy/central/vantage6/native/`) | not needed by the adapter |
 | vantage6 concepts used | user, organisation, collaboration, node, task, run, result, database label, algorithm image, node policy |
 
-At the hospitals: 0 lines of hospital code changed between stage 1 and stage 2. A code update is a new image tag: 0 hospital steps, 0 restarts, 0 s downtime. The one-time stage-2 data-variant configuration took 13.2 s and 14.7 s of node downtime (§3.4).
+At the hospitals, 0 lines of hospital code changed between stage 1 and stage 2. Hospital steps in stage 2 (§3.3, §3.4): (a) code rollout of `flhub_core` 0.2: 0 steps, a new image tag (optional pre-pull 12.6 s); (b) data provisioning for the data variants: data only; (c) data-variant configuration: one database per variant in the node configuration, 1 restart per node, 14.7 s offline; (d) later code updates: 0 steps.
 
 ### 5.3 Runtime overhead
 
@@ -380,9 +380,9 @@ With limited bandwidth vantage6 dominates a mixed round: 463.8 s at 20 Mbit/s, a
 | median round, vantage6 only (s) | 6.3 | 12.8 | 60.1 | 115.3 | 468.2 | not delivered (§6.1) |
 | vantage6 fan-out in the mixed federation (s) | 6.4 | 13.2 | 58.6 | 115.4 | 392.3 | testbed disk limit |
 | peak RSS of one training container (MiB, `peak_rss_mb`) | 303 | | | 573 | 851 | |
-| peak memory used on the hospital VM, 2 sites (MiB, sysmon) | | | | 3,322 | 5,282 | |
+| peak memory used on the hospital VM, 2 sites (MiB, sysmon) | 1,792 | 1,973 | 2,362 | 3,322 | 5,282 | |
 
-Sources: [tables](../results/evidence/stage2/tables.md) and the stage-2 vantage6 section §5 (which rounds the sysmon values to 3.3 and 5.3 GB). Where a site's time goes (median of rounds 2–3, same section): at 128 MiB the result arrived after 467 s, of which 0.05 s training, 33–38 s in the adapter (`vantage6_create_s` 10–11 s, `vantage6_fetch_s` 15–21 s, `vantage6_store_s` 1–2 s) and about 430 s inside vantage6 (server database rows, node download and upload, log streaming); at 64 MiB, 115 s = 0.03 s + 13–17 s + about 100 s. On the central host the vantage6 server and the adapter each needed 15–18× the payload (about 2,300 and 1,900 MiB at 128 MiB; stage-2 report §6.1).
+Sources: [tables](../results/evidence/stage2/tables.md), [vantage6 VM memory](../results/evidence/stage2/vantage6/e4a-vm-memory.md) (also per node and for the mixed runs) and, for `peak_rss_mb`, the stage-2 vantage6 section §5. Where a site's time goes (median of rounds 2–3, stage-2 vantage6 section §5): at 128 MiB the result arrived after 467 s, of which 0.05 s training, 33–38 s in the adapter (`vantage6_create_s` 10–11 s, `vantage6_fetch_s` 15–21 s, `vantage6_store_s` 1–2 s) and about 430 s inside vantage6 (server database rows, node download and upload, log streaming); at 64 MiB, 115 s = 0.03 s + 13–17 s + about 100 s. On the central host the vantage6 server and the adapter each needed 15–18× the payload in memory ([stage-2 report](https://github.com/Zare2001/AgnosticFL/blob/stage2-final/REPORT_STAGE2.md) §6.1).
 
 Disk: a 4.15.2 node never deletes its per-run folders `task-<run id>` (input and output, about 2.7× the model per site and round), and the server database grows with every stored task. See §6 for the clean-up.
 
@@ -416,7 +416,7 @@ vantage6 reports a killed algorithm container at once (the run becomes `crashed`
 | Limit | Value | Cause | Source |
 |---|---|---|---|
 | largest model delivered | 128 MiB, 468.2 s per round | per-log-line row rewrites (§6.2) | [tables](../results/evidence/stage2/tables.md) |
-| 256 MiB | never delivered: each node trained round 1 six times in 32 min and every result was dropped, until the round was cancelled | the server rewrites ~0.9 GB run rows for every streamed log line, the node's websocket times out, and the node drops the result (§6.2) | [node logs](../results/evidence/stage2/vantage6/e4a-256mb-node-logs.txt) |
+| 256 MiB | never delivered: each node trained round 1 six times in 32 min and every result was dropped, until the round was cancelled | for every streamed log line the server rewrites the run row (its input alone is 1.78 × 256 MiB ≈ 456 MiB), the node's websocket times out, and the node drops the result (§6.2) | [node logs](../results/evidence/stage2/vantage6/e4a-256mb-node-logs.txt) |
 | largest storable model | about 536 MiB; 1024 MiB cannot be stored | SQLite rejects a value > 10⁹ bytes (999,999,000 bytes accepted, 1,000,000,001 rejected), and a run's input is 1.78× the model | [ADR-020](../design/decisions.md) |
 | growth with model size | superlinear: 64 → 128 MiB costs 4.1× the time | per-log-line row rewrites | [tables](../results/evidence/stage2/tables.md) |
 | bytes on the wire | 5–9× the payload | four input copies per site and round, 1.78× encoding | §5.4 |
@@ -427,8 +427,8 @@ vantage6 reports a killed algorithm container at once (the run becomes `crashed`
 - **A result is dropped when the websocket is down.** After training, the node takes the result from its queue and first sends a status event over the websocket (`node/__init__.py:575-579`). If the socket is disconnected, the emit fails, the exception is caught ("Speaking thread had an exception") and the result is lost. When the node reconnects, the server hands the still-open run back and the node trains again. This is the 256 MiB failure.
 - **Run rows are rewritten per log line.** The server's `on_algorithm_log` loads the run, appends the line and saves the whole row (`server/websockets.py:442-444`); with SQLite this rewrites the row including its input. About 24 log lines per round blocked the single server worker for about 60 s at 64 MiB.
 - **Overhead grows with the stored runs.** `input` is the first column of the run table (`server/model/run.py:58-68`), so in SQLite every later column of a row sits behind its input, and listings filtered on those columns walk all stored inputs.
-- **Task listings load all stored data.** `GET /task` computes each task's status from its runs, including their input and result. With 100 `cnn-medium` tasks the listing held the server for 12 min at 1.5–2.3 GB RSS. Delete tasks by id instead.
-- **Deleting a task with subtasks orphans the subtasks' runs** (`server/resource/task.py:1289-1301`). Their input and result stay in the database, unreachable through the API; after the E7 native runs these were 50 rows and 1.6 GB.
+- **Task listings load all stored data.** `GET /task` computes each task's status from its runs, including their input and result. With 100 stored `cnn-medium` tasks the listing held the single server worker for 12 min. Delete tasks by id instead.
+- **Deleting a task with subtasks orphans the subtasks' runs** (`server/resource/task.py:1289-1301`). Their input and result stay in the database, unreachable through the API; after the E7 native runs these were 50 rows, and the database file stayed at 1.6 GiB after deleting every task and a VACUUM (`du -h` in `purge.sh`).
 - **Nodes never delete task folders** (`node/docker/task_manager.py:450-452`). A clean-up next to the node must age a folder by its newest file, because run ids are reused after task deletes and a reused folder keeps its old modification time ([`deploy/vantage6-vm/taskdir_gc.sh`](../../deploy/vantage6-vm/taskdir_gc.sh)).
 - **The large result store is not usable in 4.15.2.** The client uploads blobs in chunks of exactly 1 MiB, which the server's uWSGI rejects at its default 1 MiB chunked-input limit; with the limit raised, the SQLite-backed server deadlocked while streaming blobs ([ADR-020](../design/decisions.md)).
 - **Only unencrypted collaborations.** The adapter calls `setup_encryption(None)`.
