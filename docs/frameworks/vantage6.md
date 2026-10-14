@@ -102,7 +102,13 @@ Ports in the reference deployment ([`deploy/topology.env`](../../deploy/topology
 | `restart_adapter.sh`, `restart_server.sh` | restart only the adapter (tasks in flight live in the server and survive), or only the server |
 | `add_sites.sh`, `purge.sh [--vacuum]` | register hospitals (§2.3); delete all tasks between runs and optionally VACUUM the SQLite file |
 
-The adapter answers `GET /health`, and `discover` lists every site as `online`, `offline` or `unknown`.
+The adapter answers `GET /health`, and `discover` lists every site as `online`, `offline` or `unknown`. The central scripts take `V6_RT` (runtime directory), `V6_VENV` and `V6_SERVER_BIND` as overrides; the development setup uses them to run a second server on one VM.
+
+Setup notes for vantage6 4.15.2 (stage-1 vantage6 section §3, [ADR-005](../design/decisions.md)):
+
+- `v6 server new` and `v6 node new` are interactive only, so the reference scripts render both configurations from templates that follow the CLI's own ([`server.template.yaml`](../../deploy/central/vantage6/server.template.yaml), [`node.template.yaml`](../../deploy/vantage6-vm/node.template.yaml)). The server configuration pins the server image and sets `ui.enabled: false`.
+- The images are on `ghcr.io/vantage6/infrastructure/`. A node's image tag defaults to the server's major.minor version, so the node configuration pins it with `images.node`.
+- The entities import needs every organisation field (`name`, `domain`, `address1`, `address2`, `zipcode`, `country`, `public_key`). Each collaboration participant is `{name, api_key}`, where the API key must be a UUID, and becomes one node.
 
 ## 3. Client side: what the hospital code must contain
 
@@ -260,7 +266,18 @@ The adapter is a vantage6 user, so an existing vantage6 4.15 server and its node
 | node API key | the vantage6 server, when the node is created | the hospital's node configuration (`api_key`, mode 600) |
 | registry credentials | registry owner | none in the reference deployment (plain HTTP, limited by the firewall) |
 
-Network: the hospitals need outgoing access to the server port (7601) and the registry port (5050) only. The reference 4-VM deployment, including the hospital-side scripts in [`deploy/vantage6-vm/`](../../deploy/vantage6-vm/), is described in [`deployment.md`](../deployment.md).
+Network: the hospitals need outgoing access to the server port (7601) and the registry port (5050) only. The reference 4-VM deployment is described in [`deployment.md`](../deployment.md). Its hospital-side scripts, in [`deploy/vantage6-vm/`](../../deploy/vantage6-vm/):
+
+| Script | What it does |
+|---|---|
+| `install.sh --keys <file>` | installs the vantage6 4.15.2 CLI in a venv and pulls the node image; adds the operator's registry to `insecure-registries` (restarts Docker once); writes one node configuration per hospital from the operator's node keys; adds the watchdog and clean-up cron entries |
+| `start.sh`, `stop.sh`, `status.sh` | start the nodes with `v6 node start --user` and wait until they are connected; stop them with `docker stop`; exit 0 when both are connected |
+| `taskdir_gc.sh` | deletes finished `task-<run id>` folders whose newest file is older than 5 min and whose algorithm container is not running |
+| `extra.sh` | the two extra hospitals of the 12-site run |
+| `inject.sh`, `straggler.sh`, `netem.sh`, `sysmon.sh`, `run_follow.py`, `endstate.sh` | experiment tools: fault injection and CPU throttling (E6), link shaping (E4b), monitoring, end-state check |
+| `island.sh`, `island_round.py` | a development setup on one VM |
+
+The watchdog cron entry re-runs `start.sh` every minute while the nodes are enabled; after `docker kill` of a node container the node was back and connected after 15 s (stage-1 vantage6 section §8).
 
 ## 5. Cost and efficiency for vantage6
 
@@ -319,6 +336,8 @@ vantage6 set the round time of the mixed federation for every model. Its overhea
 
 ![E3: round-time breakdown](../results/figures/e3_round_time_breakdown.png)
 
+**Stage 1.** With `flhub/0.1` (one vantage6 task for both organisations per round) and the 51,618-parameter PneumoniaMNIST CNN, the vantage6-only run took 238 s for 30 rounds, 7.8 s per round, against 2.5 s for NVFlare and 7.3 s for Flower ([stage-1 report](https://github.com/Zare2001/AgnosticFL/blob/stage1-final/REPORT.md) §7, [stage-1 results](../results/stage1.md)).
+
 **Fixed cost per task.** With a 1 MiB echo model a vantage6 round takes 6.3 s ([tables](../results/evidence/stage2/tables.md)). Node-log phases per task, mean of 50 `cnn-small` rounds: 3.3 s from "Starting task" to the start of training (image check, container start, Python and torch import, reading the database), 1.9 s training, 2.3 s from the output to the result being sent (stage-2 vantage6 section §5).
 
 **Cost model.** Fan-out time per round = a + b·P, fitted on the E4a echo sweep, P in MiB ([cost model](../results/evidence/stage2/cost_model.md)):
@@ -356,13 +375,14 @@ With limited bandwidth vantage6 dominates a mixed round: 463.8 s at 20 Mbit/s, a
 
 ### 5.5 Memory and payload size
 
-| E4a, vantage6 only | 1 MiB | 64 MiB | 128 MiB |
-|---|---|---|---|
-| median round (s) | 6.3 | 115.3 | 468.2 |
-| peak RSS of one training container (MiB, `peak_rss_mb`) | 303 | 573 | 851 |
-| peak memory used on the hospital VM, 2 sites (MiB, sysmon) | — | 3,322 | 5,282 |
+| E4a echo model | 1 MiB | 8 MiB | 32 MiB | 64 MiB | 128 MiB | 256 MiB |
+|---|---|---|---|---|---|---|
+| median round, vantage6 only (s) | 6.3 | 12.8 | 60.1 | 115.3 | 468.2 | not delivered (§6.1) |
+| vantage6 fan-out in the mixed federation (s) | 6.4 | 13.2 | 58.6 | 115.4 | 392.3 | testbed disk limit |
+| peak RSS of one training container (MiB, `peak_rss_mb`) | 303 | | | 573 | 851 | |
+| peak memory used on the hospital VM, 2 sites (MiB, sysmon) | | | | 3,322 | 5,282 | |
 
-Sources: [tables](../results/evidence/stage2/tables.md) and the stage-2 vantage6 section §5 (which rounds the sysmon values to 3.3 and 5.3 GB). On the central host the vantage6 server and the adapter each needed 15–18× the payload (about 2,300 and 1,900 MiB at 128 MiB; stage-2 report §6.1).
+Sources: [tables](../results/evidence/stage2/tables.md) and the stage-2 vantage6 section §5 (which rounds the sysmon values to 3.3 and 5.3 GB). Where a site's time goes (median of rounds 2–3, same section): at 128 MiB the result arrived after 467 s, of which 0.05 s training, 33–38 s in the adapter (`vantage6_create_s` 10–11 s, `vantage6_fetch_s` 15–21 s, `vantage6_store_s` 1–2 s) and about 430 s inside vantage6 (server database rows, node download and upload, log streaming); at 64 MiB, 115 s = 0.03 s + 13–17 s + about 100 s. On the central host the vantage6 server and the adapter each needed 15–18× the payload (about 2,300 and 1,900 MiB at 128 MiB; stage-2 report §6.1).
 
 Disk: a 4.15.2 node never deletes its per-run folders `task-<run id>` (input and output, about 2.7× the model per site and round), and the server database grows with every stored task. See §6 for the clean-up.
 
@@ -387,7 +407,7 @@ Disk: a 4.15.2 node never deletes its per-run folders `task-<run id>` (input and
 | site throttled to 10 % CPU, rounds 7–13, deadline 20 s | — | dropped in all 7 rounds by per-site `task.kill`; rounds 20.3 s | 1 | none |
 | orchestrator and adapters killed (SIGKILL) in round 21, run resumed | — | adapter back after 2.2 s (stage-2 report §7); round 21 done 20.1 s after the kill | 1 | none |
 
-vantage6 reports a killed algorithm container at once (the run becomes `crashed`), so its detection is the fastest of the three frameworks. During both server restarts the nodes reconnected by themselves, and no vantage6 round failed or was retried.
+vantage6 reports a killed algorithm container at once (the run becomes `crashed`), so its detection is the fastest of the three frameworks. During both server restarts the nodes reconnected by themselves, and no vantage6 round failed or was retried. A node restarted in the middle of a round runs its open run again after reconnecting (the server hands open runs back), so the round completes without a retry; in a development test that round took 19.6 s instead of 8 s ([ADR-015](../design/decisions.md)).
 
 ## 6. Limits, known issues and knobs
 
