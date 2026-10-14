@@ -1,0 +1,24 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "AgnosticFL: one federated-learning hub across NVFlare, vantage6 and Flower"
+abstract: >-
+  A framework-agnostic federated-learning hub. Hospitals keep their own framework
+  (NVFlare, vantage6 or Flower) and its standard client; one hub trains a single model
+  across all of them with FedAvg or five other server aggregators. Per framework, a
+  server-side adapter speaks one framework-free protocol to the hub's orchestrator.
+type: software
+authors:
+  - given-names: Zare
+    family-names: Palanciyan
+    affiliation: SURF
+version: 0.2.0
+date-released: 2026-10-14
+repository-code: "https://github.com/Zare2001/AgnosticFL"
+url: "https://github.com/Zare2001/AgnosticFL"
+keywords:
+  - federated learning
+  - FedAvg
+  - NVFlare
+  - vantage6
+  - Flower
+  - interoperability
