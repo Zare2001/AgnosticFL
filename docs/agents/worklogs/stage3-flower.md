@@ -41,3 +41,14 @@ Newest entry at the bottom. Format: `## <UTC> — <what>` then facts (commands, 
 - Central: S3 R3-verified 6cbab50 (#1128): tests 80/15, mock conformance 12/1, Flower tests 11, selfcheck digest, 735 links 0 problems, greps clean, no-code-change diff, 88 commits all Zare2001. docs-ready from all three agents.
 - Prepared `/tmp/flwtools/r4check.sh` (fresh clone of main; agent-material check; tags; check_links; unit + Flower tests with the clone on PYTHONPATH; selfcheck; structure, content and branch-equality of my files); dry run against the old main 0f7965a worked (expected differences only).
 - Next: owner merges the PR; on `S3 merged <sha>` run the R4 check and send `confirm main <sha>`.
+
+## 2026-10-14T18:20Z — R4 confirm main 642d0b4; R5 final state
+
+- Owner merged PR #3 at 18:10:34Z: main = 642d0b4 (merge of 0f7965a and 6cbab50); tags v0.1.0 -> 250157a (= stage1-final) and v0.2.0 -> 642d0b4, releases created; central's `S3 merged 642d0b4` (#1140).
+- R4 check from a fresh clone of main (`/tmp/flwtools/r4check.sh`, code imported from the clone): no agent material on main; stage tags unchanged (stage1-final 250157a, stage2-final b40390b); check_links 735 links, 0 problems, 23/23 figures; unit tests 90 passed / 15 skipped; tests/flower 11 passed; selfcheck digest ac074a0b…, code_version 0.2.0+fe357a1dbec1; my 5 files present, structurally clean (16 closed fences, 1 Mermaid diagram, 6 images, anchors), grep-clean, identical to restructure/library.
+- DoD 3 quick start on main, `docs/getting-started.md` verbatim with no deviation (plain `git clone` = main 642d0b4), `env -i`, 18:16:55-18:19:24Z: every output equals the doc (digest, health lines, finished, 0.625, INV-1 PASS, 79/16, 12/1). All temporary clones, data and processes removed; 8800/8819 free.
+- Sent `confirm main 642d0b4` (#1144).
+- Archive branch check (DoD 1): `git diff --name-status stage2-final origin/archive/agentic-build` = 10 added stage-3 files + CLAUDE.md modified, nothing deleted.
+- Testbed end state (read-only `bash deploy/flower-vm/status.sh`, 18:19:48Z, exit 0): flw-h5 pid 457389 node 1904685626967891070, flw-h6 pid 474920 node 16440330416478537649, both connected to the SuperLink :9092, watchdog cron enabled, flower-vm HEALTHY: identical to the R0 baseline (no restarts during stage 3). 13 GB free.
+- Stage 3, Flower side: guide `docs/frameworks/flower.md` (8 sections), `adapters/flower/README.md`, `clients/flower/README.md`, evidence `docs/results/evidence/stage2/flower/{e4a-flower-vm-memory.md,e4a-breakdown.md}`, report sections archived, quick start verified three times (restructure 1637761, b1213b4, main 642d0b4), reviews of every shared page with Flower statements. I pushed nothing to main.
+- Next: after central's `S3 all-done`, `touch ~/.flhub/stage3/DONE`.
