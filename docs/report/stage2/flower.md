@@ -98,7 +98,16 @@ Flower's own path costs about 5 s per round at any size (a fresh `flwr-clientapp
 
 No server-side knob was needed. The SuperNodes logged a few `Connection attempt failed, retrying` lines at the start of the 64 MB and 256 MB runs: reconnects after `purge.sh` restarted the SuperLink just before the run (same node ids, all rounds finished).
 
-E4b on the real system: (S4 results).
+E4b on the real system (`payload-45`, mixed scope, 3 rounds; central shaped its egress to all VMs and the flower VM shaped its egress to 145.38.205.58:9092 with `netem.sh`, applied and cleared on each `NETEM APPLY/CLEAR` handshake; Flower fan-out = median of rounds 2–3 from central's E4 milestone #958):
+
+| profile | rate / delay per direction | lower bound 4 × P / rate | Flower fan-out | efficiency | RTT to :9092 measured |
+|---|---|---|---|---|---|
+| none | — | — | 7.5 s | — | 0.8 ms |
+| wan1g | 1 Gbit/s, 5 ms | 1.5 s | 8.9 s | 0.17 | 10.9 ms |
+| wan100 | 100 Mbit/s, 20 ms | 15.1 s | 22.7 s | 0.67 | 40.9 ms |
+| wan20 | 20 Mbit/s, 40 ms | 75.5 s | 85.1 s | 0.89 | 81.0 ms |
+
+Flower's fixed cost per round (about 5–7 s: a fresh ClientApp process per message and pull intervals) dominates on fast links; on the 20 Mbit/s link the transfer dominates and Flower reaches 89 % of the bound (NVFlare 0.94, vantage6 0.16). The flower VM carried 284–292 MB in and out per run (3 rounds × 2 sites × 47.2 MB = 283 MB, 1.00–1.03×), memory peak ≤ 2.9 GB; no SuperNode reconnects or errors under shaping.
 
 ## 5. Experiments supported
 
@@ -131,7 +140,6 @@ E4b on the real system: (S4 results).
   - Processes and memory on central (sysmon peaks, `sysmon/central.json` in the run dirs): hub path C1 = relay ServerApp 139 MB + adapter 44 MB + hub core 47 MB + orchestrator 377 MB (evaluation) = 0.6 GB; native C1 = one ServerApp 624 MB (strategy + the same evaluation). C2: hub path 390 + 44 + 47 + 566 MB = 1.05 GB, native ServerApp 887 MB; the SuperLink peaks at about 0.93 GB in both (object store). The hub path adds two small long-lived processes (adapter, hub core); the relay ServerApp stays up between runs.
   - The native run ran next to the idle relay run on the same SuperLink; nothing was paused, and the hospitals received the native FAB (`agnosticfl.flhub-native.0.2.0.82153140`) automatically with its first message.
 - E5 (flower side): `flw-h11` and `flw-h12` started with `extra.sh start` on `E5 EXTRAS UP` (06:08:01Z), connected and mapped by the relay 12 s later, trained all 20 rounds of `s2-e5-12sites`, and were stopped with their watchdog entry on `E5 EXTRAS DOWN` (06:13:22Z).
-- Final-run results (E4b): (S4 results).
 
 ## 6. Problems and fixes
 
