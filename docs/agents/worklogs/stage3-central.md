@@ -85,3 +85,13 @@ The inventory table to include verbatim under entry 2 (Markdown table):
 - Owner #1159: option (a), DoD item 5 counts as met; the three web-UI merges and c04fd18 (Copilot conflict resolution) stay in the history, no rewrite.
 - Raw DONE and status output for nvflare's record (#1155): reply #1158 (DONE 2026-10-14 20:21:55 +0200; `bash deploy/central/status.sh` exit 0, HEALTHY).
 - All four agents report DONE (status board; flower #1151, vantage6 #1152, nvflare 18:22:20Z). Stage 3 complete.
+
+## 2026-10-14T19:05Z — S3 examples (owner #1163)
+
+- Owner request #1163 after S3 all-done: examples/ (client + server per framework, new-framework skeleton), PR to main, v0.2.1, then 'S3 examples-done' and DONE again; the owner had removed ~/.flhub/stage3/DONE and restarted the runner (runner.log 20:29:05 local).
+- Branch examples/library-examples from main 642d0b4 pushed; layout, ownership and rules sent (#1167): no tests/examples (runnable checks inside examples/<fw>, so the quick-start pytest numbers stay 79/16 and 80/15), new files only under examples/, testbed read-only.
+- Central wrote examples/new-framework/: adapter.py (direct, BaseAdapter), relay.py (RelayAdapter + relay loop), client.py (client stub), toy_framework.py (stand-in framework), run.yaml, check.sh (temporary hub core on free ports; conformance against both skeletons; orchestrator 3 rounds + hub.sim --compare); f2e162e, bcdac83, README 5547404. Fresh clone at bcdac83 + fresh venv: check.sh 12 passed / 1 skipped for both patterns, 13/13 with FLHUB_VARIANT=organamnist-dir0.3; orchestrator finished, test acc 0.625; INV-1 hashes_equal=True; pytest 79/16, mock conformance 12/1 unchanged. Flower reviewed relay.py: correct (#1183).
+- examples/README.md and links (README.md, docs/README.md, client-contract, adding-a-framework) 18ebbf4; CI step 6b76964; CHANGELOG [0.2.1], pyproject/CITATION 0.2.1, README status 0.2.1 cc6c28a.
+- examples-ready: nvflare 499292f (#1175), flower 9939747 (#1179), vantage6 a1db585 (#1187, after central's pytest-row fix #1185). Review: all three follow the layout; server examples import the library adapters.
+- Fresh clone of cc6c28a: pytest 80/15, mock conformance 12/1, NVFlare 12, Flower 11, selfcheck ac074a0b..., check_links 884 links / 58 files / 0 problems, greps clean; main..cc6c28a 19 commits Zare2001|Zare2001, no attribution, largest 269 lines; no change under hub/, adapters/, flhub_core/, clients/, tests/, deploy/, configs/, scripts/, tools/.
+- PR #4 https://github.com/Zare2001/AgnosticFL/pull/4 (MERGEABLE); CI run 38620076289 success incl. the skeleton step (12/1 both, INV-1 PASS). Request to the owner #1192, info #1193. Next: owner merges, tag v0.2.1 + release, confirm main x3, S3 examples-done, DONE.
