@@ -22,6 +22,15 @@ Status: draft during S2–S4; experiment results are filled in from the final ru
 
 `clients/nvflare/client.py` is unchanged since `stage1-final` (0 lines). Ledger rows: `docs/report/stage2/ledger.md` (nvflare).
 
+`git diff --stat stage1-final..HEAD` (2026-10-14, during S4):
+
+| path | diff |
+|---|---|
+| `clients/nvflare` | 0 files (unchanged) |
+| `adapters/nvflare` | 5 files, +597 −94 (relay per-site tasks and timings, keeper, native E7, job with flhub_core) |
+| `deploy/central/nvflare` | 9 files, +137 −13 (base/extra sites, purge, provision_extra, restart_server, native/run.sh) |
+| `deploy/nvflare-vm` | 16 files, +916 −56 (VM tooling: watchdog, switch, extras, E6 tools, netem, sysmon, follower, end state, analysis) |
+
 ## 3. Rollout of flhub_core 0.2
 
 Channel: the relay job's custom code (BYOC). NVFlare 2.9.0 **appends** a job's `custom/` directory to the job process's `sys.path` (`utils/job_launcher_utils.py:486-503`), so a `flhub_core` installed in the hospital's environment shadows the job's copy. This was observed on the real system: after central deployed the 0.2 job, both hospitals still ran `0.1.0+9c6b064c1e96`.
