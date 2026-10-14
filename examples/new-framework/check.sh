@@ -25,16 +25,18 @@ start() {  # start <name> <command...>: run in the background, keep the pid
   echo $! > "$W/$1.pid"
 }
 stop() { kill "$(cat "$W/$1.pid")" 2> /dev/null || true; rm -f "$W/$1.pid"; }
-cleanup() {
+HUB=http://127.0.0.1:$(port)
+cleanup() {  # the services by pid, then whatever of this run still runs (a test or a restart in progress)
   for p in "$W"/*.pid; do [ -e "$p" ] && { kill "$(cat "$p")" 2> /dev/null || true; }; done
+  pkill -f -- "$W|--hub $HUB " 2> /dev/null || true
   rm -rf "$W"
 }
 trap cleanup EXIT
+trap 'exit 130' INT  # Ctrl-C ends the script, and so runs cleanup, not only the step that is running
 
 if [ -n "$VARIANT" ]; then  # build that partition for the sites first (downloads the dataset once)
   python -m flhub_core.data materialize --sites "${SITES[@]}" --variants "$VARIANT"
 fi
-HUB=http://127.0.0.1:$(port)
 start hubcore python -m hub.core --port "${HUB##*:}" --root "$W/hubcore"
 up "$HUB"
 
