@@ -1,0 +1,14 @@
+# Three rounds of FedAvg through the skeleton adapter: hub core on 8800, adapter.py on 8820.
+#   python -m hub.orchestrator run --config examples/new-framework/run.yaml --runs-dir /tmp/agnosticfl/runs
+# The orchestrator finds an adapter only through an entry like the one below: a name, its URL and
+# the sites it serves. Nothing else in the hub changes for a new framework.
+name: toy-3r
+rounds: 3
+seed: 2026
+train_config: {local_epochs: 1, batch_size: 64, lr: 0.05, momentum: 0.0, seed: 2026}
+hub_url: http://127.0.0.1:8800
+adapters:
+  - {name: toy, url: "http://127.0.0.1:8820", sites: [nvf-h1, nvf-h2]}
+deadline_s: 600
+online_wait_s: 60
+tags: [dev]
