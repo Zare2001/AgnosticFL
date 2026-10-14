@@ -9,7 +9,7 @@ This guide covers the vantage6 adapter, the hospital-side vantage6 algorithm, an
 | Tested version | vantage6 **4.15.2**: server and node images `ghcr.io/vantage6/infrastructure/server:4.15.2` and `ghcr.io/vantage6/infrastructure/node:4.15.2`, server with its default SQLite database. Algorithm image on Python 3.11.17 with torch 2.14.1+cpu, numpy 2.4.4, safetensors 0.8.0 ([`deploy/versions.env`](../../deploy/versions.env)) |
 | Protocol | `flhub/0.2` (also serves `flhub/0.1` callers) |
 | Status | Tested in stage 1 (2 hospitals, `flhub/0.1`) and stage 2 (2 hospitals, plus 2 extra hospitals for the 12-site run; experiments E1–E7). Conformance suite v2 against the reference deployment: 13 of 13 tests pass, and every returned weight equals local training bit for bit (max abs diff 0.0). |
-| Hospital code | [`clients/vantage6/v6_flhub/__init__.py`](../../clients/vantage6/v6_flhub/__init__.py), 38 code lines ([lines of code](../results/evidence/loc.md)), a standard vantage6 algorithm in its own image. 0 lines changed since stage 1. Nothing hub-specific is installed on the hospital host. |
+| Hospital code | [`clients/vantage6/v6_flhub/__init__.py`](../../clients/vantage6/v6_flhub/__init__.py), 38 code lines (54 with the Dockerfile, plus 11 configuration lines; [lines of code](../results/evidence/loc.md)), a standard vantage6 algorithm in its own image. 0 lines changed since stage 1. Nothing hub-specific is installed on the hospital host. |
 | Rollout channel | A new tag of the algorithm image in the operator's registry. Nodes pull it at their next task: 0 hospital steps, 0 restarts. |
 | Main limit | With the default SQLite server database the round time grows faster than linearly with the model size: 128 MiB is the largest model delivered (468 s per round), 256 MiB results never arrive (§6). |
 
@@ -43,16 +43,16 @@ vantage6 entities ([`deploy/central/vantage6/entities.template.yaml`](../../depl
 | login | `UserClient(url, port, api_path)`, `authenticate(user, password)`, `setup_encryption(None)`; `util.get_server_version()` gives `framework_version` |
 | `discover` | `GET node?collaboration_id=<id>`: a site is `online` when its organisation's node has `status == "online"`. A site without an organisation is `offline`; a server that does not answer gives `unknown`. |
 | `dispatch` | per active site, in parallel: `task.create(collaboration, organizations=[org_id], name="flhub-r<round>", image, description, input_={"method": "train", "kwargs": {"weights_b64", "train_config", "sites": {"<org id>": "<site id>"}}}, databases=[{"label": db_label(data_variant)}])` |
-| `tasks/get` per site | `GET task/<id>/status` of each site's task |
+| `tasks/get` per site | answered from the adapter's own per-site state, which a background loop keeps current by polling `GET task/<id>/status` of each site's task |
 | per-site result | when a site's task is `completed`: `result.from_task(id)`, checks, weights into the hub core, `report_site()` |
 | per-site failure | run states `failed`, `start failed`, `non-existing Docker image`, `crashed`, `killed by user`, `not allowed`, `unknown error`: `GET run?task_id=<id>` for the run log, `report_site_error()` |
-| `cancel`, `cancel {sites}`, deadline | `task.kill(id)` of every site's (or the given sites') task; vantage6 also marks pending runs `killed` |
+| `cancel`, `cancel {sites}`, deadline | `task.kill(id)` of every site's (or the given sites') task; vantage6 sets the task's unfinished runs to `killed by user` (`server/resource/event.py:322-327`) |
 | after the round | models ≥ 16 MiB: `task.delete(id)` for the round's tasks |
 
 1. The orchestrator sends `dispatch` with the model reference, `train_config` and, for a data variant, the hint `data_variant`.
 2. The adapter reads the model blob from the hub core and base64-encodes the exact bytes once. It never parses the weights (`needs_weights = False`).
 3. Per site it creates one vantage6 task for that site's organisation, with the algorithm image and the database label of the data variant (`default` without a variant). The server stores the input per organisation as base64(json(input)): about 1.78× the model, because the weights are already base64 inside the JSON.
-4. The node receives the run, checks or pulls the image (by default a node pulls for every task, `require_algorithm_pull`), starts the algorithm container with the named database, and `wrap_algorithm()` calls `train(...)` (§3).
+4. The node receives the run and pulls the image (a node tries to pull for every run; with the default `require_algorithm_pull: true` a failed pull fails the run instead of falling back to a local copy, `node/docker/task_manager.py:226-241, 335-337`), starts the algorithm container with the named database, and `wrap_algorithm()` calls `train(...)` (§3).
 5. The algorithm trains one round with `flhub_core.train` and returns JSON; the node sends the result to the server.
 6. The adapter polls each site's task status. When it is `completed`, the adapter downloads the result, checks that `site_id` is the site and `base_model` is the round's model, stores the weights in the hub core as received and reports the site. The envelope metrics get `vantage6_create_s` (input encoding and upload), `vantage6_fetch_s` (result download and decoding) and `vantage6_store_s` (hub-core store).
 7. A failed run becomes a site error that contains the last 600 characters of the run log; the other sites go on. A cancelled site, or a site still active at the deadline, is stopped with `task.kill`.
@@ -60,17 +60,17 @@ vantage6 entities ([`deploy/central/vantage6/entities.template.yaml`](../../depl
 
 Why one task per site ([ADR-013](../design/decisions.md)): in vantage6 4.15.2 a multi-organisation task turns `failed` as soon as one run fails, `/kill/task` then refuses to stop the other runs, and a run listing returns every run's full input. One task per site gives exact per-site state, per-site results and per-site cancel.
 
-Sessions: one control session for status polls and kills, and one data session per site for uploads and downloads, so a long transfer never blocks the polls. Control calls give up after 2 connection errors (the client otherwise retries forever), so a vantage6 server outage only delays a round, and `discover` answers `unknown` meanwhile.
+Sessions: one control session for status polls and kills, and one data session per site for uploads and downloads, so a long transfer never blocks the polls. The status polls and the node listing pass `attempts_on_timeout=2`, so they give up at the third connection error (the client otherwise retries forever, `common/client/client_base.py:290-304`); a vantage6 server outage therefore only delays a round, and `discover` answers `unknown` meanwhile. Kills and deletes keep the client's unlimited retries.
 
 Polling: every 1 s. In database mode every status call makes the server load the run row with its input, so for large models the adapter polls each site every model-MiB / 16 s, at least 1 s and at most 30 s ([ADR-020](../design/decisions.md)).
 
 ### 2.3 Sites: identity, data variants and new hospitals
 
-The adapter serves a fixed list of sites (`--sites`). At login it maps organisation names to ids, and it reads them again while a site is missing, so organisations registered later are picked up. A vantage6 algorithm only learns its organisation **id** (`meta.organization_id`). The task input therefore carries the map `sites: {"<org id>": "<site id>"}`, the algorithm returns `site_id`, and the adapter rejects a result whose `site_id` does not match.
+The adapter serves a fixed list of sites (`--sites`). At login it maps organisation names to ids, and it reads them again while a site is missing, so organisations registered later are picked up. The run metadata gives a vantage6 algorithm only its organisation **id** (`meta.organization_id`); the name would need an extra server call. The task input therefore carries the map `sites: {"<org id>": "<site id>"}`, the algorithm returns `site_id`, and the adapter rejects a result whose `site_id` does not match.
 
-Data variants ([ADR-014](../design/decisions.md)): an algorithm receives its data from the node as a DataFrame of the database the task names, so each data variant is one labelled database in the node configuration (§3.2). The label is `db_label(variant)`: the variant with every character outside `[A-Za-z0-9_]` replaced by `_` (`organamnist-dir0.3` → `organamnist_dir0_3`), because node database labels must be Python identifiers. The adapter takes the variant from the dispatch hint `data_variant` (`train_config` stays opaque); without a hint it uses the label `default`. The hub checks which data each site trained on through the `data_fp` metric.
+Data variants ([ADR-014](../design/decisions.md)): an algorithm receives its data from the node as a DataFrame of the database the task names, so each data variant is one labelled database in the node configuration (§3.2). The label is `db_label(variant)`: the variant with every character outside `[A-Za-z0-9_]` replaced by `_` (`organamnist-dir0.3` → `organamnist_dir0_3`), because node database labels must be Python identifiers. A label that would still not be an identifier (it starts with a digit) gets the prefix `v_` in the adapter, which the hospital-side helper in `deploy/vantage6-vm/common.sh` does not add; avoid variant names that start with a digit. The adapter takes the variant from the dispatch hint `data_variant` (`train_config` stays opaque); without a hint it uses the label `default`. The hub checks which data each site trained on through the `data_fp` metric.
 
-New hospital: the reference script [`deploy/central/vantage6/add_sites.sh`](../../deploy/central/vantage6/add_sites.sh) calls, as `root`, `organization.create`, `collaboration.add_organization` and `node.create`, and writes the new node's API key to a mode-600 file for that hospital. Then add the site to `V6_SITES` and restart the adapter.
+New hospital: the reference script [`deploy/central/vantage6/add_sites.sh`](../../deploy/central/vantage6/add_sites.sh) calls, as `root`, `organization.create`, `collaboration.add_organization` and `node.create`, and writes the new nodes' API keys to one mode-600 file on the operator host (`~/flhub-runtime/vantage6/v6-nodes-extra.env`), which the operator hands to the hospitals. Then add the site to `V6_SITES` and restart the adapter.
 
 ### 2.4 Ports and configuration
 
@@ -125,7 +125,7 @@ from vantage6.algorithm.tools.util import info
 def train(df, meta, weights_b64: str, train_config: dict, sites: dict | None = None) -> dict:
 ```
 
-- **vantage6 standard.** `@data(1)` passes the task's database as a pandas DataFrame (for CSV: `pd.read_csv(uri)` with default arguments, exact for integer pixels). `@metadata` passes `task_id`, `node_id` and `organization_id`. The other arguments are the `kwargs` of the task input; `wrap_algorithm()` calls the function named by the input's `method`.
+- **vantage6 standard.** `@data(1)` passes the task's database as a pandas DataFrame (for CSV: `pd.read_csv(uri)` with default arguments, exact for integer pixels). `@metadata` passes a `RunMetaData` record (`task_id`, `node_id`, `collaboration_id`, `organization_id` and the run's file paths). The other arguments are the `kwargs` of the task input; `wrap_algorithm()` calls the function named by the input's `method`.
 - **flhub.** The three keyword arguments: `weights_b64` (the global model, base64 safetensors), `train_config` (the hub's training configuration plus `round`) and `sites` (organisation id → site id).
 
 ```python
@@ -133,7 +133,7 @@ def train(df, meta, weights_b64: str, train_config: dict, sites: dict | None = N
     site_id = (sites or {}).get(str(org_id))
 ```
 
-- **flhub.** vantage6 gives an algorithm its organisation id, not its name; the site id comes from the map the adapter sends.
+- **flhub.** The run metadata holds the organisation id, not its name; the site id comes from the map the adapter sends.
 
 ```python
     raw = base64.b64decode(weights_b64)
@@ -158,13 +158,15 @@ def train(df, meta, weights_b64: str, train_config: dict, sites: dict | None = N
 ```
 
 - **vantage6 standard.** The return value must be plain JSON (`wrap_algorithm()` writes it with `json.dumps`), so the weights are base64 and the metrics plain floats.
-- **flhub.** The reply fields: `num_examples` (the FedAvg weight); every `flhub_core` metric (`train_loss`, `train_acc`, `train_time_s`, `data_load_s`, `peak_rss_mb`, `data_fp`); `site_id`; `base_model`, the sha256 reference of the bytes the site trained from (the adapter rejects a result trained from another model); and `client_code_version`, the content hash of the `flhub_core` package.
+- **flhub.** The reply fields: `num_examples` (the FedAvg weight); every `flhub_core` metric (`train_loss`, `train_acc`, `train_time_s`, `data_load_s`, `peak_rss_mb`, `data_fp`); `site_id`; `base_model`, the sha256 reference of the bytes the site trained from (the adapter rejects a result trained from another model); and `client_code_version`, the `flhub_core` version plus a 12-hex content hash of its source files (for example `0.2.0+fe357a1dbec1`).
 
 The image ([ADR-004](../design/decisions.md)):
 
 ```dockerfile
 ARG BASE_IMAGE=python:3.11.17-slim-bookworm
 FROM ${BASE_IMAGE}
+# (lines 7-12 of the file declare ARG TORCH_VERSION, TORCH_INDEX_URL, NUMPY_VERSION,
+#  SAFETENSORS_VERSION, VANTAGE6_VERSION and PANDAS_VERSION=2.3.3)
 RUN pip install --no-cache-dir "torch==${TORCH_VERSION}+cpu" --index-url "${TORCH_INDEX_URL}" \
  && pip install --no-cache-dir "numpy==${NUMPY_VERSION}" "safetensors==${SAFETENSORS_VERSION}" \
       "pandas==${PANDAS_VERSION}" "vantage6-algorithm-tools==${VANTAGE6_VERSION}"
@@ -213,7 +215,7 @@ docker build -f clients/vantage6/Dockerfile \
 docker push <registry-host>:5050/flhub/v6-train:<tag>
 ```
 
-`deploy/central/vantage6/install.sh` does this with the pins of `deploy/versions.env`; the tag is the 12-character git SHA (with `-dirty` when `flhub_core` or `clients/vantage6` has uncommitted changes). The adapter names the image in every task (`V6_ALGO_IMAGE`), and `start.sh` restarts the adapter when the tag changed. Each node pulls the new tag at its first task with it. Rollback: start the adapter with the previous tag ([ADR-021](../design/decisions.md)).
+`deploy/central/vantage6/install.sh` does this with the pins of `deploy/versions.env`; the tag is the 12-character git SHA (with `-dirty` when `flhub_core` or `clients/vantage6` has uncommitted changes). The adapter names the image in every task (`V6_ALGO_IMAGE`), and `start.sh` restarts the adapter when the tag changed. Each node pulls the new tag at its first task with it ([ADR-021](../design/decisions.md)). Rollback (not tested): set `V6_ALGO_IMAGE` in `adapter.env` back to the previous tag and run `restart_adapter.sh`; the nodes pull that tag at their next task.
 
 Measured for the `flhub_core` 0.1 → 0.2 update in stage 2 (stage-2 report §4 and stage-2 vantage6 section §3, at the tag):
 
@@ -253,7 +255,7 @@ Selfcheck v2 inside the pulled image, run with `--network none`, printed the hub
 
 The adapter is a vantage6 user, so an existing vantage6 4.15 server and its nodes need no new software.
 
-1. **Organisation and user for the hub.** Create or choose an organisation for the hub operator and make it a participant of the collaboration the hub will use; only participants can create tasks. Create a user for the adapter in it. In the reference deployment the users come from the entities import, which gives every imported user a role with all rules of the server (`server/controller/fixture.py:81-91`), so the adapter's password controls the whole vantage6 server. The adapter needs much less (§2.2): view collaborations, organisations and nodes; create, view, kill and delete tasks; view their runs and results. A role limited to that was not tested.
+1. **Organisation and user for the hub.** Create or choose an organisation for the hub operator and make it a participant of the collaboration the hub will use; only participants can create tasks. Create a user for the adapter in it. In the reference deployment the users come from the entities import, which gives every imported user a role with all rules of the server (`server/controller/fixture.py:81-91`), so the adapter's password controls the whole vantage6 server. The adapter needs much less (§2.2): view collaborations, organisations and nodes; create, view and delete tasks; view their runs and results; and send events in the collaboration, because vantage6 checks `task.kill` (`/kill/task`) against the `event` resource's send rule (`server/resource/event.py:175-180`). A role limited to that was not tested.
 2. **Collaboration.** It must be unencrypted (`encrypted: false`), because the adapter calls `setup_encryption(None)`; an encrypted collaboration needs adapter support (§8). Each node's `encryption.enabled` must equal the collaboration's `encrypted`.
 3. **Algorithm image.** Build and push the image (§3.3) to a registry the nodes can reach. A plain-HTTP registry needs an `insecure-registries` entry in each hospital's Docker daemon, because the node pulls through the host's Docker socket. The node also supports registry logins (`docker_registries` in its configuration); this was not tested.
 4. **Hospitals.** Each hospital adds the image to its `allowed_algorithms` policy and, for data variants, one database per variant (§3.2), then restarts its node once. Recommended: `share_config: false`.
@@ -264,7 +266,7 @@ The adapter is a vantage6 user, so an existing vantage6 4.15 server and its node
 |---|---|---|
 | adapter user password (on the testbed: all rules of the server, see step 1) | operator | the adapter's environment, read from a mode-600 file |
 | `root` password, server JWT secret | operator (`install.sh`) | mode-600 files on the operator host |
-| node API key | the vantage6 server, when the node is created | the hospital's node configuration (`api_key`, mode 600) |
+| node API key | the operator: `install.sh` generates a UUID per node for the entities import; nodes added later through the API (`add_sites.sh`, `node.create`) get a key from the server | the hospital's node configuration (`api_key`, mode 600); the operator keeps copies in mode-600 files |
 | registry credentials | registry owner | none in the reference deployment (plain HTTP, limited by the firewall) |
 
 Network: the hospitals need outgoing access to the server port (7601) and the registry port (5050) only. The reference 4-VM deployment is described in [`deployment.md`](../deployment.md). Its hospital-side scripts, in [`deploy/vantage6-vm/`](../../deploy/vantage6-vm/):
@@ -293,8 +295,8 @@ Comparison with the other frameworks: [`cost-and-efficiency.md`](../cost-and-eff
 | hub vs vantage6's own FedAvg (E7) | 0.00 s (0 %) with `cnn-small`; −13.4 s (−14 %) with a 45 MiB model; weights hash-identical | [tables](../results/evidence/stage2/tables.md) |
 | fixed cost per round | 6.3 s (1 MiB echo model) | [tables](../results/evidence/stage2/tables.md) |
 | cost per MiB | 1.49 s/MiB (fit on 1–64 MiB), superlinear above | [cost model](../results/evidence/stage2/cost_model.md) |
-| bytes on the wire ÷ payload | 4.97–5.53 up to 64 MiB; 9.08 at 128 MiB | [bytes on wire](../results/evidence/stage2/e4_bytes.md) |
-| bandwidth efficiency at 20 Mbit/s | 0.16 against the 4·P bound; 0.72 against vantage6's own volume of 17.8·P | [cost model](../results/evidence/stage2/cost_model.md) |
+| bytes on the wire ÷ payload | 4.97–5.53 up to 64 MiB (design 5.34: five input copies down, one result up); 9.08 at 128 MiB | [bytes on wire](../results/evidence/stage2/e4_bytes.md), §5.4 |
+| bandwidth efficiency at 20 Mbit/s | 0.16 against the 4·P bound; 0.87 against vantage6's own volume of 21.36·P (both directions) | [cost model](../results/evidence/stage2/cost_model.md), §5.4 |
 | largest model delivered | 128 MiB (468.2 s per round); 256 MiB never delivered | §6.1 |
 | 6 → 12 sites (E5) | fan-out 9.1 → 10.4 s | [tables](../results/evidence/stage2/tables.md) |
 | killed training container (E6a) | detected after 2.1 s, round done 15.2 s after the kill | [robustness](../results/evidence/stage2/e6.md) |
@@ -303,7 +305,7 @@ Comparison with the other frameworks: [`cost-and-efficiency.md`](../cost-and-eff
 
 | Item | Size |
 |---|---|
-| adapter, `adapters/vantage6/` without `native.py` | 290 code lines (`service.py` 288); 14 distinct vantage6 client calls |
+| adapter, `adapters/vantage6/` without `native.py` | 290 code lines (`service.py` 288); 14 distinct vantage6 client calls, counting the `UserClient` constructor and three raw `request()` endpoints |
 | hospital algorithm, `clients/vantage6/v6_flhub/__init__.py` | 38 code lines |
 | image and package metadata, `clients/vantage6/Dockerfile`, `pyproject.toml` | 16 code lines, 11 configuration lines |
 | unit tests, `tests/unit/test_vantage6_adapter.py` | 225 code lines; 10 tests against a fake vantage6 client, which run without vantage6 installed |
@@ -362,16 +364,18 @@ Predictions with the 1–64 MiB fit plus the slowest site's training: −31 to �
 |---|---|---|---|---|---|
 | ratio, vantage6 only | 4.97 | 5.49 | 5.53 | 5.37 | 9.08 |
 
-By design a node receives each run's input (1.78× the model) four times per site and round: in the run listing that starts it, in the server's responses to its status update and to its result upload (the server returns the whole run, input included), and in an extra `GET run/<id>` before it sends the result. That is 7.1× the model down and 1.78× up per site and round. Measured at 64 MiB: 8.8× down and 1.95× up; at 128 MiB about 16× down. The rest are requests that the client retried after the busy server dropped the connection.
+By design a node receives each run's input (1.78× the model) five times per site and round: in the run listing that starts it (`node/__init__.py:404`), in the server's responses to its three PATCH requests for that run (start time `:448`, status `:502`, result `:621`; the server returns the whole run, input included, `server/resource/run.py:716`), and in an extra `GET run/<id>` before it sends the result (`:598`). That is 8.9× the model down and 1.78× up per site and round, a design ratio of (8.9 + 1.78) ÷ 2 = 5.34 against the nominal payload. Measured per site and round: 9.1× down and 1.9–2.0× up at 8 and 32 MiB, 8.8× down and 1.95× up at 64 MiB, close to the design; at 128 MiB about 16× down, because the client retried requests after the busy server dropped the connection (stage-2 vantage6 section §4). The stage-2 analysis counted four input copies, without the start-time PATCH, and therefore put the design at 4.45× and attributed the measured excess over it to retries.
 
-**Bandwidth (E4b).** 45 MiB model, mixed federation, egress of the hospital VM shaped with netem ([cost model](../results/evidence/stage2/cost_model.md)). The plan's lower bound is 4·P/rate (2 sites, each P down and P up). vantage6 moves V = 2 sites × (4 input copies + 1 result) × 1.78 = 17.8·P per link and round. Efficiency = bound ÷ measured fan-out:
+**Bandwidth (E4b).** 45 MiB model, mixed federation, `netem` rate and delay on the link between central and the hospital VM in both directions (1 Gbit/s with 5 ms, 100 Mbit/s with 20 ms, 20 Mbit/s with 40 ms; [cost model](../results/evidence/stage2/cost_model.md), `deploy/vantage6-vm/netem.sh`). The stage-2 lower bound is 4·P/rate: each link carries two sites, 2·P down before training and 2·P up after it. Counted the same way, vantage6 moves 2 sites × (5 input copies + 1 result) × 1.78 = 21.36·P per link and round. Efficiency = bound ÷ measured fan-out:
 
-| Profile | Fan-out (s) | 4·P/rate (s) | Efficiency | 17.8·P/rate (s) | Protocol-adjusted efficiency |
+| Profile | Fan-out (s) | 4·P/rate (s) | Efficiency | 21.36·P/rate (s) | Efficiency against vantage6's own volume |
 |---|---|---|---|---|---|
 | no shaping | 81.8 | 0 | — | 0 | — |
-| 1 Gbit/s | 83.3 | 1.5 | 0.02 | 6.7 | 0.08 |
-| 100 Mbit/s | 129.5 | 15.1 | 0.12 | 67.2 | 0.52 |
-| 20 Mbit/s | 463.8 | 75.5 | 0.16 | 336.0 | 0.72 |
+| 1 Gbit/s | 83.3 | 1.5 | 0.02 | 8.1 | 0.10 |
+| 100 Mbit/s | 129.5 | 15.1 | 0.12 | 80.6 | 0.62 |
+| 20 Mbit/s | 463.8 | 75.5 | 0.16 | 403.2 | 0.87 |
+
+[cost_model.md](../results/evidence/stage2/cost_model.md) uses V = 17.8 for vantage6, derived from four input copies plus the result. With the five copies of the node source, 17.8·P is the downstream volume alone (2 × 5 × 1.78); its E4b predictions and the efficiency of 0.72 at 20 Mbit/s (336.0 s ÷ 463.8 s) count only that direction.
 
 With limited bandwidth vantage6 dominates a mixed round: 463.8 s at 20 Mbit/s, against 80.3 s for NVFlare and 85.1 s for Flower ([tables](../results/evidence/stage2/tables.md)).
 
@@ -388,7 +392,7 @@ With limited bandwidth vantage6 dominates a mixed round: 463.8 s at 20 Mbit/s, a
 | peak RSS of the vantage6 server on the central host (MiB) | 262 | 396 | 756 | 1,315 | 2,349 | 2,524 |
 | peak RSS of the vantage6 adapter on the central host (MiB) | 99 | 234 | 464 | 906 | 1,925 | 3,627 |
 
-Sources: [tables](../results/evidence/stage2/tables.md), [vantage6 VM memory](../results/evidence/stage2/vantage6/e4a-vm-memory.md) (also per node and for the mixed runs), [central host memory](../results/evidence/stage2/central-e4a-memory.md) and, for `peak_rss_mb`, the stage-2 vantage6 section §5. From 32 to 128 MiB the vantage6 server needed 18–24× the payload and the adapter 14–15×, while the hub core stayed at 42–47 MiB. Where a site's time goes (median of rounds 2–3, stage-2 vantage6 section §5): at 128 MiB the result arrived after 467 s, of which 0.05 s training, 33–38 s in the adapter (`vantage6_create_s` 10–11 s, `vantage6_fetch_s` 15–21 s, `vantage6_store_s` 1–2 s) and about 430 s inside vantage6 (server database rows, node download and upload, log streaming); at 64 MiB, 115 s = 0.03 s + 13–17 s + about 100 s.
+Sources: [tables](../results/evidence/stage2/tables.md), [vantage6 VM memory](../results/evidence/stage2/vantage6/e4a-vm-memory.md) (also per node and for the mixed runs), [central host memory](../results/evidence/stage2/central-e4a-memory.md) and, for `peak_rss_mb`, the stage-2 vantage6 section §5. From 32 to 128 MiB the vantage6 server needed 18–24× the payload and the adapter 14–15×, while the hub core stayed at 42–45 MiB (47 MiB at 256 MiB). Where a site's time goes (median of rounds 2–3, stage-2 vantage6 section §5): at 128 MiB the result arrived after 467 s, of which 0.05 s training, 33–38 s in the adapter (`vantage6_create_s` 10–11 s, `vantage6_fetch_s` 15–21 s, `vantage6_store_s` 1–2 s) and about 430 s inside vantage6 (server database rows, node download and upload, log streaming); at 64 MiB, 115 s = 0.03 s + 13–17 s + about 100 s.
 
 Disk: a 4.15.2 node never deletes its per-run folders `task-<run id>` (input and output, about 2.7× the model per site and round), and the server database grows with every stored task. See §6 for the clean-up.
 
@@ -423,9 +427,9 @@ vantage6 reports a killed algorithm container at once (the run becomes `crashed`
 |---|---|---|---|
 | largest model delivered | 128 MiB, 468.2 s per round | per-log-line row rewrites (§6.2) | [tables](../results/evidence/stage2/tables.md) |
 | 256 MiB | never delivered: each node trained round 1 six times in 32 min and every result was dropped, until the round was cancelled | for every streamed log line the server rewrites the run row (its input alone is 1.78 × 256 MiB ≈ 456 MiB), the node's websocket times out, and the node drops the result (§6.2) | [node logs](../results/evidence/stage2/vantage6/e4a-256mb-node-logs.txt) |
-| largest storable model | about 536 MiB; 1024 MiB cannot be stored | SQLite rejects a value > 10⁹ bytes (999,999,000 bytes accepted, 1,000,000,001 rejected), and a run's input is 1.78× the model | [ADR-020](../design/decisions.md) |
+| largest storable model | about 536 MiB; 1024 MiB cannot be stored | SQLite rejects a value > 10⁹ bytes (999,999,000 bytes accepted, 1,000,000,001 rejected), and a run's input is 1.78× the model | [ADR-020](../design/decisions.md); stage-2 vantage6 section §4 |
 | growth with model size | superlinear: 64 → 128 MiB costs 4.1× the time | per-log-line row rewrites | [tables](../results/evidence/stage2/tables.md) |
-| bytes on the wire | 5–9× the payload | four input copies per site and round, 1.78× encoding | §5.4 |
+| bytes on the wire | 5–9× the payload | five input copies per site and round, 1.78× encoding; retries at 128 MiB | §5.4 |
 | fixed cost per round | about 6.3 s | image check, container start, task and result round trips | §5.3 |
 
 ### 6.2 Known issues
@@ -479,18 +483,18 @@ What would lift the limits:
 
 1. A PostgreSQL server database, so that run updates do not rewrite the stored input (server side; not tested).
 2. `share_algorithm_logs: false` on the nodes (hospital side; not tested; the operator loses the run logs).
-3. vantage6 5.x (sessions, Kubernetes) or a long-running algorithm, to remove the container start per task; not tested, because the project pins 4.15.2 ([ADR-002](../design/decisions.md)).
-4. A blob store for inputs and results, once the client's upload chunks fit the server's limit.
+3. A newer vantage6 (5.x) may change the fixed cost per task; not tested, because the project pins 4.15.2 ([ADR-002](../design/decisions.md)).
+4. A blob store for inputs and results, once the client's upload chunks fit the server's uWSGI limit and the server runs on a database other than SQLite (with SQLite it deadlocked while streaming blobs, [ADR-020](../design/decisions.md)).
 5. Adapter support for encrypted collaborations: the adapter organisation's private key in `setup_encryption`. This is a code change.
 6. Production transport: an HTTPS reverse proxy for the server, a registry with TLS and authentication, and the image pinned by digest in each task (the node policy already accepts `@sha256:`) or an algorithm store.
 7. Task-folder clean-up inside the node, after the result is sent.
 
 Draft upstream issues for vantage6 4.15.2 (not filed):
 
-> **Node downloads each run's full input four times.** A node receives the run input (base64 of the JSON input) in the run listing that starts the run, in the responses to its status PATCH and its result PATCH (`server/resource/run.py:716` returns `run_schema.dump(run)`, and `RunSchema` excludes only `result`), and in an extra `GET run/<id>` before it sends the result (`node/__init__.py:595-598`, marked `FIXME: why are we retrieving the result *again*?`). With model weights as input this is 7.1× the model downstream per run. We measured 5.2–5.5× the nominal payload on the wire at 8–64 MiB and 9.1× at 128 MiB. Proposal: leave `input` out of PATCH responses (or return only the changed fields) and drop the extra GET.
+> **Node downloads each run's full input five times.** A node receives the run input (base64 of the JSON input) in the run listing that starts the run (`node/__init__.py:404`), in the responses to its three PATCH requests for that run (start time via `set_task_start_time` at `:448`, status at `:502`, result at `:621`; `server/resource/run.py:716` returns `run_schema.dump(run)`, and `RunSchema` excludes only `result`), and in an extra `GET run/<id>` before it sends the result (`node/__init__.py:595-598`, marked `FIXME: why are we retrieving the result *again*?`). With model weights as input this is 8.9× the model downstream per run. We measured 8.8–9.1× downstream per run at 8–64 MiB and about 16× at 128 MiB, where requests were retried. Proposal: leave `input` out of PATCH responses (or return only the changed fields) and drop the extra GET; the node would then download the input once.
 
 > **A finished run's result is lost when the websocket is down.** In `node/__init__.py:575-579` the node takes the result from its queue (`get_result()`) and emits `algorithm_status_change` before it PATCHes the result. If the socket is disconnected, for example because the server is busy, the emit raises, the exception is caught and logged as "Speaking thread had an exception", and the result is dropped. After reconnecting, the server returns the still-open run and the node executes it again. With 256 MiB inputs this repeated six times per node in 32 minutes, and no result was delivered. Proposal: PATCH the result first and emit afterwards, or keep the result until the PATCH succeeded and tolerate a failed emit.
 
 > **The server rewrites the whole run row for every algorithm log line.** `on_algorithm_log` (`server/websockets.py:442-444`) loads the run, appends the line and calls `run.save()`. With SQLite this rewrites the row including its input (1.78× the model when the input carries weights). About 24 log lines per round blocked the single server worker for about 60 s at 64 MiB, and the cost grows with the input size times the number of lines. Proposal: store log lines in their own table or batch them, and keep large columns out of the run row (`input` is the first column in `server/model/run.py`, so scans on later columns also walk the inputs).
 
-Smaller findings worth reporting: `Task._delete_subtasks()` deletes child tasks without their runs (`server/resource/task.py:1289-1301`); the 4.15 CLI's str-Enum formatting on Python ≥ 3.11 breaks `v6 server import` and `v6 server stop` ([ADR-005](../design/decisions.md)); the client's 1 MiB blob-upload chunks exceed uWSGI's default chunked-input limit; nodes never delete `task-<run id>` folders (`node/docker/task_manager.py:450-452`).
+Smaller findings worth reporting: `Task._delete_subtasks()` deletes child tasks without their runs (`server/resource/task.py:1289-1301`); the 4.15 CLI's str-Enum formatting on Python ≥ 3.11 breaks `v6 server import` and `v6 server stop` ([ADR-005](../design/decisions.md)); the client's 1 MiB blob-upload chunks are rejected by uWSGI's default 1 MiB chunked-input limit; nodes never delete `task-<run id>` folders (`node/docker/task_manager.py:450-452`).
