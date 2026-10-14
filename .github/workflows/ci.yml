@@ -39,3 +39,8 @@ jobs:
         env:
           FLHUB_DATA_DIR: ${{ runner.temp }}/flhub-data
         run: .venv/bin/python -m pytest tests/conformance --adapter mock
+
+      - name: New-framework skeleton against the conformance suite
+        env:
+          FLHUB_DATA_DIR: ${{ runner.temp }}/flhub-data
+        run: PATH="$PWD/.venv/bin:$PATH" bash examples/new-framework/check.sh
