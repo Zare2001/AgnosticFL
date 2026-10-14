@@ -42,7 +42,7 @@ New in stage 2:
 
 Versions are those of stage 1 (`deploy/versions.env`, ADR-002): Python 3.11.17, torch 2.14.1+cpu, numpy 2.4.4, safetensors 0.8.0, NVFlare 2.9.0, vantage6 4.15.2, flwr 1.39.0, wandb 0.30.0. `flhub_core` 0.2 has the content-hash code_version **`0.2.0+fe357a1dbec1`**; its selfcheck v2 digest is `sha256:ac074a0b79a2d3c6782765480164c0465ac598359dfe91695e893e208f4e5034` on central, in the NVFlare hospital runtime (job custom code), inside the vantage6 algorithm image `v6-train:a43cef3f75c0` and in the Flower SuperNode runtime (FAB). All four VMs: 4 vCPU AMD EPYC-Rome (AVX2), 31 GiB RAM, 19 GB disk. Training uses one CPU thread per site.
 
-Frozen SHA for every final run: **`96c44c957d6ca5d3b9cc8af93dd227c62a9323d6`** (S3-frozen, bus #210). Frozen paths: `flhub_core adapters clients hub configs/stage2 deploy/central`.
+Frozen code (paths `flhub_core adapters clients hub configs/stage2 deploy/central`): **`96c44c9`** (S3-frozen, bus #210) for the E4a sweep, and **`975a949`** (re-freeze #396) for every later run. The re-freeze fixed the two reference modes of `hub.sim` (a hub-only change that no real run executes). `scripts/stage2/run_final.py` refuses to start a final run unless the frozen paths at HEAD equal the frozen SHA, and every run records its SHA in its W&B config.
 
 ### 2.3 Dataset (ADR-009)
 
@@ -258,20 +258,6 @@ Median over rounds ≥ 2 (seconds; train and overhead are the mean of the framew
 - **Resources** (sysmon, `tables.md`): during `resnet18-gn` the framework VMs ran at 30–33 % mean CPU (two single-threaded trainings on 4 vCPUs), with peak RSS of 1.0–1.1 GB per training process (2.1 GB for vantage6's algorithm container) and at most 4.1 GB used per VM. Central peaked at 6.3 GB, of which the orchestrator took 1.7 GB.
 - **One stall, recovered by the hub.** In `s2-e3-resnet18-gn-fedavg` round 10, v6-h3's result never arrived. A hospital-side cron job (task-folder clean-up, vantage6 section) deleted the output in the second between the training container's exit and the node reading it. vantage6 reuses task ids after the adapter's per-round delete, and the reused folder kept its old modification time. The round failed at its 1800 s deadline and the retry succeeded; the cron job was removed (ledger).
 
-### 6.6 Cost model
-
-`scripts/stage2/cost_model.py` fits, per framework, fan-out time = a + b·P on the E4a echo sweeps (P = payload in MiB; least squares on relative residuals) and predicts the learning runs as a + b·P_model + max_k train_k (`docs/report/stage2/cost_model.md`):
-
-| framework | a (s) | b (s/MiB) | R² | prediction error, E1/E2 `cnn-small` | `cnn-medium` | `resnet18-gn` |
-|---|---|---|---|---|---|---|
-| NVFlare | 2.24 | 0.021 | 0.91 | +4 to +6 % | 0 to +4 % | 0 % |
-| Flower | 5.67 | 0.054 | 1.00 | −8 to −7 % | −3 to −1 % | −1 % |
-| vantage6 (fit on 1–64 MiB) | 4.13 | 1.49 | 0.96 | −38 to −31 % | −4 to −3 % | +9 % |
-
-Under netem (E4b), adding the transfer time V·P/rate with the bytes each framework moves per link and round (V = 4 for NVFlare and Flower, 17.8 for vantage6) predicts the measured fan-out of all twelve framework-profile pairs within ±13 % (`cost_model.md`). `resnet18-gn` with FedAvgM has the same timing as with FedAvg (prediction errors 0, +10 and −1 %).
-
-The model explains NVFlare and Flower within 8 % across a 200× range of model sizes: a fixed cost per round plus a small per-MiB cost plus the slowest site's training. vantage6's per-MiB cost is 30–70× higher, and its growth beyond 64 MiB is superlinear (E4a). Its small-model error has two parts (vantage6 #705): the straight line underestimates vantage6's fixed cost per task, which is 6.3 s measured at 1 MiB (container start, task and result round trips), and real training adds about 0.8 s per task that the echo runs do not have (reading the site's CSV database into a DataFrame, a slower container exit after a torch run).
-
 ### 6.4 E5 — number of sites
 
 `iid` over the 6 base sites against `iid12` over 12 sites (4 per framework; the 6 extra sites hold half as much data each, so the total per round is the same), FedAvg, 20 rounds, real system; INV-1 full simulation, hash-equal. The extra sites were started for this experiment only, with the framework agents' standard scripts: online 16 s (vantage6), 22 s (Flower) and 62 s (NVFlare) after the request, and stopped again right after the run.
@@ -308,6 +294,20 @@ Same two hospitals, same `flhub_core.train`, same config: C1 = `cnn-small`, `iid
 - **The translation layer costs at most 0.7 s per round here, and is often faster than the native path.** Where the hub path is slower it pays for the weights' round trip through the hub core (Flower C2: push 0.63 s, store 0.19 s per site). It is faster where the native exchange waits more: Flower's `Grid.send_and_receive` sleeps 3 s between pulls, while the relay pulls every second. vantage6's native central function moves inputs and results through the node proxy and waits on one multi-organisation subtask, while the adapter uploads per site in parallel and fetches each result as soon as that site is done.
 - **The hub's FedAvg equals the native FedAvg** of vantage6 and Flower bit for bit. Both sites hold the same number of examples, so p_k = 0.5 is exact in float32. NVFlare's built-in aggregator accumulates in float32 and differs by 3e-8 after one round, within the 1e-5 tolerance. Over 20 rounds of training the two trajectories drift apart, as any two numerically different runs do (round-by-round test accuracy follows the same dips; mean over rounds 16–20: 63.5 % native, 66.8 % hub). The Flower agent's island test with unequal sizes (`qty`) shows the same float32 effect for Flower (3e-8, growing through SGD).
 - **Extra processes on the hub path:** the adapter (about 40–170 MB RSS), the hub core (about 45 MB) and, for NVFlare and Flower, the long-lived relay job or ServerApp; the orchestrator replaces the native server logic. For Flower C1 the hub path used 0.6 GB in total against 0.62 GB for the native ServerApp (C2: 1.05 against 0.89 GB).
+
+### 6.6 Cost model
+
+`scripts/stage2/cost_model.py` fits, per framework, fan-out time = a + b·P on the E4a echo sweeps (P = payload in MiB; least squares on relative residuals) and predicts the learning runs as a + b·P_model + max_k train_k (`docs/report/stage2/cost_model.md`):
+
+| framework | a (s) | b (s/MiB) | R² | prediction error, E1/E2 `cnn-small` | `cnn-medium` | `resnet18-gn` |
+|---|---|---|---|---|---|---|
+| NVFlare | 2.24 | 0.021 | 0.91 | +4 to +6 % | 0 to +4 % | 0 % |
+| Flower | 5.67 | 0.054 | 1.00 | −8 to −7 % | −3 to −1 % | −1 % |
+| vantage6 (fit on 1–64 MiB) | 4.13 | 1.49 | 0.96 | −38 to −31 % | −4 to −3 % | +9 % |
+
+Under netem (E4b), adding the transfer time V·P/rate with the bytes each framework moves per link and round (V = 4 for NVFlare and Flower, 17.8 for vantage6) predicts the measured fan-out of all twelve framework-profile pairs within ±13 % (`cost_model.md`). `resnet18-gn` with FedAvgM has the same timing as with FedAvg (prediction errors 0, +10 and −1 %).
+
+The model explains NVFlare and Flower within 8 % across a 200× range of model sizes: a fixed cost per round plus a small per-MiB cost plus the slowest site's training. vantage6's per-MiB cost is 30–70× higher, and its growth beyond 64 MiB is superlinear (E4a). Its small-model error has two parts (vantage6 #705): the straight line underestimates vantage6's fixed cost per task, which is 6.3 s measured at 1 MiB (container start, task and result round trips), and real training adds about 0.8 s per task that the echo runs do not have (reading the site's CSV database into a DataFrame, a slower container exit after a torch run).
 
 ## 7. RQ5 — Robustness (E6)
 
@@ -347,9 +347,9 @@ All E6 runs use `dir0.3`, `cnn-small` and the six base sites. The framework agen
 - **Out of scope by the owner's decision (PLAN.md §3)**, so future work: SCAFFOLD and other control-variate methods, robust aggregators (median, trimmed mean, Krum), federated evaluation at the sites, secure aggregation, differential privacy, GPUs.
 - **Plaintext updates at the hub.** The hub core stores every site's weights as plain safetensors blobs (with rolling GC). Anyone with access to central sees all updates; secure aggregation would change that.
 - **TLS gaps (unchanged from stage 1).** NVFlare uses its provisioned mTLS; vantage6 and Flower run without TLS, restricted by the cloud firewall to the four VM IPs.
-- **vantage6 in DB mode is the payload bottleneck.** vantage6 4.15.2 stores task inputs and results as base64 JSON in the server database and rewrites the whole run row for every algorithm log line; the large-result-store knob is not usable in 4.15.2 (ADR-020). A next step is vantage6 5.x or a blob store with streaming.
+- **vantage6 in DB mode is the payload bottleneck.** vantage6 4.15.2 stores task inputs and results as double-base64 JSON in the server database, sends each input four times per site and round, and rewrites the whole run row for every algorithm log line. The large-result-store knob is not usable in 4.15.2 (ADR-020). At 256 MB no result arrived (§6.1). Candidate knobs: a PostgreSQL server database (server side) or `share_algorithm_logs: false` on the nodes (hospital side), and vantage6 5.x or a streaming blob store.
 - **Single operator.** One VM hosts all framework servers, the hub and the orchestrator; an operator outage stops every framework (E6 tests restarts, not the loss of the VM).
-- **Recommended next steps:** repeat E1–E2 with more seeds on the real system; a wider tuning grid; heterogeneous hardware with the tolerance fallback; real WAN links; 64 px data (the *Could* item of E3); BranchKey or other frameworks through the same flhub/0.2 adapter contract (REPORT.md §14).
+- **Recommended next steps:** repeat E1–E2 with more seeds on the real system; a wider tuning grid, with server learning rates tuned per model size and participation level (E3, E6c); heterogeneous hardware with the tolerance fallback; real WAN links; 64 px data (the *Could* item of E3); BranchKey or other frameworks through the same flhub/0.2 adapter contract (REPORT.md §14).
 
 ## 10. How the agents ran the campaign
 
