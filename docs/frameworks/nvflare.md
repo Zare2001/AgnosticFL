@@ -226,8 +226,185 @@ The hub reuses an NVFlare 2.9 project as it is: the server, its provisioning and
 
 ## 5. Cost and efficiency for NVFlare
 
+All numbers are from the reference testbed (4 vCPU AMD EPYC-Rome VMs in one data centre, CPU-only, two NVFlare hospitals on one VM). The hub-wide view, with the other frameworks, is in [`cost-and-efficiency.md`](../cost-and-efficiency.md).
+
+### 5.1 At a glance
+
+| Dimension | NVFlare | Source |
+|---|---|---|
+| Adapter code | TODO(verify): `scripts/docs/loc.py` for `adapters/nvflare/` (without `native.py`, which is only for E7) | `scripts/docs/loc.py` |
+| Hospital code | 48 lines (`client.py`), 0 changed since stage 1 | [ledger](../results/evidence/hospital-ledger.md) |
+| One-time hospital steps (rollout of `flhub_core` 0.2) | 3 steps, 50.3 s downtime per site | [ledger](../results/evidence/hospital-ledger.md) |
+| Hospital steps per later code version | 0 | ADR-018 |
+| Hub overhead against NVFlare's own FedAvg (E7) | −0.23 s (−6.5 %) per round with `cnn-small`; +0.10 s (+4.1 %) with a 45 MiB payload | [e7-native-vs-hub.md](../results/evidence/stage2/nvflare/e7-native-vs-hub.md) |
+| Fixed cost per round, cost per MiB | a = 2.23 s, b = 0.0212 s/MiB (R² 0.972, 1–512 MiB) | [cost_model.md](../results/evidence/stage2/cost_model.md) |
+| Bytes on the wire ÷ payload (E4a) | 1.005–1.064 | [e4_bytes.md](../results/evidence/stage2/e4_bytes.md) |
+| Bandwidth efficiency at 20 Mbit/s (E4b) | 0.94 of the lower bound | [cost_model.md](../results/evidence/stage2/cost_model.md) |
+| Largest payload carried | 512 MiB per site and direction (15.5 s per round); 1024 MiB on a single-host test | §5.5 |
+| Overhead per site and round (E3) | 1.6 s (`cnn-small`), 1.9 s (`cnn-medium`), 2.7 s (`resnet18-gn`) | [tables.md](../results/evidence/stage2/tables.md) |
+| 6 → 12 sites (E5) | NVFlare fan-out 3.0 s → 2.8 s | [tables.md](../results/evidence/stage2/tables.md) |
+| Hospital crash (E6a): detected / recovered | 33.1 s / 74.0 s, no manual action | [e6.md](../results/evidence/stage2/e6.md) |
+
+### 5.2 Implementation and integration cost
+
+TODO(verify): line counts per file from `scripts/docs/loc.py` once it exists.
+
+The adapter touches these NVFlare interfaces:
+
+| NVFlare interface | Used for |
+|---|---|
+| `ModelController` (`send`, `cancel_task`, `get_client_disconnect_time`, `engine.get_clients`, `abort_signal`) and `BaseModelController._prepare_task` | the relay workflow |
+| `FLModel`, `ParamsType.FULL`, `FLMetaKey`, `ReturnCode`, `SendOrder` | model exchange and reply checks |
+| Client API: `nvflare.client.init`, `receive`, `send`, `is_running`, `get_site_name` | the hospital script |
+| Job API: `FedJob`, `to_server`, `to_clients`, `to`, `set_app_packages`, `export_job`, `ScriptRunner` | building the relay job |
+| FLARE API: `new_secure_session`, `list_jobs`, `get_job_meta`, `submit_job`, `abort_job`, `delete_job`, `get_client_job_status`, `get_system_info` | the keeper and the online probe |
+| Provisioning: `nvflare provision`, `--add-client` | kits for the server, hospitals and admin |
+
+The hospital-side integration cost is in §3: no code, the standard kit, a data file, and one restart when the rollout channel changes.
+
+### 5.3 Runtime overhead
+
+**Against NVFlare's own FedAvg (E7).** Same two hospitals, same `flhub_core.train`, same configuration; the native path is NVFlare's built-in `FedAvg` workflow, the hub path is the relay. Median over rounds ≥ 2; a round is "model sent → aggregated model" on both paths.
+
+| Configuration | Native round (s) | Hub round (s) | Hub overhead | Max abs weight difference, native vs hub |
+|---|---|---|---|---|
+| C1: `cnn-small`, `iid`, 20 rounds | 3.50 (IQR 0.50) | 3.27 (IQR 0.50) | −0.23 s (−6.5 %) | 2.98e-08 after round 1, 0.68 after round 20 |
+| C2: `payload-45` echo, 5 rounds | 2.52 (IQR 0.38) | 2.62 (IQR 0.27) | +0.10 s (+4.1 %) | 2.2e-08, flat |
+
+Source: [e7-native-vs-hub.md](../results/evidence/stage2/nvflare/e7-native-vs-hub.md); figure [e7_native_vs_hub.png](../results/figures/e7_native_vs_hub.png). The generated results table uses the recorded round duration without the hub's aggregation step for C2 (2.55 s, +1.4 %).
+
+- The hub path costs NVFlare nothing measurable. Both paths sit on the same NVFlare task-request floor (below). The built-in `FedAvg` checks for its results in 0.5 s steps, the relay every 0.1 s, so the C1 rounds were slightly shorter through the hub.
+- The weights differ because of the aggregation, not the transport. Native clients train bit-exactly like hub clients. NVFlare's `FedAvg` sums `w_k · n_k` and scales by `1/Σn` in float32, in arrival order; the hub sums `p_k · w_k` in float64 and casts once. With n = 5761 and 5760 the weights are not exact in float32, so the two paths round differently: the one-step difference is 3e-8. Local SGD at learning rate 0.1 then amplifies it: 6.3e-04 after round 2, 0.68 after round 20. The payload echo has no training, so its difference stays at float32 rounding level.
+- Accuracy follows the same shape in both C1 runs (the same dips at rounds 3, 5, 9, 13 and 19; rounds 1–2 equal to four decimals). Best round: native 78.1 %, hub 78.4 % (both round 18); mean of the last five rounds: 63.5 % and 66.8 %.
+
+**Where the time goes (E4a, echo models).** Medians over rounds 2–3, NVFlare scope (two hospitals). *Transfer* is NVFlare transport both ways plus the client framework; *hub* is the relay reading the model from the hub core plus storing the replies.
+
+| Payload (MiB) | Round (s) | NVFlare transfer (s) | Hub prep + store (s) | NVFlare VM memory peak (GB) | Client job RSS peak (GB) |
+|---|---|---|---|---|---|
+| 1 | 2.52 | 2.36 | 0.01 | 1.68 | 0.43 |
+| 8 | 2.67 | 2.39 | 0.04 | 1.74 | 0.47 |
+| 32 | 2.66 | 1.95 | 0.22 | 1.97 | 0.58 |
+| 64 | 3.67 | 2.56 | 0.43 | 2.20 | 0.72 |
+| 128 | 5.08 | 2.88 | 0.88 | 2.65 | 0.95 |
+| 256 | 10.29 | 6.29 | 1.69 | 3.48 | 1.35 |
+| 512 | 15.49 | – | – | 5.01 | 2.11 |
+
+Source: [e4a-breakdown.md](../results/evidence/stage2/nvflare/e4a-breakdown.md) (timings), [stage-2 NVFlare section](https://github.com/Zare2001/AgnosticFL/blob/stage2-final/docs/report/stage2/nvflare.md) §4 (memory); figure [e4a_round_time_vs_payload.png](../results/figures/e4a_round_time_vs_payload.png).
+
+**The ~2.5 s floor.** Below about 64 MiB, an NVFlare round costs 2.3–2.6 s whatever the size. The server tells each client to wait `task_request_interval` (default 2 s, `private/fed/server/server_json_config.py:102`) before its next task request. In the client log of the 1 MiB run, the client side of a round takes 0.55 s, and the next task arrives 2.04 s after the result left. The interval is a server-side job setting (`server.task_request_interval`) that changes latency only; it was left at its default, and the native E7 runs have the same floor.
+
+**Cost model.** Fan-out time per round = a + b·P with P in MiB, fitted on the echo sweep 1–512 MiB: a = 2.23 s, b = 0.0212 s/MiB, R² 0.972. With the slowest site's training time added, it predicts the learning runs within +3 to +5 % (`cnn-small`), 0 to +4 % (`cnn-medium`) and 0 % (`resnet18-gn`). Source: [cost_model.md](../results/evidence/stage2/cost_model.md).
+
+**Overhead per site and round with real training (E3).** Transport, framework and adapter together: 1.6 s (`cnn-small`, 0.2 MiB), 1.9 s (`cnn-medium`, 6.4 MiB), 2.7 s (`resnet18-gn`, 42.6 MiB), the lowest of the three frameworks. As a share of NVFlare's fan-out it falls from 56 % to 1 %. Source: [tables.md](../results/evidence/stage2/tables.md); figure [e3_round_time_breakdown.png](../results/figures/e3_round_time_breakdown.png).
+
+### 5.4 Network efficiency
+
+- **Bytes on the wire** (interface counters of the NVFlare VM ÷ payload moved, E4a): 1.005–1.064 in the NVFlare scope, 1.007 at 512 MiB. The highest ratio is at 1 MiB, where background traffic counts most. One run (8 MiB) reads 0.840: its upload counter is below the payload that demonstrably crossed the link (every round finished with hash-equal weights), so it is a measurement artifact. Source: [e4_bytes.md](../results/evidence/stage2/e4_bytes.md).
+- **Bandwidth (E4b)**, `payload-45`, mixed scope, rate and delay emulated with netem in both directions. Lower bound = 4·P/rate (two sites, each P down and P up per round):
+
+| Profile | NVFlare fan-out (s) | Lower bound (s) | Efficiency (bound ÷ measured) |
+|---|---|---|---|
+| none | 3.3 | – | – |
+| 1 Gbit/s, 5 ms | 4.3 | 1.5 | 0.35 |
+| 100 Mbit/s, 20 ms | 17.0 | 15.1 | 0.89 |
+| 20 Mbit/s, 40 ms | 80.3 | 75.5 | 0.94 |
+
+Source: [cost_model.md](../results/evidence/stage2/cost_model.md); figure [e4b_measured_vs_bound.png](../results/figures/e4b_measured_vs_bound.png). On slow links NVFlare's streamed download comes close to the wire limit; on fast links the fixed floor dominates.
+
+### 5.5 Memory and payload size
+
+- **Hospital VM** (memory in use at peak, two clients and the operating system): 1.68 GB at 1 MiB up to 5.01 GB at 512 MiB; one client's job process 0.43 GB up to 2.11 GB (table in §5.3).
+- **Central host:** the relay's server job process peaked at 3.8 GB at 512 MiB; at 45 MiB (E7 C2) it took 585 MB, the adapter 163 MB and the hub core 44 MB. Sources: [stage-2 report §6.1](https://github.com/Zare2001/AgnosticFL/blob/stage2-final/REPORT_STAGE2.md), [stage-2 NVFlare section](https://github.com/Zare2001/AgnosticFL/blob/stage2-final/docs/report/stage2/nvflare.md) §5.
+- **Largest payload:** 512 MiB per site and direction on the testbed (15.5 s per round, every round hash-equal to the simulation). On a single-host test with NVFlare's default settings: 128 MiB 5–6 s, 256 MiB 9–10 s, 512 MiB 16–17 s and 1024 MiB 32.8 s per round (17.6 GB of host memory in use at 1024 MiB). No NVFlare limit was reached; the stops were the testbed's disk.
+
+### 5.6 Scaling and robustness
+
+**6 → 12 sites (E5).** Two extra NVFlare hospitals with standard kits from the same root CA, no server restart. NVFlare's fan-out stayed flat (3.0 s → 2.8 s): the clients poll the server in parallel, and each trains on half the data (training 0.73 s → 0.36 s, overhead per site 1.9 s → 1.7 s). The extra sites were online 62 s after the request; joining the relay job took a keeper restart of the job. Source: [tables.md](../results/evidence/stage2/tables.md); figure [e5_scaling.png](../results/figures/e5_scaling.png).
+
+**Faults (E6).** No run needed a manual action, and every run kept bit-identical weights against the simulation.
+
+| Scenario | NVFlare result |
+|---|---|
+| Hospital killed (client and job process) in round 5, all sites required | site failed after 33.1 s (offline for 30 s), round retried, done 74.0 s after the kill; client process back after 3.0 s, back in a relay job after 55.6 s |
+| Same, with `min_sites: 5` | round 5 finished with 5 sites after 34.0 s; the site stayed out for rounds 6–9 and was back 97.2 s after the kill (§6) |
+| Straggler at 10 % CPU, `deadline_s` 20 | in time in all 6 rounds: training 8.0 s instead of 0.7 s, round 10.8 s |
+| Hub and adapters killed in round 21 | adapter back after 1.1 s; the relay job kept running and re-attached; round 21 redone |
+| NVFlare server restarted between rounds | server back after 12.1 s; next round done 84.9 s after the restart, no failed attempt |
+| NVFlare server restarted mid-round | round 7 failed after 51.0 s, retried, done 96.1 s after the restart |
+
+Source: [e6.md](../results/evidence/stage2/e6.md); figures [e6_timeline_s2-e6a-minsites.png](../results/figures/e6_timeline_s2-e6a-minsites.png), [e6_timeline_s2-e6e-server-restart.png](../results/figures/e6_timeline_s2-e6e-server-restart.png).
+
 ## 6. Limits, known issues and knobs
+
+### 6.1 Known issues
+
+1. **A training-process crash ends the round for every NVFlare site.** When one client's job process exits with an error, NVFlare 2.9.0 fails the whole job (`private/fed/server/fed_server.py:942-951`; no setting). With one relay job for all NVFlare sites, both sites lose the round, and the keeper submits a new job (about 15 s on a single-host test). An exception in `client.py` has the same effect.
+2. **A restarted client rejoins only through a relay-job restart.** NVFlare does not readmit a client into a running job. The keeper restarts the job only while no round is in flight, because a restart would kill the other site's round. With all sites required the hub waits for it (back after 56 s in E6a); with `min_sites`, back-to-back rounds keep the site out until the hub pauses (4 rounds, 97 s in E6a).
+3. **A relay-job restart briefly takes every NVFlare site offline**, not only the one that needed it (about 15–30 s).
+4. **No per-task abort towards a client.** Cancelling a site's task removes it on the server, but the hospital finishes its local training. The late result is dropped, and the site's next task waits until that training ends. This matters for stragglers.
+5. **Latency floor of ~2.5 s per round** from `task_request_interval` (§5.3).
+6. **Stale job-store entries.** After an abrupt server stop, NVFlare 2.9.0 keeps the jobs that were running as `RUNNING` in its job store (`JobRunner.update_abnormal_finished_jobs()` is never called). Abort answers "not running", delete answers "still running". The keeper ignores such entries; tools that count active jobs must do the same.
+7. **Slow failure detection.** A dead client stays "connected" in `get_system_info()` for minutes. The adapter's probe sees it within about 1 s; the site watcher fails the site after 30 s offline (`OFFLINE_FAIL_S`), so a hospital crash costs the round about 33 s (E6a).
+8. **Two non-public members.** The relay calls `BaseModelController._prepare_task` and wraps `Task.result_received_cb`. Check both when you upgrade NVFlare.
+
+### 6.2 Knobs
+
+Payload-related settings, read from the NVFlare 2.9.0 source. None had to be changed up to 512 MiB.
+
+| Knob | Side | Default | Where |
+|---|---|---|---|
+| `task_request_interval` | server (job config `server.task_request_interval`) | 2 s | `private/fed/server/server_json_config.py:102` |
+| `np_download_chunk_size` (app config; ≤ 0 sends arrays inline) | sender (server for the global model, client for results) | 2 MiB | `app_common/decomposers/numpy_decomposers.py:66`, `fuel/utils/fobs/decomposers/via_downloader.py:551` |
+| `streaming_chunk_size` / `streaming_window_size` / `streaming_ack_interval` | both (`comm_config.json`) | 1 MiB / 64 MiB / 16 MiB | `fuel/f3/streaming/stream_const.py` |
+| `streaming_max_blob_size` | both (`comm_config.json`) | 4 GiB | `fuel/f3/comm_config.py` |
+| `streaming_read_timeout` / `streaming_ack_wait` | both (`comm_config.json`) | 300 s / 300 s | `fuel/f3/streaming/byte_receiver.py`, `byte_streamer.py` |
+| `max_message_size` (inline messages only) | both (`comm_config.json`) | 2 GiB − 3 MiB − 16 B | `fuel/f3/comm_config.py`, `fuel/f3/drivers/net_utils.py` |
+| `get_task_timeout`, `submit_task_result_timeout`, `communication_timeout` | hospital | none, none, 300 s | `private/fed/client/client_runner.py`, `fed_client_base.py` |
+| `memory_gc_rounds` | hospital (job, `ScriptRunner`) | 0 (off) | `job_config/script_runner.py` |
+| job store `uri_root` | server kit | `/tmp/nvflare/jobs-storage` | `local/resources.json.default`; `purge.sh` deletes finished jobs |
+
+Adapter-side settings: the NVFlare task timeout is the dispatch's `deadline_s`; the keeper and watcher constants are at the top of [`service.py`](../../adapters/nvflare/service.py) (§2.3).
 
 ## 7. Troubleshooting
 
+| Symptom | Cause | Fix |
+|---|---|---|
+| `nvflare provision` exits with `INVALID_ARGS` on `org: hospital-1` | org names must match `^[A-Za-z0-9_]+$` (client names may contain `-`) | use `hospital1` |
+| The server listens on `127.0.0.1:8002` only | server name `localhost` binds the loopback interface | provision with a non-loopback server name and resolve it on every host (`/etc/hosts`) |
+| Hospitals run a local file instead of the job's `custom/client.py` | `ScriptRunner` keeps an absolute script path, and clients prefer it | build the job with a relative path ([`job.py`](../../adapters/nvflare/job.py) does) |
+| The exported job has no `custom/client.py` | the relative path is resolved at export time, and the export ran in another directory | export in the script's directory ([`job.py`](../../adapters/nvflare/job.py) does, and checks) |
+| `ClientAPIExecutor` is missing from the kit's class allow-list | NVFlare 2.9 kits enforce an allow-list | nothing to do for jobs with custom code: they bypass the list |
+| `ComponentNotAuthorized` when submitting a job | a server app without custom code is held to the allow-list | ship the workflow as custom code |
+| A stopped hospital is still listed online | the server keeps dead clients "connected" for minutes | the adapter's `get_client_job_status()` probe (built in) |
+| A restarted hospital never trains | NVFlare does not readmit a client into a running job | the keeper restarts the relay job between rounds (built in); back after about 50 s |
+| `client_code_version` shows the old `flhub_core` after a new relay job | an installed `flhub_core` shadows the job's `custom/` copy | remove it from the client's environment and restart the client |
+| Sites offline for minutes after a server restart; abort says "not running" | the job store kept the old relay job as `RUNNING` | the keeper deletes or ignores stale jobs and submits a new one (built in) |
+| `POST /relay/result` returns 404 | the hub had already dropped the task (cancel, deadline) | expected; the late result is ignored |
+| The relay job is aborted during a normal stop | the job needs a few seconds to end after the relay returns | `stop.sh` waits up to 20 s before it aborts |
+| `startup/stop_fl.sh` waits for a key press | the kit's stop script is interactive | create `shutdown.fl` in the kit directory (`stop.sh` does) |
+| Native `FedAvg` trains with defaults from round 2 | `FLModelUtils.update_model` replaces the model meta | re-attach the `train_config` in `send_model()` ([`native.py`](../../adapters/nvflare/native.py)) |
+
 ## 8. Future work and upstream reports
+
+**What would lift the limits:**
+
+- **One relay job per hospital.** Isolates sites: a crash or restart at one hospital no longer touches the others (issues 1–3), at the cost of one server job process per site.
+- **Rejoin without a job restart.** A client that re-attaches to a running job would remove the keeper's restart and its idle-time condition. This needs NVFlare support.
+- **Lower `task_request_interval`** for latency-bound use with small models (§5.3).
+- **Hardening:** bind the admin port to loopback (`admin_host` in `fed_server.json`); give the custom-code permission only to a dedicated submitter role; ship the hospital code as a signed package instead of job custom code.
+
+**Draft upstream issues (not filed).**
+
+> **One client's job-process failure fails the whole job for all clients (NVFlare 2.9.0)**
+>
+> When the job process of one client dies (killed, or crashed), the server fails the whole job at once: `private/fed/server/fed_server.py:942-951` logs "Failing job … due to reported failure from <client>: exception" and calls `job_runner.fail_run()`. Every other client loses its in-flight task. An unhandled exception in a Client API script also ends the job.
+> Reproduce: a job with two clients running a Client API script with `ScriptRunner` (in-process); while both train, `kill -9` the job process of one client. Expected: the controller sees a failed task for that client and decides what to do, as with `ignore_result_error`. Actual: the job fails for both clients 0.1 s after the kill.
+> Proposal: a job-level option that reports a client's job-process failure to the controller as a failed task of that client, instead of failing the job.
+
+> **No way to abort a task at the client (NVFlare 2.9.0)**
+>
+> `Controller.cancel_task()` ends a task on the server, but the client is not told: a Client API script keeps training and sends a result that the server drops. The client's next task waits until that training ends.
+> Reproduce: send a long task to one client with `send()`, cancel it after 1 s with `cancel_task()`; the client log shows the training running to its end.
+> Proposal: propagate the cancel to the client, so that `flare.is_running()` (or an abort signal in the Client API) ends the current task.
+
+Related observations, not drafted: a restarted client cannot rejoin a running job; jobs that were running at an abrupt server stop stay `RUNNING` in the job store; job `custom/` code is appended to `sys.path`, so installed packages shadow it.
