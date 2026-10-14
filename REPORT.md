@@ -1,4 +1,5 @@
 # AgnosticFL — final report
+> Stage 2 (full system and performance test) is reported in [REPORT_STAGE2.md](REPORT_STAGE2.md).
 
 Framework-agnostic federated learning across NVFlare, vantage6 and Flower hospitals through one central FedAvg hub. Built on 2026-10-13 by four autonomous agents (central, nvflare, vantage6, flower), one per VM, coordinating over an agent bus and one GitHub repository.
 
