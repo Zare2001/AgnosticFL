@@ -193,7 +193,8 @@ def site_keys(row: dict, suffix: str) -> dict[str, float]:
 
 
 def breakdown(run: Run) -> dict[str, dict[str, float]]:
-    """Per framework: median over rounds >= 2 of mean train time, mean overhead, plus hub agg/eval."""
+    """Per framework: median over rounds >= 2 of the mean train time and mean overhead of its sites;
+    'hub': median aggregation time and median evaluation time over the evaluated rounds."""
     out = {}
     rows = rounds_from(run)
     for fw in FRAMEWORKS:
@@ -202,36 +203,42 @@ def breakdown(run: Run) -> dict[str, dict[str, float]]:
         over = [statistics.mean([v for s, v in site_keys(r, "overhead_s").items() if fw_of(s) == fw] or [np.nan])
                 for r in rows]
         if any(np.isfinite(train)):
-            out[fw] = {"train": float(np.nanmedian(train)), "overhead": float(np.nanmedian(over)),
-                       "agg": med([r["round/agg_s"] for r in rows]), "eval": med([r["round/eval_s"] for r in rows])}
+            out[fw] = {"train": float(np.nanmedian(train)), "overhead": float(np.nanmedian(over))}
+    evals = [r["round/eval_s"] for r in rows if r.get("round/eval_s")]
+    out["hub"] = {"agg": med([r["round/agg_s"] for r in rows]) or 0.0, "eval": med(evals) or 0.0}
     return out
 
 
 def fig_e3_breakdown(out: Path) -> None:
-    a_star = "fedavgm"
     names = [("cnn-small", "s2-e1-dir0.3-fedavg"), ("cnn-medium", "s2-e3-cnn-medium-fedavg"),
              ("resnet18-gn", "s2-e3-resnet18-gn-fedavg")]
-    data = [(model, breakdown(r)) for model, n in names if (r := load(n))]
+    data = [(model, breakdown(r), r) for model, n in names if (r := load(n))]
     if len(data) < 2:
         print("e3_breakdown: E3 runs missing")
         return
-    fig, axes = plt.subplots(1, len(data), figsize=(4 * len(data), 3.8), sharey=False)
+    fig, axes = plt.subplots(1, len(data), figsize=(4 * len(data), 4.0), sharey=False)
     axes = np.atleast_1d(axes)
-    parts = [("train", SERIES[0], "local training"), ("overhead", SERIES[1], "transport + framework + adapter"),
-             ("agg", SERIES[2], "hub aggregation"), ("eval", SERIES[3], "hub evaluation")]
-    for ax, (model, bd) in zip(axes, data):
-        x = np.arange(len(bd))
-        bottom = np.zeros(len(bd))
+    parts = [("train", SERIES[0], "local training (mean of the framework's sites)"),
+             ("overhead", SERIES[1], "transport + framework + adapter"),
+             ("agg", SERIES[2], "hub aggregation"), ("eval", SERIES[3], "hub evaluation (per evaluated round)")]
+    for ax, (model, bd, run) in zip(axes, data):
+        cols = list(bd)
+        x = np.arange(len(cols))
+        bottom = np.zeros(len(cols))
         for key, color, label in parts:
-            vals = np.array([bd[fw][key] or 0 for fw in bd])
+            vals = np.array([bd[c].get(key) or 0 for c in cols])
             ax.bar(x, vals, bottom=bottom, color=color, width=0.6, label=label, edgecolor=SURFACE, linewidth=1)
             bottom += vals
-        ax.set_xticks(x, list(bd))
-        ax.set_title(model, loc="left")
-        ax.set_ylabel("seconds per round (median, rounds >= 2)")
-    axes[0].legend(fontsize=7, loc="upper left")
-    fig.suptitle(f"E3: round-time breakdown per framework and model (fedavg; A* = {a_star} in the run table)",
-                 x=0.01, ha="left")
+        ax.set_xticks(x, cols)
+        cfg_path = run.path / "config.json"
+        run_cfg = json.loads(cfg_path.read_text()).get("run_config", {}) if cfg_path.exists() else {}
+        every = (run_cfg.get("eval") or {}).get("every", 1)
+        ax.set_title(f"{model}" + (f" (eval every {every} rounds)" if every and every > 1 else ""), loc="left",
+                     fontsize=9)
+        ax.set_ylabel("seconds (median, rounds >= 2)")
+    handles, labels = axes[0].get_legend_handles_labels()
+    fig.legend(handles, labels, ncol=4, fontsize=8, loc="lower center", bbox_to_anchor=(0.5, -0.06), frameon=False)
+    fig.suptitle("E3: per-round time per framework and model (fedavg, dir0.3)", x=0.01, ha="left")
     save(fig, "e3_round_time_breakdown", out)
 
 
