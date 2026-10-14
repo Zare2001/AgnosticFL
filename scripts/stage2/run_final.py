@@ -60,7 +60,7 @@ def round_windows(run_dir: Path) -> list[str]:
 
 def sysmon_central(run_dir: Path, start: str, end: str, name: str) -> None:
     out = run_dir / "sysmon"
-    out.mkdir(exist_ok=True)
+    out.mkdir(parents=True, exist_ok=True)
     subprocess.run(["python3", str(REPO / "scripts" / "sysmon.py"), "summarize", "--from", start, "--to", end,
                     "--run", name, "-o", str(out / "central.json")], capture_output=True, timeout=300)
 
@@ -145,8 +145,7 @@ def native(args) -> int:
         print(f"another run is active: {ACTIVE.read_text()}")
         return 4
     stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
-    out = RUNS / f"{args.name}-{stamp}"
-    out.mkdir(parents=True)
+    out = RUNS / f"{args.name}-{stamp}"  # created by the native script (NVFlare's refuses an existing dir)
     link = RUNS / f"{args.name}-latest"
     link.unlink(missing_ok=True)
     link.symlink_to(out.name)
