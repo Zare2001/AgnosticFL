@@ -192,14 +192,14 @@ Hyperparameters from S3 (tuned on `dir0.3`, validation split): fedavgm η 1.0 (�
 | 8 | 2.7 | 6.1 | 12.8 | 13.3 |
 | 32 | 2.7 | 7.7 | 60.1 | 58.9 |
 | 64 | 3.7 | 9.1 | 115.3 | 116.2 |
-| 128 | 5.1 | 13.5 | 468.2 | *(disk)* |
-| 256 | 10.3 | 20.6 | *(disk)* | *(disk)* |
-| 512 | *(disk, see extension)* | *(disk, see extension)* | — | — |
+| 128 | 5.1 | 13.5 | 468.2 | 393.8 (ext.) |
+| 256 | 10.3 | 20.6 | *(pending, ext.)* | *(disk)* |
+| 512 | 15.5 (ext.) | 45.8 (ext.) | *(disk)* | — |
 
-- **No framework limit was hit.** Every stop is a *testbed disk limit* of the 19 GB central VM (PLAN.md §7 rule: free ≥ 3 GB + 4 × payload × sites; for vantage6 a measured projection of its database growth). *(pending: the end-of-S4 extension after the owner freed 1.5 GB.)*
+- **No framework limit was hit.** Every stop is a *testbed disk limit* of the 19 GB central VM (PLAN.md §7 rule: free ≥ 3 GB + 4 × payload × sites; for vantage6 a measured projection of its database growth). At the owner's request (#410) the sweep was extended at the end of S4 ("ext." in the table), after freeing disk on central (the owner removed the stage-1 image; central removed its local copies of the stage-2 algorithm images, the docker build cache and vantage6 run rows orphaned by subtask deletion): NVFlare and Flower carry 512 MB per site and direction, and the mixed scope 128 MB. Mixed 256 MB (needs 9 GB free) and 1024 MB (11 GB) remain testbed disk limits. *(pending: vantage6 256 MB)*
 - **Bytes on wire** (interface deltas on the framework VMs ÷ payload moved): NVFlare 1.005–1.06, Flower 1.002–1.005, vantage6 5.4 (64 MB) to 9.1 (128 MB). vantage6 4.15.2 sends the run input (base64 JSON, 1.78× the payload) four times per site and round by design (run list, PATCH response, GET before the result, result PATCH response), and more under load, when its single uwsgi worker drops connections while it rewrites the run row for every algorithm log line (vantage6 section §4).
 - **Scaling.** NVFlare's round time stays near its 2–2.5 s task-polling floor up to 32 MB and grows about linearly beyond (10.3 s at 256 MB). Flower has about 5.5 s of fixed cost per round (relay and SuperNode message handling, a ClientApp process per message; breakdown in the flower section) and grows linearly. vantage6 grows superlinearly (doubling 64 → 128 MB costs 4×) because the server is CPU-bound in one process; the mixed scope inherits vantage6's time.
-- **Memory on central** (sysmon peak RSS): the hub core stays at 42–46 MB at every size (blobs are streamed); the orchestrator needs about 8× the payload (2.0 GB at 256 MB, 2 sites), NVFlare's relay job about 10×, Flower's relay ServerApp about 7.6×, vantage6's server and adapter 15–18× (2.3 / 1.9 GB at 128 MB). Central used at most 7.9 GB of 31 GB; the framework VMs stayed below 16 % of RAM.
+- **Memory on central** (sysmon peak RSS): the hub core stays at 42–46 MB at every size (blobs are streamed); the orchestrator needs about 8× the payload (2.0 GB at 256 MB, 2 sites), NVFlare's relay job about 10×, Flower's relay ServerApp about 7.6×, vantage6's server and adapter 15–18× (2.3 / 1.9 GB at 128 MB). Central used at most 7.9 GB of 31 GB up to 256 MB; at 512 MB the orchestrator peaked at 4.1–4.3 GB, NVFlare's relay job at 3.8 GB, Flower's ServerApp at 3.6 GB, and central at 12.1 GB in total (39 %). The framework VMs stayed below 16 % of RAM up to 256 MB; at 512 MB the Flower VM peaked at 7.7 GB (24 %) and the NVFlare VM at 5.1 GB (16 %). Bytes on wire at 512 MB: NVFlare 1.007, Flower 1.002 (`e4_bytes.md`).
 
 ### 6.2 E4b — bandwidth sensitivity
 
