@@ -95,6 +95,7 @@ Evidence: vantage6 4.15.2 source (server/node wheels, client, algorithm tools) a
 | island server hung after node restarts | `on_node_info_update` busy for minutes | 785 column rows per CSV database deleted one commit at a time | `share_config: false` (ADR-014) | 525b7c5 | 30 min |
 | island registry lost images | image missing after `island.sh up` | install.sh replaced a stopped registry container | restart it instead | d7be8ba | 5 min |
 | VM disk < 3 GB twice | df 2.5 GB / 2.0 GB | island images, build cache, payload task folders | prune, GC cron, island removal | 2e2061b | 15 min |
+| GC removed a fresh output (final run) | s2-e3-resnet18-gn-fedavg r10: v6-h3 run 'active' 30 min, node 'FileNotFoundError .../output' | adapter deletes >= 16 MB tasks per round -> sqlite reuses run ids -> the node reuses `task-<id>/` and overwrites its files, the folder mtime stays old; the cron GC (minute boundary) hit the ~1 s between container exit and the node reading the output | GC off for E3 (02:15Z); hub deadline + retry recovered r10; GC now ages a folder by its newest file | _(fix SHA)_ | ~30 min of the run |
 | deploy-request late | central waited for vantage6 (#168) | the payload investigation above | — | — | ~40 min schedule slip |
 
 ## 7. Recommendations
