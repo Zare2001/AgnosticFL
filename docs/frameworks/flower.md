@@ -27,7 +27,7 @@ All server-side components run on the central host, next to the hub.
 | Component | Process | Listens on | Code |
 |---|---|---|---|
 | SuperLink | `flower-superlink` | Fleet API `0.0.0.0:9092` (hospitals), HTTP API `127.0.0.1:9093` (`flwr run`, ServerApp runtime) | Flower |
-| relay ServerApp | `flwr-serverapp`, started by Flower's `flower-superexec` for the relay run | none (client of 9093 and 8813) | [`server_app.py`](../../clients/flower/flhub_flower/server_app.py) |
+| relay ServerApp | `flwr-serverapp`, started by Flower's `flower-superexec` for the relay run | none (client of 9093, 8813 and 8800) | [`server_app.py`](../../clients/flower/flhub_flower/server_app.py) |
 | Flower adapter | `python -m adapters.flower.service` | `127.0.0.1:8813` (flhub JSON-RPC and `/relay/*` routes) | [`service.py`](../../adapters/flower/service.py), on [`adapters.common.RelayAdapter`](../../adapters/common/relay.py) |
 | hub core | `python -m hub.core` | `127.0.0.1:8800` (blob store) | [`hub/`](../../hub/) |
 
@@ -252,7 +252,7 @@ Because the record keys are Flower's defaults, the same ClientApp also served Fl
 
 The FAB is Flower's own code-distribution channel ([ADR-016](../design/decisions.md)):
 
-- **What a FAB may hold.** By default `flwr run` packs the app directory's `*.py`, `*.toml`, `*.md`, `*.yaml`, `*.yml`, `*.json` and `*.jsonl` files. It skips `test_*.py`, `*_test.py`, `build/`, `lib/`, `__pycache__/` and files ignored by `.gitignore`, and refuses FABs larger than 10 MiB (`FAB_INCLUDE_PATTERNS`, `FAB_EXCLUDE_PATTERNS` and `FAB_MAX_SIZE` in `flwr/common/constant.py`). `flhub_core` must therefore stay pure Python without data files.
+- **What a FAB may hold.** By default `flwr run` packs the app directory's `*.py`, `*.toml`, `*.md`, `*.yaml`, `*.yml`, `*.json` and `*.jsonl` files and a top-level `LICENSE` file. It skips `test_*.py`, `*_test.py`, `build/`, `lib/`, `__pycache__/` and files ignored by `.gitignore`, and refuses FABs larger than 10 MiB (`FAB_INCLUDE_PATTERNS`, `FAB_EXCLUDE_PATTERNS` and `FAB_MAX_SIZE` in `flwr/common/constant.py`). `flhub_core` must therefore stay pure Python without data files.
 - **How a new version arrives.** Every message starts a fresh `flwr-clientapp`. It unpacks the run's FAB into `$FLWR_HOME/apps/<publisher>.<name>.<version>.<hash8>` and puts that directory first on `sys.path` before it imports the ClientApp (`flwr/supercore/object_ref.py:182`). A `flhub_core/` inside the FAB therefore wins over any copy installed in the hospital environment: in a single-VM test, SuperNodes whose environment held `flhub_core` 0.1.0 reported the version of a marked test copy in the FAB, `0.1.99+29638ceb7307`. Connected SuperNodes fetch a new run's FAB by its hash, without a restart.
 - **Rollout procedure.** Restart the adapter on the new commit (`bash deploy/central/flower/restart.sh adapter`). It stages a new FAB, starts a new relay run and retires the old one. Rollback is the same command on the old commit.
 
@@ -275,7 +275,7 @@ Every change on the Flower hospital VM during stage 2 ([hospital-ledger.md](../r
 | 14:41 | data | stage-2 data variants provisioned next to `<site>.csv`, sha256-checked | 0 | no |
 | 14:45 | ops | fault-injection and straggler tools for the robustness experiments | 0 | no |
 | 14:50 | ops | start/stop script for the two extra sites of the scaling experiment | 0 | no |
-| 15:10 | code | `flhub_core` 0.2 inside the FAB (§3.4) | 0 hospital-executed lines; FAB metadata only (`pyproject.toml`: version 0.2.0, `fab-id` key) | no: 0 steps, 0 restarts, 0 s downtime |
+| 15:10 | code | `flhub_core` 0.2 inside the FAB (§3.4) | 0 hospital-executed lines; `pyproject.toml` FAB metadata (version 0.2.0, `fab-id` key); the relay `server_app.py` in the same FAB also changed, but runs only on the central host | no: 0 steps, 0 restarts, 0 s downtime |
 | 21:41 | ops | watchdog cron line uses `flock -n -o` | 0 (`install.sh` 1, `extra.sh` 1) | no |
 | 16:01–09:00 | ops | experiment actions (kills, CPU quota, extra sites, traffic shaping), all reverted | 0 | automatic restarts only |
 
@@ -292,7 +292,7 @@ Every change on the Flower hospital VM during stage 2 ([hospital-ledger.md](../r
 
 ## 4. Deploying next to an existing Flower federation
 
-Apart from the site's data and the Python packages for training, the only change to a running Flower federation is one node-config entry per SuperNode. The adapter talks to the SuperLink as an ordinary Flower user: it submits a run with `flwr run`, and that run's ServerApp is the relay. General deployment of the hub is in [deployment.md](../deployment.md).
+Apart from the site's data and the Python packages for training, a running Flower federation needs two changes: one node-config entry per SuperNode, and the hub package in the environment from which the SuperLink starts its ServerApps (§4.2 step 1). The adapter talks to the SuperLink as an ordinary Flower user: it submits a run with `flwr run`, and that run's ServerApp is the relay. General deployment of the hub is in [deployment.md](../deployment.md).
 
 ### 4.1 Requirements
 
@@ -302,7 +302,7 @@ Apart from the site's data and the Python packages for training, the only change
 
 ### 4.2 Server side
 
-1. Install an environment with `flwr` (the SuperLink's version), torch (CPU), `flhub_core` and the hub package. [`deploy/central/flower/install.sh`](../../deploy/central/flower/install.sh) has the exact commands.
+1. Install an environment with `flwr` (the SuperLink's version), torch (CPU), `flhub_core` and the hub package for the adapter. [`deploy/central/flower/install.sh`](../../deploy/central/flower/install.sh) has the exact commands. The relay runs in the SuperLink's ServerApp runtime (the `flwr-serverapp` that the SuperLink finds on its `PATH`) and imports `adapters.common`, which the FAB does not carry: that environment needs the hub package with numpy and safetensors (`flhub_core` comes with the FAB). In the testbed the SuperLink, the adapter and the relay share one environment.
 2. Add a connection for the adapter to `$FLWR_HOME/config.toml`:
 
    ```toml
@@ -336,7 +336,7 @@ If the SuperNodes accept only signed FABs (`--trusted-entities`), the hub's FAB 
 
 ### 4.4 Credentials
 
-The testbed exchanges no credentials: Flower runs with `--insecure`, and the cloud firewall restricts the Fleet API port to the hospital hosts ([ADR-007](../design/decisions.md)). The adapter needs only access to the SuperLink's HTTP API. It needs no hospital credentials, and the hospitals need none from the hub. A federation with TLS or SuperNode authentication keeps its own certificates and keys; the adapter's connection then needs the CA certificate (§4.2 step 2).
+The testbed exchanges no credentials: Flower runs with `--insecure`, and the cloud firewall admits the Fleet API port only from the hospital hosts ([ADR-007](../design/decisions.md); [stage-1 report](https://github.com/Zare2001/AgnosticFL/blob/stage1-final/REPORT.md) §11, [stage-2 report](https://github.com/Zare2001/AgnosticFL/blob/stage2-final/REPORT_STAGE2.md) §9). The adapter needs only access to the SuperLink's HTTP API. It needs no hospital credentials, and the hospitals need none from the hub. A federation with TLS or SuperNode authentication keeps its own certificates and keys; the adapter's connection then needs the CA certificate (§4.2 step 2).
 
 ### 4.5 Verify
 
@@ -364,10 +364,12 @@ It checks dispatch, collect, cancel, subset rounds, partial collect, offline sit
 
 Each SuperNode has its own `FLWR_HOME` (so two nodes never unpack the same FAB at the same time), its own runtime port (9094, 9095) and a working directory outside the repository. A cron watchdog re-runs the idempotent `start.sh` every minute while the nodes are enabled.
 
-**Everything on one machine.** For development, [`deploy/flower-vm/island.sh`](../../deploy/flower-vm/island.sh) runs the whole Flower path on one VM with its own runtime directory (`~/flhub-runtime/island`), apart from any SuperNodes on that VM that serve another SuperLink: a hub core on `127.0.0.1:8800`, the SuperLink (Fleet API `127.0.0.1:9092`, HTTP API `127.0.0.1:9093`) and the adapter on `127.0.0.1:8813` from the environment `~/venvs/island` (created on first use), and the SuperNodes `flw-h5` and `flw-h6` from the hospital environment on runtime ports 19094 and 19095:
+**Everything on one machine.** For development, [`deploy/flower-vm/island.sh`](../../deploy/flower-vm/island.sh) runs the whole Flower path on one VM with its own runtime directory (`~/flhub-runtime/island`), apart from any SuperNodes on that VM that serve another SuperLink: a hub core on `127.0.0.1:8800`, the SuperLink (Fleet API `127.0.0.1:9092`, HTTP API `127.0.0.1:9093`) and the adapter on `127.0.0.1:8813` from the environment `~/venvs/island`, and the SuperNodes `flw-h5` and `flw-h6` from the hospital environment on runtime ports 19094 and 19095:
 
 ```bash
 bash deploy/flower-vm/install.sh       # hospital environment and site data, once
+FLHUB_FLOWER_VENV=~/venvs/island FLHUB_FLOWER_RUNTIME=~/flhub-runtime/island/server \
+    bash deploy/central/flower/install.sh   # hub-side environment, once
 bash deploy/flower-vm/island.sh up
 ~/venvs/island/bin/python -m hub.orchestrator run --config deploy/flower-vm/island-3r.yaml
 bash deploy/flower-vm/island.sh down
@@ -377,7 +379,7 @@ bash deploy/flower-vm/island.sh down
 
 | Script | Purpose |
 |---|---|
-| [`deploy/flower-vm/inject.sh`](../../deploy/flower-vm/inject.sh) | one fault at a given hub round, triggered by the SuperNode log: kill the ClientApp, kill the SuperNode process tree, or stop the SuperNode ([ADR-017](../design/decisions.md)) |
+| [`deploy/flower-vm/inject.sh`](../../deploy/flower-vm/inject.sh) | one fault at a given hub round, triggered by the SuperNode log: kill the ClientApp, kill the SuperNode process tree, or send SIGTERM to the SuperNode (its supervisor restarts it); it can also switch a straggler's CPU quota on or off ([ADR-017](../design/decisions.md)) |
 | [`deploy/flower-vm/straggler.sh`](../../deploy/flower-vm/straggler.sh) | a CPU quota for one SuperNode in a user systemd scope, no root needed ([ADR-017](../design/decisions.md)) |
 | [`deploy/flower-vm/extra.sh`](../../deploy/flower-vm/extra.sh) | two more SuperNodes (`flw-h11`, `flw-h12`) for the scaling experiment |
 | [`deploy/flower-vm/netem.sh`](../../deploy/flower-vm/netem.sh) | rate and delay on the traffic to the SuperLink's Fleet API, with a revert timer set first |
@@ -457,7 +459,7 @@ The hospital-side cost, split as in [cost-and-efficiency.md](../cost-and-efficie
 
 ![E7: native FedAvg against the hub path](../results/figures/e7_native_vs_hub.png)
 
-- **Why the hub path is faster for C1.** `Grid.send_and_receive`, which Flower's built-in strategies use, sleeps 3 s between pulls (`flwr/serverapp/grid/grid.py`), so native rounds come in steps of about 3 s. The relay pulls every second.
+- **Why the hub path is faster for C1.** `Grid.send_and_receive`, which Flower's built-in strategies use, sleeps 3 s between pulls (`HttpGrid.send_and_receive` in `flwr/superlink/grid/http_grid.py`), so native rounds come in steps of about 3 s. The relay pulls every second.
 - **Why it is slower for C2.** The hub path moves the weights through the hub core. Per site: relay preparation 0.12 s, push 0.63 s, store 0.19 s; push to reply 6.15 s.
 - **Round time.** Native: end of `configure_train` to start of `aggregate_train`. Hub: dispatch to the last result. Neither includes aggregation or evaluation.
 - **Why the weights are identical.** Both sites hold the same number of examples (5,760 in C1, 784 in C2), so each weight factor is exactly 0.5. Flower's `FedAvg` accumulates the weighted arrays in float32, in reply order (`aggregate_arrayrecords` in `flwr/serverapp/strategy/strategy_utils.py`); with factors of 0.5 every term is exact, and both paths round the same exact sum once. With unequal site sizes they differ: in an extra test with the `qty` partition (factors 2194/6583 and 4389/6583), the native weights differed from the hub's by 3.0e-8 after round 1, by 1e-6 to 7e-6 in rounds 2–4 and by about 2e-2 from round 6, because SGD amplifies small differences; test accuracy was equal up to round 4 and within 0.6 percentage points afterwards. This is a property of Flower's float32 aggregation, not of the transport.
@@ -490,7 +492,7 @@ Flower's overhead falls from 72 % of its fan-out time with `cnn-small` to 5 % wi
 | 128 | 13.51 s | 12.58 s | 0.24 s | 1.61 s | 10.03 s | 0.53 s | 0.05 s |
 | 256 | 20.61 s | 17.75 s | 0.37 s | 3.35 s | 12.75 s | 1.06 s | 0.10 s |
 
-Flower's own path costs about 5 s per round at any size and about 0.03 s per MiB on top; the hub side (relay preparation, push, store and the adapter) adds 0.16 s at 1 MiB and 4.90 s at 256 MiB. The largest part of the 5 s is the fresh `flwr-clientapp` process that Flower starts for every message: at a hospital the process started 0.3 s after the train message arrived, but training (1.6 s, `cnn-small`) began only about 3.2 s after it and ended at about 4.8 s; the process ended at about 5.0 s. Pull intervals add the rest.
+Flower's own path costs about 5 s per round at any size and about 0.03 s per MiB on top; the hub side (relay preparation, push, store and the adapter) adds 0.16 s at 1 MiB and 4.90 s at 256 MiB. The largest part of the 5 s is the fresh `flwr-clientapp` process that Flower starts for every message ([stage-2 Flower section](https://github.com/Zare2001/AgnosticFL/blob/stage2-final/docs/report/stage2/flower.md) §5): at a hospital the process started 0.3 s after the train message arrived, but training (1.6 s, `cnn-small`) began only about 3.2 s after it and ended at about 4.8 s; the process ended at about 5.0 s. Pull intervals add the rest.
 
 ![E4a: round time against payload](../results/figures/e4a_round_time_vs_payload.png)
 
@@ -502,10 +504,10 @@ Flower's own path costs about 5 s per round at any size and about 0.03 s per MiB
 |---|---|
 | E4a, Flower only, 8–512 MiB | 1.002–1.005 |
 | E4a, mixed scope, 1–128 MiB | 1.003–1.023 |
-| E4b, `payload-45` under traffic shaping | 1.003–1.021 |
+| E4b, `payload-45`: without shaping / with the three shaped profiles | 1.003 / 1.004–1.021 |
 | E7, hub path / native path, `payload-45` | 1.002 / 1.003 |
 
-Flower moves each update once. At 1 MiB the count is too coarse to use: 11.2 MiB counted for 12 MiB moved (ratio 0.938), with 2.7 MiB of background traffic on the idle VM. Flower's own accounting of the native E7 runs (`flwr ls --format json`) agrees: 17.2 MB (10⁶ bytes) on the wire for C1, against 16.7 MB expected, and 943.9 MB for C2, against 943.7 MB.
+Flower moves each update once. At 1 MiB the count is too coarse to use: 11.3 MiB counted for 12 MiB moved (ratio 0.938), with 2.7 MiB of background traffic on the idle VM. Flower's own accounting of the native E7 runs (`flwr ls --format json`) agrees: 17.2 MB (10⁶ bytes) on the wire for C1, against 16.7 MB expected, and 943.9 MB for C2, against 943.7 MB.
 
 **Bandwidth efficiency (E4b).** `payload-45` in the mixed scope, 3 rounds per profile, with `netem` rate and delay on the hospital links in both directions. The lower bound is the time to move 4 × P over the link (two sites, each P down and P up); efficiency = bound ÷ measured fan-out ([cost_model.md](../results/evidence/stage2/cost_model.md), E4b; RTT from the [stage-2 Flower section](https://github.com/Zare2001/AgnosticFL/blob/stage2-final/docs/report/stage2/flower.md) §4):
 
@@ -554,7 +556,7 @@ The relay ServerApp needs about 7–8 × the payload from 128 MiB on, as much as
 
 ### 5.6 Scaling (E5)
 
-`iid` over 6 sites against `iid12` over 12 sites (Flower: 2 → 4 sites on one VM; each extra site holds half as much data), FedAvg, 20 rounds ([tables.md](../results/evidence/stage2/tables.md), E5; per-site and CPU rows from the [stage-2 report](https://github.com/Zare2001/AgnosticFL/blob/stage2-final/REPORT_STAGE2.md) §6.4):
+`iid` over 6 sites against `iid12` over 12 sites (Flower: 2 → 4 sites on one VM; in `iid12` every site holds half as much data as in `iid`, 2,880 instead of 5,760 examples, so the total stays the same; [`configs/stage2/partitions/`](../../configs/stage2/partitions/)), FedAvg, 20 rounds ([tables.md](../results/evidence/stage2/tables.md), E5; per-site and CPU rows from the [stage-2 report](https://github.com/Zare2001/AgnosticFL/blob/stage2-final/REPORT_STAGE2.md) §6.4):
 
 | | 6 sites | 12 sites |
 |---|---|---|
@@ -622,7 +624,7 @@ At the hospital, the killed SuperNode was restarted by its supervisor after 10 s
 | array chunk size `FLWR_PRIVATE_MAX_ARRAY_CHUNK_SIZE` (environment; `flwr/common/constant.py`) | sender of a message | 5 MiB | default |
 | concurrent object transfers `FLWR_PRIVATE_MAX_CONCURRENT_OBJ_PUSHES` / `_PULLS` (environment; `flwr/supercore/constant.py`) | each side | 2 | default |
 | message TTL (`DEFAULT_TTL`, `flwr/app/constants.py`) | ServerApp | 12 h | the relay sets the round deadline |
-| heartbeat (`flwr/common/constant.py`) | SuperNode | every 30 s × (0.8 ± 0.1); offline after 60 s | default |
+| heartbeat (`flwr/common/constant.py`, `flwr/supercore/heartbeat.py`) | SuperNode | every (30 s − 5 s) × 0.7–0.9 = 17.5–22.5 s; offline after 2 × 30 s = 60 s | default |
 | relay timing constants (`NODE_REFRESH_S`, `PULL_INTERVAL_S`, `SITE_WAIT_S`, `BEAT_S`, ...) | central, in [`server_app.py`](../../clients/flower/flhub_flower/server_app.py) | §2.2–2.4 | defaults |
 | adapter timing constants (`RELAY_STALE_S`, `LAUNCH_COOLDOWN_S`, ...) | central, in [`service.py`](../../adapters/flower/service.py) | §2.4 | defaults |
 
@@ -643,7 +645,7 @@ Problems met during the two test stages, as symptom → cause → fix.
 - **The SuperLink database stays hundreds of MiB large after large-payload runs.** → SQLite keeps freed pages. → `bash deploy/central/flower/purge.sh` between runs.
 - **SuperNode logs show `NoObjectInStoreError` / `Failed to push reply message`.** → The ClientApp finished after the message's TTL (the round deadline). → Harmless; give slow sites a longer deadline if they should count.
 - **A round fails with `CLIENT_APP_CRASHED` ("ClientApp stopped responding") after about a minute.** → The ClientApp process died; Flower reports it when its task heartbeat expires. → The hub retries the round; check the hospital's resources.
-- **The cron watchdog never restarts anything ("watchdog lock busy").** → A SuperNode supervisor started by the watchdog under `flock -n` inherited the lock's file descriptor. → Use `flock -n -o` in the cron line ([`install.sh`](../../deploy/flower-vm/install.sh) does).
+- **The cron watchdog never restarts anything (and `straggler.sh prepare` fails with "watchdog lock busy").** → A SuperNode supervisor started by the watchdog under `flock -n` inherited the lock's file descriptor. → Use `flock -n -o` in the cron line ([`install.sh`](../../deploy/flower-vm/install.sh) does).
 - **A `git pull` on the hospital VM changes the hospital's training code.** → `flhub_core` was installed in editable mode from the VM's checkout. → Install a fixed copy ([`deploy/flower-vm/install.sh`](../../deploy/flower-vm/install.sh) does); newer versions arrive with the FAB.
 - **`Address already in use` when the adapter is restarted.** → The start script had recorded the pid of a wrapper shell, so the stop script did not stop the adapter. → Fixed: the scripts record the adapter's own pid.
 - **Every round costs about 1.5 s more and the adapter about 1 GiB more memory at 512 MiB.** → The shared adapter base loaded the global model for every task, although a relay adapter never uses it. → Fixed in `adapters/common`: relay adapters set `needs_weights = False`.
@@ -655,8 +657,8 @@ Problems met during the two test stages, as symptom → cause → fix.
 
 What would lift the limits or harden a deployment:
 
-- **TLS and SuperNode authentication.** SuperLink `--ssl-certfile`, `--ssl-keyfile`, `--ssl-ca-certfile`, `--enable-supernode-auth` with `--auth-list-public-keys`; SuperNodes `--root-certificates` and `--auth-supernode-private-key` / `--auth-supernode-public-key` (flags of Flower 1.39.0). The adapter's `flwr` connection then needs `root-certificates`. Not tested.
-- **A lower fixed cost per round.** `--isolation process` runs the ClientApp as a long-lived process instead of one per message; it could remove most of the ClientApp start-up (§5.3). Not tested.
+- **TLS and SuperNode authentication.** SuperLink `--ssl-certfile`, `--ssl-keyfile`, `--ssl-ca-certfile` and `--enable-supernode-auth`, with each SuperNode's public key registered through the Flower CLI (`flwr supernode register <public-key> [<superlink>]`); SuperNodes `--root-certificates` and `--auth-supernode-private-key`. In Flower 1.39.0, `--auth-list-public-keys` is rejected, `--auth-supernode-public-key` is deprecated (the public key is derived from the private key), and SuperNode authentication requires TLS. The adapter's `flwr` connection then needs `root-certificates`. Not tested.
+- **A lower fixed cost per round.** In Flower 1.39.0 every message runs in a fresh `flwr-clientapp` process in both isolation modes (`--isolation process` only moves the SuperExec out of the SuperNode), so removing the per-message start-up (§5.3) needs a change in Flower (upstream idea 6 below).
 - **Large models.** Reclaim SuperLink database space without a restart, or move the object store off SQLite; measure beyond 512 MiB and beyond two sites per VM.
 - **Signed FABs.** SuperNodes that accept only FABs from trusted entities (`--trusted-entities`) need a signed hub FAB; not tested.
 - **Separate hosts.** The adapter and the hub on a host other than the SuperLink's, reaching its HTTP API over TLS; not tested.
@@ -664,8 +666,9 @@ What would lift the limits or harden a deployment:
 
 **Upstream reports.** We found no Flower bug in the two test stages. Improvement ideas that could be proposed upstream (not filed):
 
-1. *Configurable poll interval for `Grid.send_and_receive`.* It sleeps a fixed 3 s between pulls (`flwr/serverapp/grid/grid.py`), so the rounds of a built-in strategy come in steps of about 3 s. In our E7 comparison the native FedAvg rounds took 9.48 s against 7.55 s through our relay, which pulls every second.
+1. *Configurable poll interval for `Grid.send_and_receive`.* It sleeps a fixed 3 s between pulls (`HttpGrid.send_and_receive` in `flwr/superlink/grid/http_grid.py`), so the rounds of a built-in strategy come in steps of about 3 s. In our E7 comparison the native FedAvg rounds took 9.48 s against 7.55 s through our relay, which pulls every second.
 2. *Reproducible FedAvg aggregation.* `aggregate_arrayrecords` accumulates in the arrays' dtype (float32), in reply order. With unequal site sizes the result differs from a float64 reference (we measured 3e-8 after one round, growing to about 2e-2 through training), and with three or more sites the float32 sum can also depend on the reply order. Accumulating in float64, in a fixed order, would make the aggregate reproducible.
 3. *Reclaim SQLite space in the SuperLink.* Message objects are deleted after delivery, but the database file keeps its peak size (about 4 × the payload); incremental or automatic vacuuming would release it without a restart.
 4. *Clearer message for expired replies.* A ClientApp that finishes after its message's TTL logs `NoObjectInStoreError`; a message such as "reply not pushed: message expired" would make the cause obvious.
 5. *Run recovery after a SuperLink restart.* A ServerApp run ends with the SuperLink and is not restarted; a documented way to resubmit or resume a long-lived run would help applications like the relay.
+6. *Reusable ClientApp processes.* A `flwr-clientapp` process serves one message and exits (`flwr/supernode/runtime/run_clientapp.py`), and the warm executor pool covers other task types only (`flwr/supercore/superexec/executor/warm_executor_pool.py`). A ClientApp process that serves all messages of a run would remove most of the about 3 s of start-up per message that we measured (§5.3).
