@@ -8,7 +8,7 @@ This guide covers the NVFlare adapter, the hospital-side NVFlare client, and wha
 |---|---|
 | Tested version | NVFlare **2.9.0** with Python 3.11.17, torch 2.14.1+cpu, numpy 2.4.4, safetensors 0.8.0 ([`deploy/versions.env`](../../deploy/versions.env)) |
 | Protocol | `flhub/0.2` (also serves `flhub/0.1` callers) |
-| Status | Tested in stage 1 (2 hospitals, `flhub/0.1`) and stage 2 (2 hospitals, plus 2 extra hospitals for the 12-site run). Conformance suite v2 against the reference deployment: 13 of 13 tests pass, and every returned weight equals local training bit for bit (max abs diff 0.0). |
+| Status | Tested in stage 1 (2 hospitals, `flhub/0.1`) and stage 2 (2 hospitals, plus 2 extra hospitals for the 12-site run). Conformance suite v2 against the reference deployment: 13 of 13 tests pass, and every returned weight equals local training bit for bit (max abs diff 0.0). Every real run with NVFlare sites in both stages produced the same global weights as the framework-free simulation. |
 | Hospital code | [`clients/nvflare/client.py`](../../clients/nvflare/client.py), 48 lines, the standard NVFlare Client API loop. 0 lines changed since stage 1. |
 | Rollout channel | The job's custom code (`custom/client.py` and `custom/flhub_core/`), deployed by the NVFlare server like any other job. |
 
@@ -115,7 +115,20 @@ python -m adapters.nvflare.service --admin-kit <admin kit dir> --job-dir <jobs d
 | `restart_server.sh` | restarts only the NVFlare server; hospitals reconnect and the keeper submits a new relay job |
 | `purge.sh` | deletes finished jobs from the server's job store (FLARE API) and stale server job workspaces |
 
-The hospital side has its own scripts in [`deploy/nvflare-vm/`](../../deploy/nvflare-vm/) (`install.sh`, `start.sh`, `stop.sh`, `status.sh`). `GET /relay/status` on the adapter shows the relay's liveness, the relay job id and the job each client runs.
+`GET /relay/status` on the adapter shows the relay's liveness, the relay job id and the job each client runs. The adapter's keeper and site status have unit tests against a fake FLARE API: [`tests/unit/test_nvflare_adapter.py`](../../tests/unit/test_nvflare_adapter.py) (12 tests; skipped where `nvflare` is not installed).
+
+The hospital side of the testbed has its own scripts:
+
+| Script (`deploy/nvflare-vm/`) | What it does |
+|---|---|
+| `install.sh [kit.tgz ...]` | Python environment (`nvflare`, torch, numpy, safetensors; removes an installed `flhub_core`), sha256-verified data files, the operator's kits (archives deleted after unpacking) |
+| `start.sh [site ...]` | starts each site with its kit's `startup/start.sh` and `FLHUB_DATA_PATH` set, waits for "Successfully registered client", enables a per-minute cron watchdog |
+| `status.sh [site ...]` | per site: client process alive and connected to the server |
+| `stop.sh [site ...]` | stops sites through the kit's `shutdown.fl` and disables their watchdog |
+| `switch_s2.sh` | the one-time switch to job-shipped `flhub_core` (§3) |
+| `extra.sh install\|start\|stop\|status` | the two extra hospitals of the 12-site run |
+
+The other files in [`deploy/nvflare-vm/`](../../deploy/nvflare-vm/) are experiment tooling and are not needed to run the hub: fault injection (`inject.sh`, `inject_watch.py`), CPU throttling (`straggler.sh`), link shaping (`netem.sh`), monitoring (`sysmon.sh`, `run_follow.py`), the end-state check (`endstate.sh`) and analysis scripts.
 
 ## 3. Client side: what the hospital code must contain
 
@@ -166,7 +179,7 @@ flare.send(FLModel(
 ))
 ```
 
-The relay rejects a reply that is not `FULL` or has no positive `num_examples` (it falls back to `NUM_STEPS_CURRENT_ROUND`). A missing `client_code_version` is reported as `unknown`, and the hub then cannot verify the code the site ran.
+The relay rejects a reply that is not `FULL` or has no positive `num_examples` (it falls back to `NUM_STEPS_CURRENT_ROUND`). A missing `client_code_version` is reported as `unknown`, and the hub then cannot verify the code the site ran. (On the wire, NVFlare 2.9 carries the metrics as `meta["initial_metrics"]` when parameters are present; the server's `FLModel.metrics` holds them again.)
 
 **Data and data variants.** Hospitals hold sha256-verified CSV files (`label,x0..x783`), written by `python -m flhub_core.data materialize`. A data variant is a file `<variant>-<site>.csv` next to `<site>.csv`. The hub selects it per run with `train_config["data_variant"]`, so a new variant needs a new file at the hospital, never a configuration change. Each reply carries `data_fp` (the first 32 bits of the data fingerprint), which the hub checks against the partition manifest.
 
@@ -220,7 +233,7 @@ The hub reuses an NVFlare 2.9 project as it is: the server, its provisioning and
 5. **Hospitals.** No new credentials and no new software. Each hospital removes `flhub_core` if it had installed it, restarts its client once, and places its data file at `$FLHUB_DATA_DIR/<site>.csv` or sets `FLHUB_DATA_PATH` in the client's environment. Its Python environment needs torch, numpy and safetensors next to NVFlare; for bit-exact results, the versions of [`deploy/versions.env`](../../deploy/versions.env).
 6. **Check.** `discover` must list every site as `online` (see `deploy/central/nvflare/status.sh`). Then run the conformance suite against the adapter: `pytest tests/conformance --adapter http://127.0.0.1:8811`.
 
-**Credentials in use:** the hospitals' kits (mTLS client certificates, unchanged), the operator's admin kit (adapter only) and the root CA from `nvflare provision`. New hospitals get kits from `nvflare provision --add-client` with the same root CA; the running server and the existing kits stay valid ([`provision_extra.sh`](../../deploy/central/nvflare/provision_extra.sh)). The testbed kits expire on 2027-10-08; `provision.sh --force` issues new ones, which must then be redistributed.
+**Credentials in use:** the hospitals' kits (mTLS client certificates, unchanged), the operator's admin kit (adapter only) and the root CA from `nvflare provision`. New hospitals get kits from `nvflare provision --add-client` with the same root CA; the running server and the existing kits stay valid ([`provision_extra.sh`](../../deploy/central/nvflare/provision_extra.sh)). The testbed kits expire on 2027-10-08; `provision.sh --force` issues new ones, which must then be redistributed. NVFlare 2.9 kits have no `signature.json`, so nothing checks the integrity of a kit's `startup/` folder; the mTLS certificates are the trust anchor.
 
 **Two NVFlare 2.9 defaults to know.** Kits enforce a class allow-list (`class_list_enforcement_mode: enforce`) that does not contain `ClientAPIExecutor`; jobs with custom code (BYOC) bypass it, and the relay job is such a job. A server app without custom code is held to the list (`ComponentNotAuthorized`), which is why the E7 native job ships its workflow as custom code.
 
@@ -260,6 +273,8 @@ The adapter touches these NVFlare interfaces:
 | FLARE API: `new_secure_session`, `list_jobs`, `get_job_meta`, `submit_job`, `abort_job`, `delete_job`, `get_client_job_status`, `get_system_info` | the keeper and the online probe |
 | Provisioning: `nvflare provision`, `--add-client` | kits for the server, hospitals and admin |
 
+Moving the adapter from `flhub/0.1` to `flhub/0.2` (one task per site, per-site results and cancels, keeper changes, the job that ships `flhub_core`) changed `adapters/nvflare/` by +313 −94 lines in four files, plus `native.py` (+284) for the E7 baseline; `deploy/central/nvflare/` by +137 −13 lines; `clients/nvflare/` by 0 lines (`git diff --stat stage1-final stage2-final`).
+
 The hospital-side integration cost is in §3: no code, the standard kit, a data file, and one restart when the rollout channel changes.
 
 ### 5.3 Runtime overhead
@@ -290,6 +305,8 @@ Source: [e7-native-vs-hub.md](../results/evidence/stage2/nvflare/e7-native-vs-hu
 | 512 | 15.49 | – | – | 5.01 | 2.11 |
 
 Source: [e4a-breakdown.md](../results/evidence/stage2/nvflare/e4a-breakdown.md) (timings), [stage-2 NVFlare section](https://github.com/Zare2001/AgnosticFL/blob/stage2-final/docs/report/stage2/nvflare.md) §4 (memory); figure [e4a_round_time_vs_payload.png](../results/figures/e4a_round_time_vs_payload.png).
+
+In the mixed scope (six sites, three frameworks) NVFlare's fan-out was 1.8–3.8 s from 1 to 64 MiB and 5.5 s at 128 MiB; vantage6 set those round times ([tables.md](../results/evidence/stage2/tables.md)).
 
 **The ~2.5 s floor.** Below about 64 MiB, an NVFlare round costs 2.3–2.6 s whatever the size. The server tells each client to wait `task_request_interval` (default 2 s, `private/fed/server/server_json_config.py:102`) before its next task request. In the client log of the 1 MiB run, the client side of a round takes 0.55 s, and the next task arrives 2.04 s after the result left. The interval is a server-side job setting (`server.task_request_interval`) that changes latency only; it was left at its default, and the native E7 runs have the same floor.
 
@@ -383,6 +400,8 @@ Adapter-side settings: the NVFlare task timeout is the dispatch's `deadline_s`; 
 | The relay job is aborted during a normal stop | the job needs a few seconds to end after the relay returns | `stop.sh` waits up to 20 s before it aborts |
 | `startup/stop_fl.sh` waits for a key press | the kit's stop script is interactive | create `shutdown.fl` in the kit directory (`stop.sh` does) |
 | Native `FedAvg` trains with defaults from round 2 | `FLModelUtils.update_model` replaces the model meta | re-attach the `train_config` in `send_model()` ([`native.py`](../../adapters/nvflare/native.py)) |
+| `native/run.sh` exits with `native: <dir> exists` | it refuses an existing output directory | pass a new directory |
+| The client's log shows a warning `posix_spawn … falling back to subprocess` | NVFlare's process launcher | harmless; no action |
 
 ## 8. Future work and upstream reports
 
@@ -391,6 +410,7 @@ Adapter-side settings: the NVFlare task timeout is the dispatch's `deadline_s`; 
 - **One relay job per hospital.** Isolates sites: a crash or restart at one hospital no longer touches the others (issues 1–3), at the cost of one server job process per site.
 - **Rejoin without a job restart.** A client that re-attaches to a running job would remove the keeper's restart and its idle-time condition. This needs NVFlare support.
 - **Lower `task_request_interval`** for latency-bound use with small models (§5.3).
+- **A rollout without any hospital step.** `ScriptRunner(..., launch_external_process=True)` runs the script as an external process with its own directory first on `sys.path`, so the job's `flhub_core` would win even over an installed copy. It was not used because it adds a pipe hop to every model transfer and changes the stage-1 execution mode (ADR-018).
 - **Hardening:** bind the admin port to loopback (`admin_host` in `fed_server.json`); give the custom-code permission only to a dedicated submitter role; ship the hospital code as a signed package instead of job custom code.
 
 **Draft upstream issues (not filed).**
