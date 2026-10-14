@@ -15,7 +15,7 @@ This guide explains how the hub drives a [Flower](https://flower.ai) federation:
 
 What the adapter does: it keeps one Flower run alive on the SuperLink. That run's ServerApp, the *relay*, takes each round from the adapter and sends one standard TRAIN message per site through Flower's `Grid`; the hospitals answer through Flower's Message API, and the relay hands every reply back to the adapter as a per-site result.
 
-Sources for this guide. Full stage reports and Flower sections at their tags: [stage-1 report](https://github.com/Zare2001/AgnosticFL/blob/stage1-final/REPORT.md), [stage-1 Flower section](https://github.com/Zare2001/AgnosticFL/blob/stage1-final/docs/report/flower.md), [stage-2 report](https://github.com/Zare2001/AgnosticFL/blob/stage2-final/REPORT_STAGE2.md), [stage-2 Flower section](https://github.com/Zare2001/AgnosticFL/blob/stage2-final/docs/report/stage2/flower.md). Decisions: ADR-007, ADR-016 and ADR-017 in [design/decisions.md](../design/decisions.md). Evidence: conformance reports [stage 1](../results/evidence/stage1/conformance-flower-central.json) and [stage 2](../results/evidence/stage2/conformance-v2-flower-central.json), the run tables in [tables.md](../results/evidence/stage2/tables.md) (the equivalence check of every real run is under RQ1) and the [hospital ledger](../results/evidence/hospital-ledger.md). Summaries of both stages: [results/stage1.md](../results/stage1.md), [results/stage2.md](../results/stage2.md).
+Sources for this guide. Full stage reports and Flower sections at their tags: [stage-1 report](https://github.com/Zare2001/AgnosticFL/blob/stage1-final/REPORT.md), [stage-1 Flower section](https://github.com/Zare2001/AgnosticFL/blob/stage1-final/docs/report/flower.md), [stage-2 report](https://github.com/Zare2001/AgnosticFL/blob/stage2-final/REPORT_STAGE2.md), [stage-2 Flower section](https://github.com/Zare2001/AgnosticFL/blob/stage2-final/docs/report/stage2/flower.md). Decisions: ADR-007, ADR-016 and ADR-017 in [design/decisions.md](../design/decisions.md). Evidence: conformance reports [stage 1](../results/evidence/stage1/conformance-flower-central.json) and [stage 2](../results/evidence/stage2/conformance-v2-flower-central.json), the run tables in [tables.md](../results/evidence/stage2/tables.md) (the equivalence check of every real run is under RQ1), the [hospital ledger](../results/evidence/hospital-ledger.md) and the Flower evidence files in [results/evidence/stage2/flower/](../results/evidence/stage2/flower/). Summaries of both stages: [results/stage1.md](../results/stage1.md), [results/stage2.md](../results/stage2.md).
 
 ## 2. Server side: how the adapter maps flhub onto Flower
 
@@ -362,8 +362,265 @@ Each SuperNode has its own `FLWR_HOME` (so two nodes never unpack the same FAB a
 
 ## 5. Cost and efficiency for Flower
 
+All numbers are from the reference testbed: 4-vCPU AMD EPYC-Rome VMs with 31 GiB RAM in one data centre, CPU only, with the SuperLink on the central VM and the two Flower hospitals on one hospital VM. Memory figures come from the testbed's sampler (`scripts/sysmon.py`, 1 s interval) and are in MiB/GiB; payload sizes `payload-<N>` are N MiB. The hub-wide view, with the other frameworks, is in [cost-and-efficiency.md](../cost-and-efficiency.md).
+
+### 5.1 At a glance
+
+| Dimension | Flower | Source |
+|---|---|---|
+| Adapter code | 553 lines: adapter service 210, relay ServerApp 342 (central only), package marker 1 | [loc.md](../results/evidence/loc.md) |
+| Hospital code | 75 lines (`client_app.py` 50, `records.py` 24, package marker 1) and 26 configuration lines of FAB metadata; 0 lines changed since stage 1 | [loc.md](../results/evidence/loc.md), [ledger](../results/evidence/hospital-ledger.md) |
+| Hospital steps per new `flhub_core` version | 0 steps, 0 restarts, 0 s downtime | [ledger](../results/evidence/hospital-ledger.md) |
+| Server-side rollout | `restart.sh adapter`: HEALTHY after 29.6 s; SuperNodes had the new FAB 21.5 s after the adapter's SIGTERM | [ledger](../results/evidence/hospital-ledger.md) |
+| Hub overhead against Flower's own FedAvg (E7) | −1.93 s (−20.3 %) per round with `cnn-small`; +0.73 s (+9.8 %) with a 45 MiB payload | [tables.md](../results/evidence/stage2/tables.md) |
+| Fixed cost per round, cost per MiB | a = 5.48 s, b = 0.0612 s/MiB (R² 0.956, 1–512 MiB) | [cost_model.md](../results/evidence/stage2/cost_model.md) |
+| Bytes on the wire ÷ payload (E4a) | 1.002–1.005 (8–512 MiB) | [e4_bytes.md](../results/evidence/stage2/e4_bytes.md) |
+| Bandwidth efficiency at 20 Mbit/s (E4b) | 0.89 of the lower bound | [cost_model.md](../results/evidence/stage2/cost_model.md) |
+| Largest payload carried | 512 MiB per site and direction (45.8 s per round) | [tables.md](../results/evidence/stage2/tables.md) |
+| Overhead per site and round (E3) | 5.6 s (`cnn-small`), 6.3 s (`cnn-medium`), 10.9 s (`resnet18-gn`) | [tables.md](../results/evidence/stage2/tables.md) |
+| 6 → 12 sites (E5) | Flower fan-out 7.6 s → 8.3 s | [tables.md](../results/evidence/stage2/tables.md) |
+| Hospital crash (E6a): detected / recovered | 20.7 s / 31.3 s, no manual action | [e6.md](../results/evidence/stage2/e6.md) |
+
+### 5.2 Implementation and integration cost
+
+Code lines are non-blank, non-comment lines as counted by [`scripts/docs/loc.py`](../../scripts/docs/loc.py) ([loc.md](../results/evidence/loc.md) has the component totals; the per-file numbers come from the same counter).
+
+| Part | Files | Code lines | Runs on |
+|---|---|---|---|
+| adapter and relay launcher | [`adapters/flower/service.py`](../../adapters/flower/service.py) (+ `__init__.py`, 1 line) | 210 | central host |
+| relay ServerApp | [`clients/flower/flhub_flower/server_app.py`](../../clients/flower/flhub_flower/server_app.py) | 342 | central host, inside a Flower run |
+| hospital ClientApp | [`client_app.py`](../../clients/flower/flhub_flower/client_app.py), [`records.py`](../../clients/flower/flhub_flower/records.py) (+ `__init__.py`, 1 line) | 50 + 24 | hospitals, inside the FAB |
+| FAB metadata | [`clients/flower/pyproject.toml`](../../clients/flower/pyproject.toml) | 26 configuration lines | — |
+| tests | [`tests/flower/test_flower_relay.py`](../../tests/flower/test_flower_relay.py), 11 tests with a fake `Grid` that runs the real ClientApp | 275 | developer machine |
+| reference deployment | [`deploy/central/flower/`](../../deploy/central/flower/), [`deploy/flower-vm/`](../../deploy/flower-vm/) (25 files, including the experiment tools, without the E7 baseline) | 940 (+ 27 configuration lines) | testbed |
+
+For comparison, the shared adapter base in `adapters/common` that the Flower adapter builds on has 1,182 lines, and the mock adapter 100 ([loc.md](../results/evidence/loc.md)).
+
+The native FedAvg baseline in [`deploy/central/flower/native/`](../../deploy/central/flower/native/) exists only for the E7 comparison and is not needed to run the hub.
+
+The adapter uses these Flower interfaces:
+
+| Flower interface | Used for |
+|---|---|
+| `ServerApp`, `@app.main()`, `Grid.get_node_ids`, `Grid.push_messages`, `Grid.pull_messages`, `Context.run_config`, `Context.run_id` | the relay |
+| `Message` (`MessageType.TRAIN`, `MessageType.QUERY`, `ttl`, `group_id`, `reply_to`, `has_error`, `error`), `metadata.reply_to_message_id` | requests and replies |
+| `RecordDict`, `ArrayRecord`, `Array`, `ConfigRecord`, `MetricRecord` | message content |
+| `ClientApp`, `@app.train()`, `@app.query()`, `Context.node_config` | the hospital ClientApp |
+| `flwr run`, `flwr stop`, connections in `$FLWR_HOME/config.toml` | relay lifecycle |
+| `flower-superlink` (`--database`, `--disable-runtime-dependency-installation`), `flower-supernode` (`--node-config`) | deployment |
+
+The hospital-side cost, split as in [cost-and-efficiency.md](../cost-and-efficiency.md) (details in §3 and the [ledger](../results/evidence/hospital-ledger.md)):
+
+| Hospital step | Flower |
+|---|---|
+| (a) code rollout of `flhub_core` 0.2 | 0 steps, 0 restarts, 0 s downtime: the new FAB arrived with the next relay run |
+| (b) data provisioning for the stage-2 data variants | data only: variant files next to `<site>.csv` (44 s), no restart |
+| (c) configuration for data variants | none: `flhub_core` finds `<variant>-<site>.csv` next to the configured file |
+| (d) later code updates | 0 steps |
+| one-time setup | the standard SuperNode with `site-id` and `data-path` in its node config, the site's data, and torch, numpy and safetensors in its environment |
+
+### 5.3 Runtime overhead
+
+**Against Flower's own FedAvg (E7).** Same two hospitals, same ClientApp, same `flhub_core.train`, same configuration. The native path is Flower's built-in `FedAvg` strategy (`fraction_train` 1.0, no federated evaluation) in its own ServerApp, run on the same SuperLink next to the idle relay run. Its only additions are recording hooks: `round` in the train config (Flower's FedAvg adds only `server-round`), one SuperNode per site, and hub-format checkpoints and evaluation. Median over rounds ≥ 2 ([tables.md](../results/evidence/stage2/tables.md), E7):
+
+| Configuration | Native round | Hub round | Hub overhead | Global weights |
+|---|---|---|---|---|
+| C1: `cnn-small`, `iid`, 20 rounds | 9.48 s | 7.55 s | −1.93 s (−20.3 %) | hash-identical in every round |
+| C2: `payload-45`, 5 rounds | 7.45 s | 8.19 s | +0.73 s (+9.8 %) | hash-identical in every round |
+
+![E7: native FedAvg against the hub path](../results/figures/e7_native_vs_hub.png)
+
+- **Why the hub path is faster for C1.** `Grid.send_and_receive`, which Flower's built-in strategies use, sleeps 3 s between pulls (`flwr/serverapp/grid/grid.py`), so native rounds come in steps of about 3 s. The relay pulls every second.
+- **Why it is slower for C2.** The hub path moves the weights through the hub core. Per site: relay preparation 0.12 s, push 0.63 s, store 0.19 s; push to reply 6.15 s.
+- **Round time.** Native: end of `configure_train` to start of `aggregate_train`. Hub: dispatch to the last result. Neither includes aggregation or evaluation.
+- **Why the weights are identical.** Both sites hold the same number of examples (5,760 in C1, 784 in C2), so each weight factor is exactly 0.5. Flower's `FedAvg` accumulates the weighted arrays in float32, in reply order (`aggregate_arrayrecords` in `flwr/serverapp/strategy/strategy_utils.py`); with factors of 0.5 every term is exact, and both paths round the same exact sum once. With unequal site sizes they differ: in an extra test with the `qty` partition (factors 2194/6583 and 4389/6583), the native weights differed from the hub's by 3.0e-8 after round 1, by 1e-6 to 7e-6 in rounds 2–4 and by about 2e-2 from round 6, because SGD amplifies small differences; test accuracy was equal up to round 4 and within 0.6 percentage points afterwards. This is a property of Flower's float32 aggregation, not of the transport.
+- **Memory on the central host** (peak RSS). C1: relay ServerApp 139 MiB + adapter 44 MiB + hub core 47 MiB + orchestrator 377 MiB (with evaluation) = 607 MiB, against 624 MiB for the native ServerApp (strategy and the same evaluation). C2: 390 + 44 + 47 + 566 = 1,047 MiB against 887 MiB.
+
+E7 sources besides `tables.md`: the [stage-2 Flower section](https://github.com/Zare2001/AgnosticFL/blob/stage2-final/docs/report/stage2/flower.md) (§5) at the `stage2-final` tag.
+
+**Round-time breakdown with training (E3).** FedAvg runs, median over rounds ≥ 2 ([tables.md](../results/evidence/stage2/tables.md), E3). *Overhead* is the time per site and round that is not training: transport, Flower and the adapter.
+
+| Model (parameters) | Flower training | Flower overhead per site | Flower fan-out | Round, all frameworks |
+|---|---|---|---|---|
+| `cnn-small` (52,203) | 1.60 s | 5.63 s | 7.86 s | 9.13 s |
+| `cnn-medium` (1,676,779) | 13.93 s | 6.25 s | 21.08 s | 28.77 s |
+| `resnet18-gn` (11,173,323) | 223.31 s | 10.86 s | 235.49 s | 267.97 s |
+
+Flower's overhead falls from 72 % of its fan-out time with `cnn-small` to 5 % with `resnet18-gn`.
+
+![E3: round-time breakdown](../results/figures/e3_round_time_breakdown.png)
+
+**Cost model.** Fan-out time per round ≈ a + b·P + the slowest site's training, with P the model size in MiB, fitted on the E4a echo sweep ([cost_model.md](../results/evidence/stage2/cost_model.md)): a = 5.48 s, b = 0.0612 s/MiB, R² 0.956 over 1–512 MiB; a quadratic term (c = 5.26e-5 s/MiB²) raises R² to 0.997. The linear model predicts the fan-out of the learning runs within −10 % (`cnn-small`), −4 to −1 % (`cnn-medium`) and −1 % (`resnet18-gn`).
+
+**Where the fixed cost comes from.** Breakdown of the E4a echo runs on the real system, medians over rounds 2–3 and both sites, from the relay's timing metrics ([e4a-breakdown.md](../results/evidence/stage2/flower/e4a-breakdown.md)). *Site result* is the time from dispatch to a site's result at the hub. *Flower transport* is the time from push to reply minus training and data loading: SuperNode download, ClientApp start, upload and the relay's pull.
+
+| Payload (MiB) | Round | Site result | Relay preparation | Push to SuperLink | Flower transport | Store in hub core | Training (echo) |
+|---|---|---|---|---|---|---|---|
+| 1 | 5.79 s | 5.28 s | 0.00 s | 0.07 s | 5.11 s | 0.01 s | 0.00 s |
+| 8 | 6.07 s | 5.04 s | 0.02 s | 0.14 s | 4.69 s | 0.03 s | 0.00 s |
+| 32 | 7.69 s | 6.29 s | 0.09 s | 0.47 s | 5.47 s | 0.14 s | 0.01 s |
+| 64 | 9.08 s | 7.93 s | 0.17 s | 0.82 s | 6.46 s | 0.27 s | 0.03 s |
+| 128 | 13.51 s | 12.58 s | 0.24 s | 1.61 s | 10.03 s | 0.53 s | 0.05 s |
+| 256 | 20.61 s | 17.75 s | 0.37 s | 3.35 s | 12.75 s | 1.06 s | 0.10 s |
+
+Flower's own path costs about 5 s per round at any size and about 0.03 s per MiB on top; the hub side (relay preparation, push, store and the adapter) adds 0.16 s at 1 MiB and 4.90 s at 256 MiB. The largest part of the 5 s is the fresh `flwr-clientapp` process that Flower starts for every message: at a hospital the process started 0.3 s after the train message arrived, but training (1.6 s, `cnn-small`) began only about 3.2 s after it and ended at about 4.8 s; the process ended at about 5.0 s. Pull intervals add the rest.
+
+![E4a: round time against payload](../results/figures/e4a_round_time_vs_payload.png)
+
+### 5.4 Network efficiency
+
+**Bytes on the wire.** Interface byte counts on the hospital VM during each run, divided by the payload the run must move (sites × 2 directions × rounds × size) ([e4_bytes.md](../results/evidence/stage2/e4_bytes.md)):
+
+| Runs | Bytes on the wire ÷ payload |
+|---|---|
+| E4a, Flower only, 8–512 MiB | 1.002–1.005 |
+| E4a, mixed scope, 1–128 MiB | 1.003–1.023 |
+| E4b, `payload-45` under traffic shaping | 1.003–1.021 |
+| E7, hub path / native path, `payload-45` | 1.002 / 1.003 |
+
+Flower moves each update once. At 1 MiB the count is too coarse to use: 11.2 MiB counted for 12 MiB moved (ratio 0.938), with 2.7 MiB of background traffic on the idle VM. Flower's own accounting of the native E7 runs (`flwr ls --format json`) agrees: 17.2 MB (10⁶ bytes) on the wire for C1, against 16.7 MB expected, and 943.9 MB for C2, against 943.7 MB.
+
+**Bandwidth efficiency (E4b).** `payload-45` in the mixed scope, 3 rounds per profile, with `netem` rate and delay on the hospital links in both directions. The lower bound is the time to move 4 × P over the link (two sites, each P down and P up); efficiency = bound ÷ measured fan-out ([cost_model.md](../results/evidence/stage2/cost_model.md), E4b; RTT from the [stage-2 Flower section](https://github.com/Zare2001/AgnosticFL/blob/stage2-final/docs/report/stage2/flower.md) §4):
+
+| Profile | Rate, delay per direction | Lower bound | Flower fan-out | Efficiency | Measured RTT to port 9092 |
+|---|---|---|---|---|---|
+| none | — | — | 7.5 s | — | 0.8 ms |
+| wan1g | 1 Gbit/s, 5 ms | 1.5 s | 8.9 s | 0.17 | 10.9 ms |
+| wan100 | 100 Mbit/s, 20 ms | 15.1 s | 22.7 s | 0.67 | 40.9 ms |
+| wan20 | 20 Mbit/s, 40 ms | 75.5 s | 85.1 s | 0.89 | 81.0 ms |
+
+On fast links Flower's fixed cost per round dominates; on the 20 Mbit/s link the transfer dominates and Flower reaches 89 % of the bound. No SuperNode reconnected or logged an error under shaping.
+
+![E4b: measured fan-out against the lower bound](../results/figures/e4b_measured_vs_bound.png)
+
+### 5.5 Memory and disk
+
+**Hospital VM** (two SuperNodes, E4a echo runs on the real system; peak over the run; [e4a-flower-vm-memory.md](../results/evidence/stage2/flower/e4a-flower-vm-memory.md)):
+
+| Payload (MiB) | VM memory in use | ClientApp per site | SuperNode per site | SuperExec per site |
+|---|---|---|---|---|
+| 1 | 1,923 MiB | 319 MiB | 199–314 MiB | 124 MiB |
+| 8 | 2,033 MiB | 313–368 MiB | 254–346 MiB | 124 MiB |
+| 32 | 2,156 MiB | 404–405 MiB | 322–370 MiB | 124 MiB |
+| 64 | 2,519 MiB | 624–636 MiB | 404–406 MiB | 124 MiB |
+| 128 | 3,704 MiB | 949–950 MiB | 584–620 MiB | 124 MiB |
+| 256 | 5,054 MiB | 1,433–1,462 MiB | 921–982 MiB | 124 MiB |
+| 512 | 7,723 MiB (24 % of 31.3 GiB) | 2,461 MiB | 1,113–1,180 MiB | 123–124 MiB |
+
+At 512 MiB a hospital's ClientApp peaks at about 4.8 × the payload and its SuperNode at 2.2–2.3 ×. With real training (E3) the largest Flower process was a ClientApp of 432 MiB (`cnn-small`), 532 MiB (`cnn-medium`) and 998–1,012 MiB (`resnet18-gn`), and the hospital VM peaked at 2,152, 2,432–2,475 and 3,395–3,487 MiB ([tables.md](../results/evidence/stage2/tables.md), E3 resources).
+
+**Central host.** The relay ServerApp's peak RSS grew to about 7.6 × the payload in the E4a sweep ([stage-2 report](https://github.com/Zare2001/AgnosticFL/blob/stage2-final/REPORT_STAGE2.md) §6.1); [e4a_peak_rss_vs_payload.png](../results/figures/e4a_peak_rss_vs_payload.png) shows the SuperLink and the other central components in the mixed scope.
+
+**SuperLink disk.** With `--database` the SuperLink keeps message objects (the weights, in 5 MiB chunks) in SQLite. They are deleted once delivered, but SQLite keeps the freed pages and the write-ahead log, so the database stays at its peak size: about 4 × the payload with two sites (2,082 MiB after a 512 MiB run in a single-VM test). [`purge.sh`](../../deploy/central/flower/purge.sh) stops the adapter and the SuperLink, checkpoints the log, runs `VACUUM` and starts both again; this brought the database to about 1 MiB in about 35 s. Node rows survive, so the SuperNodes reconnect with their ids. Plan free disk on the central host accordingly for large models; more than two Flower sites were not measured.
+
+### 5.6 Scaling (E5)
+
+`iid` over 6 sites against `iid12` over 12 sites (Flower: 2 → 4 sites on one VM; each extra site holds half as much data), FedAvg, 20 rounds ([tables.md](../results/evidence/stage2/tables.md), E5; per-site and CPU rows from the [stage-2 report](https://github.com/Zare2001/AgnosticFL/blob/stage2-final/REPORT_STAGE2.md) §6.4):
+
+| | 6 sites | 12 sites |
+|---|---|---|
+| Flower fan-out | 7.6 s | 8.3 s |
+| training per Flower site | 1.61 s | 1.29 s |
+| overhead per Flower site | 5.6 s | 6.4 s |
+| Flower VM CPU, mean | 25.2 % | 39.8 % |
+
+Four ClientApp processes now share the hospital VM's 4 vCPUs, and each extra site adds its own per-message start-up. The two extra SuperNodes were started with the standard scripts and were connected and mapped by the relay 12 s after their start. In a mixed federation the round waits for the slowest framework ([cost-and-efficiency.md](../cost-and-efficiency.md)).
+
+![E5: scaling from 6 to 12 sites](../results/figures/e5_scaling.png)
+
+### 5.7 Robustness (E6)
+
+Faults injected on the real system, `dir0.3`, `cnn-small`, six base sites ([e6.md](../results/evidence/stage2/e6.md); [stage-2 report](https://github.com/Zare2001/AgnosticFL/blob/stage2-final/REPORT_STAGE2.md) §7). No run needed a manual action, and every run still equals `hub.sim` (with the recorded participants).
+
+| Fault | Detection | Recovery |
+|---|---|---|
+| SuperNode process tree of `flw-h5` killed 4 s after round 15's train message arrived, all sites required | 20.7 s (relay: SuperNode replaced) | round retried, done 31.3 s after the kill |
+| the same with `min_sites` 5 | 26.1 s | round finished with 5 sites 26.1 s after the kill; `flw-h5` back in round 16 |
+| `flw-h6` throttled to 10 % CPU, deadline 20 s, `min_sites` 5 | — | `flw-h6` dropped in all 7 throttled rounds; rounds ended at the deadline (20.2 s) |
+| SuperLink restarted between rounds | — | relay relaunched by the adapter after 35.9 s; next round done 47.7 s after the restart |
+| SuperLink restarted mid-round | 22.8 s (no relay heartbeat for 20 s) | round retried, done 54.6 s after the restart |
+| orchestrator and all adapters killed (SIGKILL) | — | Flower relay run back 7.0 s after the kill; the resumed run is hash-identical to the uninterrupted one |
+
+At the hospital, the killed SuperNode was restarted by its supervisor after 10 s and registered again 11.1 s after the kill with a new node id. Through the SuperLink restarts the SuperNodes kept running and kept their node ids (persistent `--database`). Throttled ClientApps finished after their messages had expired (TTL = deadline), so Flower dropped those late replies at the hospital. Tests on a single-VM setup ([ADR-017](../design/decisions.md)) showed Flower's own detection: a killed ClientApp process alone is reported by Flower as `CLIENT_APP_CRASHED` after 58 s (task heartbeat expiry), and a SIGTERM to a SuperNode as `NODE_UNAVAILABLE` after 1.2 s.
+
+![E6: SuperLink restarts](../results/figures/e6_timeline_s2-e6e-server-restart.png)
+
 ## 6. Limits, known issues and knobs
+
+### 6.1 Measured limits
+
+| Limit | Value | Evidence |
+|---|---|---|
+| Largest payload carried | 512 MiB per site and direction, 45.8 s per round, no knob changed. 1024 MiB was not run: the testbed's central disk was the limit, not Flower. | [tables.md](../results/evidence/stage2/tables.md) (E4a) |
+| gRPC message size | 2 GiB − 1 B (`GRPC_MAX_MESSAGE_LENGTH`, `flwr/supercore/grpc.py`), not configurable. Arrays travel in 5 MiB chunks, so this does not cap the model size; the adapter declares `max_payload_mb` 2048. | Flower 1.39.0 source |
+| FAB size | 10 MiB, file types as in §3.4. The FAB carries the Flower app and `flhub_core`. | Flower 1.39.0 source |
+| Fixed cost per round | about 5.5 s (a = 5.48 s), largely the fresh ClientApp process per message | §5.3 |
+| SuperLink database | about 4 × the payload with two sites, not released without `VACUUM` | §5.5 |
+| Hospital memory at 512 MiB | 7,723 MiB for two sites (24 % of the VM) | §5.5 |
+| Detection of a dead SuperNode | 20–26 s through the relay (node offline or replaced); a crashed ClientApp alone: 58 s through Flower's task heartbeat | §5.7 |
+| Sites tested | up to 4 Flower sites on one VM (12 sites in total) | §5.6 |
+
+### 6.2 Known issues and failure modes
+
+- **The relay dies with the SuperLink.** Flower's parent-process monitors end SuperExec and the relay ServerApp when the SuperLink stops, and Flower does not restart a run. The adapter notices after 20 s without a beat, fails the round in flight and starts a new relay; the hub retries the round (§5.7).
+- **SuperNodes exit when the SuperLink forgets them.** A SuperLink restarted without its database answers `UNAUTHENTICATED`; the SuperNode then stops itself ("SuperNode terminated gracefully"). Run the SuperLink with `--database` and supervise the SuperNodes.
+- **Old node ids stay listed for up to 60 s** after a SuperNode restart, because offline detection is heartbeat-based. The relay's site mapping handles this (§2.3).
+- **Late replies are dropped at the hospital.** A message's TTL is the round deadline; a ClientApp that finishes later cannot push its reply, and the SuperNode logs `NoObjectInStoreError` / `Failed to push reply message`. Harmless: the hub has already finished the round without that site.
+- **The SuperLink database does not shrink** (§5.5), and reclaiming the space needs a short SuperLink restart (`purge.sh`). The SuperNodes reconnect with their ids and log a few `Connection attempt failed, retrying` lines.
+- **No transport security in the testbed.** Flower runs with `--insecure` and without SuperNode authentication, restricted by the cloud firewall (§8).
+- **The SuperLink logs every HTTP request** of its local API; a long-lived deployment should use `--log-file` with rotation.
+- **The FAB declares a license string.** [`clients/flower/pyproject.toml`](../../clients/flower/pyproject.toml) contains `license = "Apache-2.0"` as FAB metadata, although no license has been chosen for this repository yet. This is a known inconsistency that stays until the author chooses a license ([limitations-and-future-work.md](../limitations-and-future-work.md)).
+
+### 6.3 Knobs
+
+| Knob | Side | Default | In the testbed |
+|---|---|---|---|
+| `deadline_s`, `round_retries`, `participation: {fraction, min_sites}` (orchestrator config) | hub | per run | set per experiment; the relay uses the deadline as message TTL and gives a missing SuperNode min(60 s, deadline/4) |
+| `--database` | SuperLink | in memory | SQLite file, keeps node ids across restarts |
+| `--disable-runtime-dependency-installation` (SuperLink), `--allow-runtime-dependency-installation` (SuperNode) | both | SuperLink installs, SuperNode does not | installation off on both sides |
+| `--isolation subprocess\|process` | SuperLink, SuperNode | `subprocess` | `subprocess` |
+| array chunk size `FLWR_PRIVATE_MAX_ARRAY_CHUNK_SIZE` (environment; `flwr/common/constant.py`) | sender of a message | 5 MiB | default |
+| concurrent object transfers `FLWR_PRIVATE_MAX_CONCURRENT_OBJ_PUSHES` / `_PULLS` (environment; `flwr/supercore/constant.py`) | each side | 2 | default |
+| message TTL (`DEFAULT_TTL`, `flwr/app/constants.py`) | ServerApp | 12 h | the relay sets the round deadline |
+| heartbeat (`flwr/common/constant.py`) | SuperNode | every 30 s × (0.8 ± 0.1); offline after 60 s | default |
+| relay timing constants (`NODE_REFRESH_S`, `PULL_INTERVAL_S`, `SITE_WAIT_S`, `BEAT_S`, ...) | central, in [`server_app.py`](../../clients/flower/flhub_flower/server_app.py) | §2.2–2.4 | defaults |
+| adapter timing constants (`RELAY_STALE_S`, `LAUNCH_COOLDOWN_S`, ...) | central, in [`service.py`](../../adapters/flower/service.py) | §2.4 | defaults |
+
+Flower's knobs take effect when the process that reads them starts again; on the hospital side that means a SuperNode restart. None of them had to change to carry 512 MiB.
 
 ## 7. Troubleshooting
 
+Problems met during the two test stages, as symptom → cause → fix.
+
+- **`flower-superlink` has no ServerAppIo port option, `flower-supernode` no `--clientappio-api-address`.** → Flower 1.39 has one HTTP API per process. → Use `--host/--port` on the SuperLink (9093 here) and a distinct `--port` for each SuperNode on one host.
+- **`flower-superexec`, `flwr-serverapp` or `flwr-clientapp` not found.** → Flower starts them by bare name. → Put the venv's `bin` directory on `PATH` for the SuperLink and the SuperNodes.
+- **SuperNodes log "SuperNode terminated gracefully" after a SuperLink restart.** → An in-memory SuperLink forgot their node ids, answered `UNAUTHENTICATED`, and the SuperNodes stopped themselves. → Run the SuperLink with `--database`; supervise each SuperNode (here [`supernode.sh`](../../deploy/flower-vm/supernode.sh), back about 10 s after an exit).
+- **A restarted hospital trains under a new node id while the old one is still listed online.** → Node ids are random per start; offline detection takes up to 60 s. → Nothing to do: the relay maps sites by QUERY and the newest node wins.
+- **A round waits for its deadline after the SuperLink was killed.** → The relay died with the SuperLink. → Fixed in the adapter: 20 s without a relay beat fails the round at once and starts a new relay; [`restart.sh`](../../deploy/central/flower/restart.sh) waits for the new relay run.
+- **`status.sh` says HEALTHY seconds after a SuperLink kill.** → Site reports of the lost relay were still cached. → Fixed: without a live relay the adapter reports every site as `unknown`.
+- **An adapter restart takes about 97 s instead of about 30 s.** → The old relay (previous FAB) was told to leave through one global shutdown flag in the adapter; the new relay polled first and took that shutdown itself, and the launcher waited out its 60 s cooldown before starting another. → Fixed: the relay sends its fab id with every poll, only a relay with another fab id is told to leave, and its beats no longer count as liveness.
+- **`start.sh` reports "adapter started" for an adapter that exited.** → The previous adapter still held the port and answered `/health`. → `start.sh` checks the new process after `/health`.
+- **The SuperLink database stays hundreds of MiB large after large-payload runs.** → SQLite keeps freed pages. → `bash deploy/central/flower/purge.sh` between runs.
+- **SuperNode logs show `NoObjectInStoreError` / `Failed to push reply message`.** → The ClientApp finished after the message's TTL (the round deadline). → Harmless; give slow sites a longer deadline if they should count.
+- **A round fails with `CLIENT_APP_CRASHED` ("ClientApp stopped responding") after about a minute.** → The ClientApp process died; Flower reports it when its task heartbeat expires. → The hub retries the round; check the hospital's resources.
+- **The cron watchdog never restarts anything ("watchdog lock busy").** → A SuperNode supervisor started by the watchdog under `flock -n` inherited the lock's file descriptor. → Use `flock -n -o` in the cron line ([`install.sh`](../../deploy/flower-vm/install.sh) does).
+- **Where is the relay's log?** → It is the log of a Flower run. → `FLWR_HOME=<runtime>/flwr-home flwr log <run-id> flhub --show`; the run id is in `/relay/status`.
+
 ## 8. Future work and upstream reports
+
+What would lift the limits or harden a deployment:
+
+- **TLS and SuperNode authentication.** SuperLink `--ssl-certfile`, `--ssl-keyfile`, `--ssl-ca-certfile`, `--enable-supernode-auth` with `--auth-list-public-keys`; SuperNodes `--root-certificates` and `--auth-supernode-private-key` / `--auth-supernode-public-key` (flags of Flower 1.39.0). The adapter's `flwr` connection then needs `root-certificates`. Not tested.
+- **A lower fixed cost per round.** `--isolation process` runs the ClientApp as a long-lived process instead of one per message; it could remove most of the ClientApp start-up (§5.3). Not tested.
+- **Large models.** Reclaim SuperLink database space without a restart, or move the object store off SQLite; measure beyond 512 MiB and beyond two sites per VM.
+- **Signed FABs.** SuperNodes that accept only FABs from trusted entities (`--trusted-entities`) need a signed hub FAB; not tested.
+- **Separate hosts.** The adapter and the hub on a host other than the SuperLink's, reaching its HTTP API over TLS; not tested.
+- **Other Flower versions.** Only 1.39.0 was tested; the relay uses only the public `Grid`, `Message` and record APIs.
+
+**Upstream reports.** We found no Flower bug in the two test stages. Improvement ideas that could be proposed upstream (not filed):
+
+1. *Configurable poll interval for `Grid.send_and_receive`.* It sleeps a fixed 3 s between pulls (`flwr/serverapp/grid/grid.py`), so the rounds of a built-in strategy come in steps of about 3 s. In our E7 comparison the native FedAvg rounds took 9.48 s against 7.55 s through our relay, which pulls every second.
+2. *Reproducible FedAvg aggregation.* `aggregate_arrayrecords` accumulates in the arrays' dtype (float32), in reply order. With unequal site sizes the result differs from a float64 reference (we measured 3e-8 after one round, growing to about 2e-2 through training), and with three or more sites the float32 sum can also depend on the reply order. Accumulating in float64, in a fixed order, would make the aggregate reproducible.
+3. *Reclaim SQLite space in the SuperLink.* Message objects are deleted after delivery, but the database file keeps its peak size (about 4 × the payload); incremental or automatic vacuuming would release it without a restart.
+4. *Clearer message for expired replies.* A ClientApp that finishes after its message's TTL logs `NoObjectInStoreError`; a message such as "reply not pushed: message expired" would make the cause obvious.
+5. *Run recovery after a SuperLink restart.* A ServerApp run ends with the SuperLink and is not restarted; a documented way to resubmit or resume a long-lived run would help applications like the relay.
