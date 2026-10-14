@@ -96,3 +96,8 @@ Newest entries at the bottom. Format: `### <UTC timestamp> — S<n> — <title>`
 ### 2026-10-14T06:15Z — S4 — E3 monitored, E5 extras up/down
 - E3 (4 runs, 22:46Z-05:34Z): no anomalies on the flower VM; VM peaks 2.4 GB (cnn-medium), 3.3 GB (resnet18-gn); wire bytes per run ~1.01-1.06x payload x rounds x 2 sites. Central #731: flower train/overhead per site 13.9/6.3 s (cnn-medium), 223/10.9 s (resnet18-gn); one stall in resnet r10 was a vantage6 hospital-side GC race (deadline + retry).
 - E5: `E5 EXTRAS UP` #736 -> `extra.sh start` 06:08:01Z, flw-h11 (16156373353830183144) and flw-h12 (4829869334115821877) connected and mapped by 06:08:13Z -> `E5 EXTRAS ONLINE` #743; s2-e5-12sites 06:09Z (20 rounds trained by both extras); `E5 EXTRAS DOWN` #749 -> `extra.sh stop` 06:13:22Z, cron entry removed -> `E5 EXTRAS STOPPED`.
+
+### 2026-10-14T07:20Z — S4 — E7 analysed; follower crash fixed
+- Follower crashed 06:18:20Z on a 2-s run (s2-e7-nvflare-native-cnn, sysmon summary without samples: KeyError 'system'); fixed (post_perf tolerant, never stops the loop) and restarted 06:25Z; it re-processed the missed RUN messages.
+- E7 flower (central runs 06:49-06:59Z, data bus #220): native == hub hash-equal in every round for C1 (20 rounds) and C2 (5 rounds); medians native/hub 9.48/7.55 s (C1; Flower send_and_receive 3 s polling) and 7.45/8.19 s (C2; hub-core round trip +0.73 s). Flower's own run accounting 17.2 MB (C1) / 943.9 MB (C2). Report section updated.
+- Next: E4a 512 MB extension, E4b (NETEM APPLY/CLEAR handshakes), then S5.
