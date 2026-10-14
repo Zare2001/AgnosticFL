@@ -25,6 +25,7 @@ import contextlib
 import json
 import os
 import shutil
+import signal
 import socket
 import subprocess
 import sys
@@ -108,6 +109,9 @@ def main() -> int:
     ap.add_argument("--workdir", default="/tmp/flhub-nvflare-example")
     ap.add_argument("--keep", action="store_true", help="keep the work directory (logs, runs) afterwards")
     args = ap.parse_args()
+    # SIGTERM (from `timeout` or a cancelled CI job, for example) would end Python without running the
+    # clean-up below; as SystemExit it stops the started processes and removes the working directory.
+    signal.signal(signal.SIGTERM, lambda *_: sys.exit(143))
 
     work = Path(args.workdir).resolve()
     shutil.rmtree(work, ignore_errors=True)
