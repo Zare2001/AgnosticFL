@@ -61,8 +61,8 @@ def fig_bytes_on_wire() -> None:
                        edgecolors=col, linewidths=1.5, zorder=3)
     ax.axhline(1.0, color=fs.INK_2, lw=1, ls=(0, (4, 2)))
     ax.text(640, 1.04, "1.0 = every update\ncrosses the link once", fontsize=8, color=fs.INK_2, va="bottom")
-    ax.axhline(4.45, color=fs.FRAMEWORK["vantage6"], lw=1, ls=(0, (1, 1.5)))
-    ax.text(640, 3.6, "4.45 = vantage6 by design\n(4 input copies + 1 result,\nx1.78 encoding)", fontsize=8,
+    ax.axhline(5.34, color=fs.FRAMEWORK["vantage6"], lw=1, ls=(0, (1, 1.5)))
+    ax.text(640, 5.1, "5.34 = vantage6 by design\n(5 input copies + 1 result,\nx1.78 encoding)", fontsize=8,
             color=fs.INK_2, va="top")
     ax.set_xscale("log", base=2)
     ax.set_xticks([1, 8, 32, 64, 128, 256, 512], ["1", "8", "32", "64", "128", "256", "512"])

@@ -32,7 +32,7 @@ Each finding is described with its cause in the framework guide's §6, and draft
 **vantage6 4.15.2** ([guide](frameworks/vantage6.md#6-limits-known-issues-and-knobs)):
 
 1. A node drops a finished result when its websocket is down, and trains again after reconnecting.
-2. A node receives each run's full input four times per site and round (the run listing, the responses to its two PATCH requests, an extra `GET run/<id>`), and that input is base64-encoded twice, so the network carries 5–9× the payload.
+2. A node receives each run's full input five times per site and round (the run listing, the responses to its three PATCH requests for start time, status and result, and an extra `GET run/<id>`), and that input is base64-encoded twice, so the network carries 5–9× the payload.
 3. The server rewrites the whole run row (including its input) for every algorithm log line; with SQLite this blocks the single worker for minutes with large models.
 4. Task listings load every stored input and result; deleting a task with subtasks orphans their runs.
 5. Nodes never delete their task folders.
@@ -54,6 +54,7 @@ Each finding is described with its cause in the framework guide's §6, and draft
 | The vantage6 adapter supports only unencrypted collaborations (it calls `setup_encryption(None)`) | needs an adapter change |
 | The figure `e4a_peak_rss_vs_payload.png` labels its axis MB; the stage-2 report at its tag writes GB for values in MiB / 1000 | the documentation uses MiB and GiB; the values are MiB |
 | The generated E3 resource table ([tables.md](results/evidence/stage2/tables.md)) lists vantage6's "largest process" as one container; it is the sum of both sites' training containers (2.1 GiB) | stated correctly in the documentation |
+| [cost_model.md](results/evidence/stage2/cost_model.md) derives vantage6's E4b volume V = 17.8 from four input copies; the vantage6 4.15.2 node downloads five (the stage-2 analysis missed the response to the start-time PATCH), so 17.8·P is its downstream volume alone and both directions are 21.36·P | the documentation uses the five copies ([vantage6 guide](frameworks/vantage6.md) §5.4); the generated evidence is kept as produced |
 | Docstrings and comments in the code and scripts cite the documents of the build: `PLAN.md`, `EXPERIMENTS.md`, `PROJECT_PLAN.md`, `REPORT_TEMPLATE.md`, `COLLABORATION.md`, `PROTOCOL.md` and `docs/DECISIONS.md` | the planning documents are on branch `archive/agentic-build`; `PROTOCOL.md` is now [docs/protocol.md](protocol.md) and `docs/DECISIONS.md` is [docs/design/decisions.md](design/decisions.md); the code was not changed in the restructure |
 
 ## Future work

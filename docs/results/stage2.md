@@ -190,7 +190,7 @@ Source: [tables.md](evidence/stage2/tables.md). 1024 MiB (two sites) and 256 MiB
 
 ![E4b measured fan-out against the bound](figures/e4b_measured_vs_bound.png)
 
-NVFlare and Flower move each update once and reach 94 % and 89 % of the bandwidth bound at 20 Mbit/s. vantage6 moves 17.8× the payload per link and round by design (four input copies down and one result up per site, base64 twice); against that volume it reaches 0.72, against the 4·P bound 0.16, and it sets the round time ([cost_model.md](evidence/stage2/cost_model.md)).
+NVFlare and Flower move each update once and reach 94 % and 89 % of the bandwidth bound at 20 Mbit/s. vantage6 moves 21.36× the payload per link and round by design (five input copies down and one result up per site, base64 twice); against that volume it reaches 0.87, against the 4·P bound 0.16, and it sets the round time ([cost_model.md](evidence/stage2/cost_model.md), [vantage6 guide](../frameworks/vantage6.md) §5.4).
 
 ### E3: round time and model size
 

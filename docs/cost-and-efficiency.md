@@ -16,7 +16,7 @@ What it costs to build the framework-agnostic hub, to bring it to hospitals that
 | Cost per MiB of model, b | 0.0212 s | 1.49 s (1–64 MiB), superlinear above | 0.0612 s | | [cost_model.md](results/evidence/stage2/cost_model.md) |
 | Overhead per site and round with training (E3): 0.2 / 6.4 / 42.6 MiB models | 1.6 / 1.9 / 2.7 s | 7.2 / 14.1 / 42.0 s | 5.6 / 6.3 / 10.9 s | | [tables.md](results/evidence/stage2/tables.md) |
 | Bytes on the wire ÷ payload (E4a) | 1.005–1.064 | 4.97–5.53 (≤ 64 MiB), 9.08 (128 MiB) | 1.002–1.005 | | [e4_bytes.md](results/evidence/stage2/e4_bytes.md) |
-| Bandwidth efficiency at 20 Mbit/s (E4b) | 0.94 | 0.16 (0.72 against its own transfer volume) | 0.89 | | [cost_model.md](results/evidence/stage2/cost_model.md) |
+| Bandwidth efficiency at 20 Mbit/s (E4b) | 0.94 | 0.16 (0.87 against its own transfer volume, 21.36·P in both directions) | 0.89 | | [cost_model.md](results/evidence/stage2/cost_model.md) |
 | Largest model update carried | 512 MiB (15.5 s per round) | 128 MiB (468.2 s); 256 MiB never delivered | 512 MiB (45.8 s) | above that: testbed disk limit | [tables.md](results/evidence/stage2/tables.md) |
 | Central memory at that size (peak RSS) | relay job 3,779 MiB (7.4×) | server 2,349 MiB (18×), adapter 1,925 MiB (15×) | relay ServerApp 3,647 MiB (7.1×) | orchestrator about 8× the update; hub core 41–47 MiB | [central-e4a-memory.md](results/evidence/stage2/central-e4a-memory.md) |
 | Hospital VM memory at that size (two sites) | 5.0 GiB | 5.2 GiB | 7.5 GiB | | [nvflare](results/evidence/stage2/nvflare/e4a-memory.md), [vantage6](results/evidence/stage2/vantage6/e4a-vm-memory.md), [flower](results/evidence/stage2/flower/e4a-flower-vm-memory.md) |
@@ -111,7 +111,7 @@ Per framework, the fan-out time of a round (dispatch to the last result) is fitt
 | Flower | 1–512 MiB | 5.48 | 0.0612 | 0.956 (quadratic 0.997) | −10 % / −4 to −1 % / −1 % |
 | vantage6 | 1–64 MiB | 4.13 | 1.494 | 0.959 (1–128 MiB: 0.581 linear, 0.981 quadratic) | −38 to −31 % / −4 to −3 % / +10 % |
 
-Source: [cost_model.md](results/evidence/stage2/cost_model.md). With link transfer added (V·P/rate, V = the bytes a framework moves per link and round in units of P: 4 for NVFlare and Flower, 17.8 for vantage6), the model predicts all twelve framework-profile pairs of the bandwidth test within ±13 % (same file).
+Source: [cost_model.md](results/evidence/stage2/cost_model.md). With link transfer added (V·P/rate, V = the bytes a framework moves per link and round in units of P: 4 for NVFlare and Flower, 17.8 for vantage6, which is its downstream volume alone, §5.1), the model predicts all twelve framework-profile pairs of the bandwidth test within ±13 % (same file). Counting vantage6's upstream results too (21.36·P), its predictions are −5 %, +17 % and +2 % at 1 Gbit/s, 100 and 20 Mbit/s.
 
 **Fixed floors per round and their causes:**
 
@@ -128,7 +128,7 @@ Interface byte counters of each framework's hospital VM during the payload sweep
 ![Bytes on the wire per byte of model update](results/figures/cost_bytes_on_wire.png)
 
 - **NVFlare 1.005–1.064 and Flower 1.002–1.005:** each update crosses the link once; the small excess is protocol framing and, at 1 MiB, background traffic. Two rows read below 1 (NVFlare 8 MiB 0.840, Flower 1 MiB 0.938): counter artefacts, since every round of those runs finished with weights hash-equal to the simulation.
-- **vantage6 4.97–5.53 up to 64 MiB, 9.08 at 128 MiB:** by design, a 4.15.2 node receives the run input four times per site and round (run list, two PATCH responses, an extra `GET run/<id>`), and the input is the weights base64-encoded inside JSON that is base64-encoded again (1.78× the update). Per VM link and round with two sites that is 2 × (4 + 1) × 1.78 = 17.8 × P, i.e. 4.45× the payload; the excess above that grows with load: at 64 MiB a node downloaded 8.8× the update per site and round instead of 7.1×, at 128 MiB about 16×, because it retried requests after the busy server dropped the connection.
+- **vantage6 4.97–5.53 up to 64 MiB, 9.08 at 128 MiB:** by design, a 4.15.2 node receives the run input five times per site and round (the run listing, the responses to its three PATCH requests for start time, status and result, and an extra `GET run/<id>`), and the input is the weights base64-encoded inside JSON that is base64-encoded again (1.78× the update). Per site and round that is 8.9× the update down and 1.78× up, a design ratio of (8.9 + 1.78) ÷ 2 = 5.34, which the measurements at 8–64 MiB match (8.8–9.1× down). At 128 MiB a node downloaded about 16× the update per site and round, because it retried requests after the busy server dropped the connection ([vantage6 guide](frameworks/vantage6.md) §5.4).
 
 Source: [e4_bytes.md](results/evidence/stage2/e4_bytes.md), [vantage6 guide](frameworks/vantage6.md) §5.
 
@@ -138,14 +138,14 @@ Source: [e4_bytes.md](results/evidence/stage2/e4_bytes.md), [vantage6 guide](fra
 
 ![Measured fan-out against the bandwidth bound](results/figures/e4b_measured_vs_bound.png)
 
-| Profile | Lower bound (s) | NVFlare (s), efficiency | Flower (s), efficiency | vantage6 (s), efficiency | vantage6 against its own volume 17.8·P |
+| Profile | Lower bound (s) | NVFlare (s), efficiency | Flower (s), efficiency | vantage6 (s), efficiency | vantage6 against its own volume 21.36·P |
 |---|---|---|---|---|---|
 | none | – | 3.3 | 7.5 | 81.8 | – |
-| 1 Gbit/s, 5 ms | 1.5 | 4.3, 0.35 | 8.9, 0.17 | 83.3, 0.02 | 6.7 s bound, 0.08 |
-| 100 Mbit/s, 20 ms | 15.1 | 17.0, 0.89 | 22.7, 0.67 | 129.5, 0.12 | 67.2 s bound, 0.52 |
-| 20 Mbit/s, 40 ms | 75.5 | 80.3, 0.94 | 85.1, 0.89 | 463.8, 0.16 | 336.0 s bound, 0.72 |
+| 1 Gbit/s, 5 ms | 1.5 | 4.3, 0.35 | 8.9, 0.17 | 83.3, 0.02 | 8.1 s bound, 0.10 |
+| 100 Mbit/s, 20 ms | 15.1 | 17.0, 0.89 | 22.7, 0.67 | 129.5, 0.12 | 80.6 s bound, 0.62 |
+| 20 Mbit/s, 40 ms | 75.5 | 80.3, 0.94 | 85.1, 0.89 | 463.8, 0.16 | 403.2 s bound, 0.87 |
 
-Source: [cost_model.md](results/evidence/stage2/cost_model.md) (E4b table), [tables.md](results/evidence/stage2/tables.md). On slow links NVFlare and Flower come close to the wire limit; on fast links their fixed per-round cost dominates. Under realistic hospital bandwidth vantage6 sets the round time of a mixed federation (464 s against 80–85 s at 20 Mbit/s).
+Source: [cost_model.md](results/evidence/stage2/cost_model.md) (E4b table), [tables.md](results/evidence/stage2/tables.md). vantage6's volume counts both directions like the bound: 2 sites × (5 input copies + 1 result) × 1.78 = 21.36·P; its downstream direction alone (17.8·P, the V of cost_model.md) gives 0.72 at 20 Mbit/s. On slow links NVFlare and Flower come close to the wire limit; on fast links their fixed per-round cost dominates. Under realistic hospital bandwidth vantage6 sets the round time of a mixed federation (464 s against 80–85 s at 20 Mbit/s).
 
 ## 6. Memory and disk
 
