@@ -246,8 +246,8 @@ All numbers are from the reference testbed (4 vCPU AMD EPYC-Rome VMs in one data
 
 | Dimension | NVFlare | Source |
 |---|---|---|
-| Adapter code | TODO(verify): `scripts/docs/loc.py` for `adapters/nvflare/` (without `native.py`, which is only for E7) | `scripts/docs/loc.py` |
-| Hospital code | 48 lines (`client.py`), 0 changed since stage 1 | [ledger](../results/evidence/hospital-ledger.md) |
+| Adapter code | 604 code lines in 5 files (`adapters/nvflare/` without `native.py`, which is only for E7) | [loc.md](../results/evidence/loc.md) |
+| Hospital code | 39 code lines (`client.py`, 48 lines with comments and blank lines), 0 changed since stage 1 | [loc.md](../results/evidence/loc.md), [ledger](../results/evidence/hospital-ledger.md) |
 | Hospital steps for the `flhub_core` 0.2 rollout | once: remove the installed copy and restart the client (50.3 s offline per site) | [ledger](../results/evidence/hospital-ledger.md) |
 | Hospital steps per later code version | 0: the next relay job carries it | ADR-018 |
 | Hub overhead against NVFlare's own FedAvg (E7) | −0.23 s (−6.5 %) per round with `cnn-small`; +0.10 s (+4.1 %) with a 45 MiB payload | [e7-native-vs-hub.md](../results/evidence/stage2/nvflare/e7-native-vs-hub.md) |
@@ -262,9 +262,22 @@ All numbers are from the reference testbed (4 vCPU AMD EPYC-Rome VMs in one data
 
 ### 5.2 Implementation and integration cost
 
-TODO(verify): line counts per file from `scripts/docs/loc.py` once it exists.
+Code lines are non-blank, non-comment lines, counted with the rule of [`scripts/docs/loc.py`](../../scripts/docs/loc.py); the component totals are in [loc.md](../results/evidence/loc.md).
 
-The adapter touches these NVFlare interfaces:
+| Code | Code lines | Role |
+|---|---|---|
+| `adapters/nvflare/service.py` | 239 | adapter service, relay-job keeper, site watcher |
+| `adapters/nvflare/relay_controller.py` | 208 | relay workflow inside the NVFlare server |
+| `adapters/nvflare/flare_admin.py` | 84 | FLARE API session |
+| `adapters/nvflare/job.py` | 72 | relay job export |
+| `adapters/nvflare/__init__.py` | 1 | |
+| **NVFlare adapter** | **604** | on top of `adapters/common` (1182 lines, shared by every adapter) |
+| `clients/nvflare/client.py` | 39 | hospital script |
+| `adapters/nvflare/native.py` | 240 | E7 baseline only |
+| `tests/unit/test_nvflare_adapter.py` | 175 | 12 unit tests of the keeper and site status |
+| `deploy/central/nvflare/`, `deploy/nvflare-vm/` | 1137 (+10 configuration) | testbed scripts, including the experiment tooling |
+
+The adapter touches six NVFlare concepts: the server workflow (`ModelController`), the model container (`FLModel`), the Client API, the Job API, the FLARE API and provisioning.
 
 | NVFlare interface | Used for |
 |---|---|
@@ -272,7 +285,7 @@ The adapter touches these NVFlare interfaces:
 | `FLModel`, `ParamsType.FULL`, `FLMetaKey`, `ReturnCode`, `SendOrder` | model exchange and reply checks |
 | Client API: `nvflare.client.init`, `receive`, `send`, `is_running`, `get_site_name` | the hospital script |
 | Job API: `FedJob`, `to_server`, `to_clients`, `to`, `set_app_packages`, `export_job`, `ScriptRunner` | building the relay job |
-| FLARE API: `new_secure_session`, `list_jobs`, `get_job_meta`, `submit_job`, `abort_job`, `delete_job`, `get_client_job_status`, `get_system_info` | the keeper and the online probe |
+| FLARE API: `new_secure_session`, `list_jobs`, `submit_job`, `abort_job`, `delete_job`, `get_client_job_status`; `get_job_meta` for the E7 baseline | the keeper, the online probe and `purge.sh` |
 | Provisioning: `nvflare provision`, `--add-client` | kits for the server, hospitals and admin |
 
 Moving the adapter from `flhub/0.1` to `flhub/0.2` (one task per site, per-site results and cancels, keeper changes, the job that ships `flhub_core`) changed `adapters/nvflare/` by +313 −94 lines in four files, plus `native.py` (+284) for the E7 baseline; `deploy/central/nvflare/` by +137 −13 lines; `clients/nvflare/` by 0 lines (`git diff --stat stage1-final stage2-final`).
