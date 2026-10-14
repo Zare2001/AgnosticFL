@@ -2,9 +2,9 @@
 
 Framework-agnostic federated learning hub. Hospitals keep their own federated learning framework (**NVFlare**, **vantage6** or **Flower**) and run its standard client, unchanged; one central hub runs plain, weighted **FedAvg** across all of them. Per framework, a server-side **adapter** makes the hub look like a normal part of that framework, and speaks one small protocol (`flhub/0.1`, JSON-RPC) to a framework-free orchestrator.
 
-**Result**: in a 30-round run with 6 hospitals (2 NVFlare, 2 vantage6, 2 Flower), the federated model reaches 86.5 % test accuracy / 0.925 AUC on PneumoniaMNIST, on par with centralized training on the pooled data (86.1 % / 0.928). It is bit-identical (max weight difference 0.0 in every round) to a framework-free FedAvg simulation. Results and evidence: [`docs/results/stage1.md`](docs/results/stage1.md). Protocol: [`docs/protocol.md`](docs/protocol.md). Decisions: [`docs/design/decisions.md`](docs/design/decisions.md).
+**Result**: in a 30-round run with 6 hospitals (2 NVFlare, 2 vantage6, 2 Flower), the federated model reaches 86.5 % test accuracy / 0.925 AUC on PneumoniaMNIST, on par with centralized training on the pooled data (86.1 % / 0.928). It is bit-identical (max weight difference 0.0 in every round) to a framework-free FedAvg simulation. Results, evidence and the full build story: [`REPORT.md`](REPORT.md). Protocol: [`docs/agents/PROTOCOL.md`](docs/agents/PROTOCOL.md). Decisions: [`docs/DECISIONS.md`](docs/DECISIONS.md).
 
-**Stage 2** (full system and performance test: non-IID data, six server aggregators, models up to 11 M parameters, payloads up to 512 MB, faults and restarts, native-framework baselines; every real run equal to the framework-free simulation): [`docs/results/stage2.md`](docs/results/stage2.md).
+**Stage 2** (full system and performance test: non-IID data, six server aggregators, models up to 11 M parameters, payloads up to 512 MB, faults and restarts, native-framework baselines; every real run equal to the framework-free simulation): [`REPORT_STAGE2.md`](REPORT_STAGE2.md).
 
 ## Architecture
 

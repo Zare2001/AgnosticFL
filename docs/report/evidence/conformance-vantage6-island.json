@@ -1,0 +1,19 @@
+{
+ "note": "vantage6 island (P1, vantage6 VM, deployed with deploy/central/vantage6 --island + deploy/vantage6-vm --island). Summary transcribed from the pytest -s output and bus #31; the original --report file was removed with the island. train_loss as printed (6 decimals).",
+ "command": "pytest tests/conformance/test_adapter.py --adapter http://127.0.0.1:8812 --hub http://127.0.0.1:8800 --timeout 600 -v -s",
+ "result": "7 passed in 26.37s",
+ "adapter": {"adapter": "vantage6", "framework": "vantage6", "framework_version": "4.15.2", "protocol": "flhub/0.1"},
+ "sites": ["v6-h3", "v6-h4"],
+ "exitstatus": 0,
+ "tests": {
+  "round_1": {"seconds": 7.0, "sites": {
+   "v6-h3": {"max_abs_diff": 0.0, "num_examples": 785, "train_loss": 0.617726, "client_code_version": "0.1.0+9c6b064c1e96"},
+   "v6-h4": {"max_abs_diff": 0.0, "num_examples": 785, "train_loss": 0.605632, "client_code_version": "0.1.0+9c6b064c1e96"}}},
+  "round_2": {"sites": {
+   "v6-h3": {"max_abs_diff": 0.0, "num_examples": 785, "train_loss": 0.618572, "client_code_version": "0.1.0+9c6b064c1e96"},
+   "v6-h4": {"max_abs_diff": 0.0, "num_examples": 785, "train_loss": 0.605404, "client_code_version": "0.1.0+9c6b064c1e96"}}},
+  "round_4_after_cancel": {"sites": {
+   "v6-h3": {"max_abs_diff": 0.0, "num_examples": 785, "train_loss": 0.619024, "client_code_version": "0.1.0+9c6b064c1e96"},
+   "v6-h4": {"max_abs_diff": 0.0, "num_examples": 785, "train_loss": 0.604558, "client_code_version": "0.1.0+9c6b064c1e96"}}}
+ }
+}
