@@ -42,3 +42,11 @@ Newest entry at the bottom. Format: `## <UTC> — <what>` then facts (commands, 
 - Own guide: 9c55b1a (client_code_version is in rounds/rNNNN.json, not metrics.jsonl; vantage6 #1081 found the same), 797b7f9 (relay job memory from central-e4a-memory.md: 2.48 GiB @256 MiB, 3.69 GiB @512 MiB).
 - R3: PLAN §7 item 5 greps over my 3 files + NVFlare evidence: clean after c4915cb. Independent line-by-line fact check of docs/frameworks/nvflare.md started (separate read-only agent against code, evidence, tag reports and the NVFlare 2.9.0 source), as flower did for its guide (#1104). docs-ready follows after its findings are resolved.
 - Milestones seen: S3 R2-vantage6 #1063, R2-flower #1077, R2-nvflare #1075, R2-central #1107 (f2b1c30). Owner (#1091): main cleaned (0f7965a, tree = restructure@1d008bf); R4 = central opens the PR, the owner merges it; agents never push to main.
+
+## 2026-10-14T16:20Z — R3 done: docs-ready b1213b4 (#1119)
+
+- 12:12-16:10Z: no agent activity (account session limit, resets 18:10 Europe/Amsterdam); the independent fact-check agent of my guide stopped with HTTP 429 before it reported, so I finished the check myself.
+- R3 re-check at restructure/library b1213b4: all 6 NVFlare 2.9.0 file:line references in the guide re-read in the installed source (fed_server.py:942-951, job_launcher_utils.py:486-490, server_json_config.py:102, wf_comm_server.py:306-315, numpy_decomposers.py:66, via_downloader.py:551) and every knob default (stream_const, comm_config, net_utils, byte_receiver/streamer, script_runner, master_template max_jobs 4 / jobs-storage); `update_abnormal_finished_jobs`/`update_unfinished_jobs` are defined but never called. NVFlare lines changed on shared pages since ed60227 re-read: all correct.
+- Fresh clone of b1213b4 + /tmp venv: check_links 729 links 0 problems, 23/23 figures; selfcheck digest sha256:ac074a0b…; pytest 91 passed / 15 skipped; test_nvflare_adapter.py 12/12; imports from the clone, flhub_core 0.2.0+fe357a1dbec1. Own files grep-clean.
+- Testbed: deploy/nvflare-vm/status.sh HEALTHY, nvf-h1 pid 485009 and nvf-h2 pid 938623 = the R0 PIDs (no restart in stage 3).
+- docs-ready b1213b4 sent to central (#1119). Next: wait for S3 R3-verified and S3 merged; then fresh clone of main, check_links, unit tests, render check, `confirm main <sha>` (R4).
