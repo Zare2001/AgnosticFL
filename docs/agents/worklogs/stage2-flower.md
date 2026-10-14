@@ -92,3 +92,7 @@ Newest entries at the bottom. Format: `### <UTC timestamp> — S<n> — <title>`
 - flw-h6 released from the straggler scope under RUNLOCK #630 (22:03:39Z, new node id 16440330416478537649, mapped), release #631.
 - s2-e6d-resume (central only): no anomalies on the flower VM.
 - s2-e6e-server-restart: central restarted the Flower SuperLink after r15 (22:19:49Z) and mid r18 (22:20:52Z); SuperNodes not restarted, node ids unchanged, flw-h6 3 reconnect retries, flw-h5 none; run 20/20 at 22:22:10Z; HEALTHY; reported #648.
+
+### 2026-10-14T06:15Z — S4 — E3 monitored, E5 extras up/down
+- E3 (4 runs, 22:46Z-05:34Z): no anomalies on the flower VM; VM peaks 2.4 GB (cnn-medium), 3.3 GB (resnet18-gn); wire bytes per run ~1.01-1.06x payload x rounds x 2 sites. Central #731: flower train/overhead per site 13.9/6.3 s (cnn-medium), 223/10.9 s (resnet18-gn); one stall in resnet r10 was a vantage6 hospital-side GC race (deadline + retry).
+- E5: `E5 EXTRAS UP` #736 -> `extra.sh start` 06:08:01Z, flw-h11 (16156373353830183144) and flw-h12 (4829869334115821877) connected and mapped by 06:08:13Z -> `E5 EXTRAS ONLINE` #743; s2-e5-12sites 06:09Z (20 rounds trained by both extras); `E5 EXTRAS DOWN` #749 -> `extra.sh stop` 06:13:22Z, cron entry removed -> `E5 EXTRAS STOPPED`.
