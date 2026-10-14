@@ -264,8 +264,207 @@ Network: the hospitals need outgoing access to the server port (7601) and the re
 
 ## 5. Cost and efficiency for vantage6
 
+Comparison with the other frameworks: [`cost-and-efficiency.md`](../cost-and-efficiency.md).
+
+### 5.1 At a glance
+
+| Dimension | vantage6 | Source |
+|---|---|---|
+| hospital code changed in stage 2 | 0 lines | [hospital ledger](../results/evidence/hospital-ledger.md) |
+| code rollout | new image tag: 98 s build and push, 2 s adapter restart; 0 hospital steps | §3.3 |
+| hub vs vantage6's own FedAvg (E7) | 0.00 s (0 %) with `cnn-small`; −13.4 s (−14 %) with a 45 MiB model; weights hash-identical | [tables](../results/evidence/stage2/tables.md) |
+| fixed cost per round | 6.3 s (1 MiB echo model) | [tables](../results/evidence/stage2/tables.md) |
+| cost per MiB | 1.49 s/MiB (fit on 1–64 MiB), superlinear above | [cost model](../results/evidence/stage2/cost_model.md) |
+| bytes on the wire ÷ payload | 4.97–5.53 up to 64 MiB; 9.08 at 128 MiB | [bytes on wire](../results/evidence/stage2/e4_bytes.md) |
+| bandwidth efficiency at 20 Mbit/s | 0.16 against the 4·P bound; 0.72 against vantage6's own volume of 17.8·P | [cost model](../results/evidence/stage2/cost_model.md) |
+| largest model delivered | 128 MiB (468.2 s per round); 256 MiB never delivered | §6.1 |
+| 6 → 12 sites (E5) | fan-out 9.1 → 10.4 s | [tables](../results/evidence/stage2/tables.md) |
+| killed training container (E6a) | detected after 2.1 s, round done 15.2 s after the kill | [robustness](../results/evidence/stage2/e6.md) |
+
+### 5.2 Implementation and integration cost
+
+| Item | Size |
+|---|---|
+| adapter, `adapters/vantage6/service.py` | TODO(verify) lines (`scripts/docs/loc.py`); 14 distinct vantage6 client calls |
+| hospital algorithm, `clients/vantage6/v6_flhub/__init__.py` | TODO(verify) lines (`scripts/docs/loc.py`) |
+| image, `clients/vantage6/Dockerfile` | TODO(verify) lines (`scripts/docs/loc.py`) |
+| unit tests, `tests/unit/test_vantage6_adapter.py` | 10 tests against a fake vantage6 client; they run without vantage6 installed |
+| E7 baseline tooling (`adapters/vantage6/native.py`, `deploy/central/vantage6/native/`) | not needed by the adapter |
+| vantage6 concepts used | user, organisation, collaboration, node, task, run, result, database label, algorithm image, node policy |
+
+At the hospitals: 0 lines of hospital code changed between stage 1 and stage 2. A code update is a new image tag: 0 hospital steps, 0 restarts, 0 s downtime. The one-time stage-2 data-variant configuration took 13.2 s and 14.7 s of node downtime (§3.4).
+
+### 5.3 Runtime overhead
+
+**Against vantage6's own FedAvg (E7).** Native: a vantage6 central function on a node of the hub operator's organisation, which creates one multi-organisation `train` subtask per round and averages in float64 ([ADR-022](../design/decisions.md)). Hub: the adapter. Same two hospitals, same training code and configuration. Median round time over rounds ≥ 2, with the interquartile range ([tables](../results/evidence/stage2/tables.md); ranges from the stage-2 vantage6 section §5):
+
+| Configuration | Native | Hub | Hub − native | Weights |
+|---|---|---|---|---|
+| C1 `cnn-small`, iid, 20 rounds | 8.81 s (8.74–8.88) | 8.81 s (8.56–9.56) | 0.00 s (0 %) | global hash equal in all 21 checkpoints |
+| C2 `payload-45` (45 MiB), 5 rounds | 95.5 s (94.3–98.5) | 82.1 s (81.1–86.5) | −13.4 s (−14 %) | global hash equal in all 6 checkpoints |
+
+The hub path is faster at 45 MiB: the central function moves every input and result through the node's proxy and waits on one multi-organisation subtask, while the adapter uploads per site in parallel and fetches each result as soon as that site is done. Hub aggregation took 0.0–0.07 s per round, the native aggregation 0.002–0.56 s.
+
+![E7: native FedAvg vs hub](../results/figures/e7_native_vs_hub.png)
+
+**Where a round's time goes (E3).** Median over rounds ≥ 2 for the vantage6 sites in the FedAvg runs ([tables](../results/evidence/stage2/tables.md)):
+
+| Model | Parameters | Training (s) | Transport, vantage6 and adapter (s) | Fan-out (s) | Overhead share |
+|---|---|---|---|---|---|
+| `cnn-small` | 52,203 | 1.84 | 7.23 | 9.12 | 79 % |
+| `cnn-medium` | 1,676,779 | 13.47 | 14.08 | 28.71 | 49 % |
+| `resnet18-gn` | 11,173,323 | 225.26 | 41.99 | 267.58 | 16 % |
+
+vantage6 set the round time of the mixed federation for every model. Its overhead also grows during a run while tasks stay in the server database: with `cnn-medium` from 8.7 s at round 3 to 12.4 s at round 21 (stage-2 report §6.3). With `resnet18-gn` the adapter deletes each round's tasks (≥ 16 MiB) and the overhead stays flat.
+
+![E3: round-time breakdown](../results/figures/e3_round_time_breakdown.png)
+
+**Fixed cost per task.** With a 1 MiB echo model a vantage6 round takes 6.3 s ([tables](../results/evidence/stage2/tables.md)). Node-log phases per task, mean of 50 `cnn-small` rounds: 3.3 s from "Starting task" to the start of training (image check, container start, Python and torch import, reading the database), 1.9 s training, 2.3 s from the output to the result being sent (stage-2 vantage6 section §5).
+
+**Cost model.** Fan-out time per round = a + b·P, fitted on the E4a echo sweep, P in MiB ([cost model](../results/evidence/stage2/cost_model.md)):
+
+| Fit | a (s) | b (s/MiB) | R² |
+|---|---|---|---|
+| linear, 1–64 MiB (used for predictions) | 4.13 | 1.494 | 0.959 |
+| linear, 1–128 MiB | 3.65 | 1.680 | 0.581 |
+| with a quadratic term, 1–128 MiB (c = 0.019 s/MiB²) | | | 0.981 |
+
+Predictions with the 1–64 MiB fit plus the slowest site's training: −31 to −38 % for `cnn-small` (the line underestimates the fixed cost per task, and real training adds reading the database and a slower container exit), −3 to −4 % for `cnn-medium`, +10 % for `resnet18-gn`. The cost per MiB is 1.49 s against 0.021 s for NVFlare and 0.061 s for Flower, and growth above 64 MiB is superlinear (§6.1).
+
+### 5.4 Network efficiency
+
+**Bytes on the wire** (interface counters on the hospital VM ÷ nominal payload, which counts each site's model once down and once up per round; [bytes on wire](../results/evidence/stage2/e4_bytes.md)):
+
+| Model size | 1 MiB | 8 MiB | 32 MiB | 64 MiB | 128 MiB |
+|---|---|---|---|---|---|
+| ratio, vantage6 only | 4.97 | 5.49 | 5.53 | 5.37 | 9.08 |
+
+By design a node receives each run's input (1.78× the model) four times per site and round: in the run listing that starts it, in the server's responses to its status update and to its result upload (the server returns the whole run, input included), and in an extra `GET run/<id>` before it sends the result. That is 7.1× the model down and 1.78× up per site and round. Measured at 64 MiB: 8.8× down and 1.95× up; at 128 MiB about 16× down. The rest are requests that the client retried after the busy server dropped the connection.
+
+**Bandwidth (E4b).** 45 MiB model, mixed federation, egress of the hospital VM shaped with netem ([cost model](../results/evidence/stage2/cost_model.md)). The plan's lower bound is 4·P/rate (2 sites, each P down and P up). vantage6 moves V = 2 sites × (4 input copies + 1 result) × 1.78 = 17.8·P per link and round. Efficiency = bound ÷ measured fan-out:
+
+| Profile | Fan-out (s) | 4·P/rate (s) | Efficiency | 17.8·P/rate (s) | Protocol-adjusted efficiency |
+|---|---|---|---|---|---|
+| no shaping | 81.8 | 0 | — | 0 | — |
+| 1 Gbit/s | 83.3 | 1.5 | 0.02 | 6.7 | 0.08 |
+| 100 Mbit/s | 129.5 | 15.1 | 0.12 | 67.2 | 0.52 |
+| 20 Mbit/s | 463.8 | 75.5 | 0.16 | 336.0 | 0.72 |
+
+With limited bandwidth vantage6 dominates a mixed round: 463.8 s at 20 Mbit/s, against 80.3 s for NVFlare and 85.1 s for Flower ([tables](../results/evidence/stage2/tables.md)).
+
+![E4b: measured fan-out vs lower bound](../results/figures/e4b_measured_vs_bound.png)
+
+### 5.5 Memory and payload size
+
+| E4a, vantage6 only | 1 MiB | 64 MiB | 128 MiB |
+|---|---|---|---|
+| median round (s) | 6.3 | 115.3 | 468.2 |
+| peak RSS of one training container (MiB, `peak_rss_mb`) | 303 | 573 | 851 |
+| peak memory used on the hospital VM, 2 sites (MiB, sysmon) | — | 3,322 | 5,282 |
+
+Sources: [tables](../results/evidence/stage2/tables.md) and the stage-2 vantage6 section §5 (which rounds the sysmon values to 3.3 and 5.3 GB). On the central host the vantage6 server and the adapter each needed 15–18× the payload (about 2,300 and 1,900 MiB at 128 MiB; stage-2 report §6.1).
+
+Disk: a 4.15.2 node never deletes its per-run folders `task-<run id>` (input and output, about 2.7× the model per site and round), and the server database grows with every stored task. See §6 for the clean-up.
+
+![E4a: round time vs payload](../results/figures/e4a_round_time_vs_payload.png)
+
+![E4a: peak RSS vs payload](../results/figures/e4a_peak_rss_vs_payload.png)
+
+### 5.6 Scaling and robustness
+
+**Scaling (E5).** Six sites against twelve (four per framework; the extra sites hold half as much data each): vantage6 fan-out 9.1 → 10.4 s ([tables](../results/evidence/stage2/tables.md)), overhead per site 6.7 → 8.2 s, hospital-VM CPU mean 26.7 → 42.0 % with four training containers on 4 vCPUs (stage-2 report §6.4). The two extra nodes were online 16 s after the request; registered but offline, they never blocked a run.
+
+![E5: scaling](../results/figures/e5_scaling.png)
+
+**Robustness (E6)** ([robustness](../results/evidence/stage2/e6.md)):
+
+| Fault | Detection | Recovery | Attempts of that round | Manual action |
+|---|---|---|---|---|
+| training container killed in round 10, all sites required | 2.1 s (run `crashed`) | round done 15.2 s after the kill | 2 | none |
+| the same with `min_sites: 5`; an NVFlare site was still out, so 4 sites remained and the round was retried with all 6 | 2.1 s | 32.3 s | 2 | none |
+| vantage6 server restarted between rounds (back after 14.8 s) | — | next round done 26.9 s after the restart | 1 | none |
+| vantage6 server restarted during round 12 (back after 14.5 s) | — | next round done 20.4 s after the restart | 1 | none |
+| site throttled to 10 % CPU, rounds 7–13, deadline 20 s | — | dropped in all 7 rounds by per-site `task.kill`; rounds 20.3 s | 1 | none |
+| orchestrator and adapters killed (SIGKILL) in round 21, run resumed | — | adapter back after 2.2 s (stage-2 report §7); round 21 done 20.1 s after the kill | 1 | none |
+
+vantage6 reports a killed algorithm container at once (the run becomes `crashed`), so its detection is the fastest of the three frameworks. During both server restarts the nodes reconnected by themselves, and no vantage6 round failed or was retried.
+
 ## 6. Limits, known issues and knobs
+
+### 6.1 Measured limits (vantage6 4.15.2, SQLite server database)
+
+| Limit | Value | Cause | Source |
+|---|---|---|---|
+| largest model delivered | 128 MiB, 468.2 s per round | per-log-line row rewrites (§6.2) | [tables](../results/evidence/stage2/tables.md) |
+| 256 MiB | never delivered: each node trained round 1 six times in 32 min and every result was dropped, until the round was cancelled | the server rewrites ~0.9 GB run rows for every streamed log line, the node's websocket times out, and the node drops the result (§6.2) | [node logs](../results/evidence/stage2/vantage6/e4a-256mb-node-logs.txt) |
+| largest storable model | about 536 MiB; 1024 MiB cannot be stored | SQLite rejects a value > 10⁹ bytes (999,999,000 bytes accepted, 1,000,000,001 rejected), and a run's input is 1.78× the model | [ADR-020](../design/decisions.md) |
+| growth with model size | superlinear: 64 → 128 MiB costs 4.1× the time | per-log-line row rewrites | [tables](../results/evidence/stage2/tables.md) |
+| bytes on the wire | 5–9× the payload | four input copies per site and round, 1.78× encoding | §5.4 |
+| fixed cost per round | about 6.3 s | image check, container start, task and result round trips | §5.3 |
+
+### 6.2 Known issues
+
+- **A result is dropped when the websocket is down.** After training, the node takes the result from its queue and first sends a status event over the websocket (`node/__init__.py:575-579`). If the socket is disconnected, the emit fails, the exception is caught ("Speaking thread had an exception") and the result is lost. When the node reconnects, the server hands the still-open run back and the node trains again. This is the 256 MiB failure.
+- **Run rows are rewritten per log line.** The server's `on_algorithm_log` loads the run, appends the line and saves the whole row (`server/websockets.py:442-444`); with SQLite this rewrites the row including its input. About 24 log lines per round blocked the single server worker for about 60 s at 64 MiB.
+- **Overhead grows with the stored runs.** `input` is the first column of the run table (`server/model/run.py:58-68`), so in SQLite every later column of a row sits behind its input, and listings filtered on those columns walk all stored inputs.
+- **Task listings load all stored data.** `GET /task` computes each task's status from its runs, including their input and result. With 100 `cnn-medium` tasks the listing held the server for 12 min at 1.5–2.3 GB RSS. Delete tasks by id instead.
+- **Deleting a task with subtasks orphans the subtasks' runs** (`server/resource/task.py:1289-1301`). Their input and result stay in the database, unreachable through the API; after the E7 native runs these were 50 rows and 1.6 GB.
+- **Nodes never delete task folders** (`node/docker/task_manager.py:450-452`). A clean-up next to the node must age a folder by its newest file, because run ids are reused after task deletes and a reused folder keeps its old modification time ([`deploy/vantage6-vm/taskdir_gc.sh`](../../deploy/vantage6-vm/taskdir_gc.sh)).
+- **The large result store is not usable in 4.15.2.** The client uploads blobs in chunks of exactly 1 MiB, which the server's uWSGI rejects at its default 1 MiB chunked-input limit; with the limit raised, the SQLite-backed server deadlocked while streaming blobs ([ADR-020](../design/decisions.md)).
+- **Only unencrypted collaborations.** The adapter calls `setup_encryption(None)`.
+- **Transport and storage in the reference deployment.** The vantage6 API and the registry are plain HTTP, limited by the cloud firewall, and the collaboration is unencrypted, so the server stores task inputs and results (the weights) in plaintext.
+
+### 6.3 Knobs
+
+| Knob | Side | Effect | Status |
+|---|---|---|---|
+| `V6_PURGE_MIN_MB` (default 16) | adapter | deletes a round's tasks for models of at least this size; `0` keeps the database at one round for every model and avoids the growing overhead | used (default) |
+| poll interval | adapter (constant) | model-MiB / 16 s, 1–30 s, in database mode | used |
+| `deadline_s`, `min_sites` | hub | stragglers and dropouts are cancelled per site | used |
+| `purge.sh --vacuum` | operator | deletes all tasks and compacts the SQLite file between runs | used |
+| `share_config: false` | hospital (node configuration) | the node does not publish its configuration | used |
+| `share_algorithm_logs: false` | hospital (node configuration) | the node stops streaming algorithm log lines (`node/docker/task_manager.py:955-957`), which removes the per-line row rewrites; the operator no longer sees run logs | not tested |
+| PostgreSQL as server database | server | a run update does not rewrite the large input, which PostgreSQL stores out of line | not tested |
+| `large_result_store` | server | inputs and results in blob storage | not usable in 4.15.2 |
 
 ## 7. Troubleshooting
 
+- **`v6 server import` reports success, but logins fail; the server logs "No root user found! Is this the first run?"** → On Python 3.11 the 4.15 CLI formats a str-Enum used as an environment-variable name as `ServerGlobals.DB_URI_ENV_VAR` instead of `VANTAGE6_DB_URI`, so the import writes into a throw-away database → run the server image's own `vserver-local import` with `VANTAGE6_DB_URI` set, as `install.sh` does ([ADR-005](../design/decisions.md)).
+- **`v6 server stop` answers "flhub is not running!"** → the same Enum bug names the container `…-ServerType.V6SERVER` → stop the server container by its Docker labels (`stop.sh`).
+- **A fresh server has the superuser `root`/`root`** → the server creates it when no user `root` exists → import `root` with a generated password.
+- **`v6 node stop` and other CLI calls exit with "Can't write to log dir"** → server and node containers write the CLI's log directory as root → start the server with `-c <config>` (no CLI file log) and stop a node with `docker stop vantage6-<site>-user`.
+- **The adapter's own log lines disappear** → `UserClient()` replaces the root logger's handlers and level → the adapter restores them under a lock.
+- **The server is busy for minutes after a node (re)connects** → the node publishes every CSV column as a configuration row (785 per file), and the server deletes them one commit at a time → `share_config: false` in the node configuration.
+- **`v6 node start` exits with "Database label … contains invalid characters"** → labels must be Python identifiers (letters, digits and underscores, not starting with a digit) → use `db_label(variant)`.
+- **A run fails because a database is missing** → the task names a label the node does not have → add the variant's database to the node configuration and restart the node.
+- **Runs end as `not allowed` (node log "Docker image … is not allowed on this Node!") or as `non-existing Docker image` (node log "Failed to pull image!")** → the image does not match the node's `allowed_algorithms`, or the node cannot pull it, for example from a plain-HTTP registry that is missing in `insecure-registries` (with the default `require_algorithm_pull` a local copy is not used) → fix the regular expression or the Docker daemon configuration.
+- **Rounds take about 2 min at 64 MiB, the server runs at 100 % CPU, and nodes log "Connection error... Retrying"** → per-log-line row rewrites in SQLite (§6.2) → expected in database mode; the client retries and the rounds complete. Use smaller models or the untested knobs of §6.3.
+- **A node logs `IncompleteRead` after a status update** → uWSGI cut the response (the whole run with its input) while the worker was busy; the update itself reached the server → harmless.
+- **At 256 MiB the nodes train the same round again and again; their logs show "Speaking thread had an exception" and `BadNamespaceError: /tasks is not a connected namespace`** → the result is dropped while the websocket is down (§6.2) → no fix in 4.15.2 with SQLite; stay at or below 128 MiB.
+- **A run stays `active`; the node logs `FileNotFoundError .../task-000000001/output`** → a task-folder clean-up deleted a fresh output: run ids are reused after deletes and the reused folder kept an old modification time → age folders by their newest file and skip folders whose container is running; the hub's deadline and retry recover the round.
+- **The hospital disk fills up** → nodes never delete `task-<run id>` folders (about 2.7× the model per site and round) → a periodic clean-up such as `taskdir_gc.sh`.
+- **Blob uploads fail with HTTP 500, then the server hangs** (`large_result_store` configured) → 1 MiB upload chunks against uWSGI's 1 MiB chunked-input limit, then a deadlock in the SQLite-backed server → do not use the large result store with 4.15.2.
+- **Listing tasks takes minutes and the server needs GBs of memory** → `GET /task` loads every run's input and result → delete tasks by id; `purge.sh --vacuum` between runs.
+- **The server database keeps growing after central-function tasks were deleted** → subtask runs are not deleted with their tasks → remove the orphaned rows while the server is stopped ([`scripts/stage2/v6_orphan_cleanup.sh`](../../scripts/stage2/v6_orphan_cleanup.sh)).
+
 ## 8. Future work and upstream reports
+
+What would lift the limits:
+
+1. A PostgreSQL server database, so that run updates do not rewrite the stored input (server side; not tested).
+2. `share_algorithm_logs: false` on the nodes (hospital side; not tested; the operator loses the run logs).
+3. vantage6 5.x (sessions, Kubernetes) or a long-running algorithm, to remove the container start per task; not tested, because the project pins 4.15.2 ([ADR-002](../design/decisions.md)).
+4. A blob store for inputs and results, once the client's upload chunks fit the server's limit.
+5. Adapter support for encrypted collaborations: the adapter organisation's private key in `setup_encryption`. This is a code change.
+6. Production transport: an HTTPS reverse proxy for the server, a registry with TLS and authentication, and the image pinned by digest in each task (the node policy already accepts `@sha256:`) or an algorithm store.
+7. Task-folder clean-up inside the node, after the result is sent.
+
+Draft upstream issues for vantage6 4.15.2 (not filed):
+
+> **Node downloads each run's full input four times.** A node receives the run input (base64 of the JSON input) in the run listing that starts the run, in the responses to its status PATCH and its result PATCH (`server/resource/run.py:716` returns `run_schema.dump(run)`, and `RunSchema` excludes only `result`), and in an extra `GET run/<id>` before it sends the result (`node/__init__.py:595-598`, marked `FIXME: why are we retrieving the result *again*?`). With model weights as input this is 7.1× the model downstream per run. We measured 5.2–5.5× the nominal payload on the wire at 8–64 MiB and 9.1× at 128 MiB. Proposal: leave `input` out of PATCH responses (or return only the changed fields) and drop the extra GET.
+
+> **A finished run's result is lost when the websocket is down.** In `node/__init__.py:575-579` the node takes the result from its queue (`get_result()`) and emits `algorithm_status_change` before it PATCHes the result. If the socket is disconnected, for example because the server is busy, the emit raises, the exception is caught and logged as "Speaking thread had an exception", and the result is dropped. After reconnecting, the server returns the still-open run and the node executes it again. With 256 MiB inputs this repeated six times per node in 32 minutes, and no result was delivered. Proposal: PATCH the result first and emit afterwards, or keep the result until the PATCH succeeded and tolerate a failed emit.
+
+> **The server rewrites the whole run row for every algorithm log line.** `on_algorithm_log` (`server/websockets.py:442-444`) loads the run, appends the line and calls `run.save()`. With SQLite this rewrites the row including its input (1.78× the model when the input carries weights). About 24 log lines per round blocked the single server worker for about 60 s at 64 MiB, and the cost grows with the input size times the number of lines. Proposal: store log lines in their own table or batch them, and keep large columns out of the run row (`input` is the first column in `server/model/run.py`, so scans on later columns also walk the inputs).
+
+Smaller findings worth reporting: `Task._delete_subtasks()` deletes child tasks without their runs (`server/resource/task.py:1289-1301`); the 4.15 CLI's str-Enum formatting on Python ≥ 3.11 breaks `v6 server import` and `v6 server stop` ([ADR-005](../design/decisions.md)); the client's 1 MiB blob-upload chunks exceed uWSGI's default chunked-input limit; nodes never delete `task-<run id>` folders (`node/docker/task_manager.py:450-452`).
