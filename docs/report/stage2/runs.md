@@ -109,16 +109,16 @@ Rows are appended by `scripts/stage2/finalize_run.py` (or by hand for native run
 | s2-e5-12sites | E5 | real | [run](https://wandb.ai/hpml_surf-surf/AgnosticFL-stage2/runs/cml3zumo) | 20 | 0.7488 | 0.7289 | 0.9675 | 10.37 | full-sim | 0.000 |  |
 | s2-e7-nvflare-hub-cnn | E7 | real | [run](https://wandb.ai/hpml_surf-surf/AgnosticFL-stage2/runs/8lvxxxu8) | 20 | 0.6716 | 0.6406 | 0.9591 | 3.27 | full-sim | 0.000 |  |
 | s2-e7-nvflare-hub-payload | E7 | real | [run](https://wandb.ai/hpml_surf-surf/AgnosticFL-stage2/runs/aq17b9z4) | 5 | - | - | - | 2.55 | full-sim | 0.000 |  |
-| s2-e7-nvflare-native-payload | E7 | native | [run](https://wandb.ai/hpml_surf-surf/AgnosticFL-stage2/runs/vphzfi4d) | 5 | - | - | - | - | native | - |  |
+| s2-e7-nvflare-native-payload | E7 | native | [run](https://wandb.ai/hpml_surf-surf/AgnosticFL-stage2/runs/vphzfi4d) | 5 | - | - | - | - | native | 2.2e-08 | native_vs_hub_max_diff; global hash equal in 1/6 rounds |
 | s2-e7-vantage6-hub-cnn | E7 | real | [run](https://wandb.ai/hpml_surf-surf/AgnosticFL-stage2/runs/t8efg2iz) | 20 | 0.7842 | 0.7568 | 0.9754 | 8.81 | full-sim | 0.000 |  |
-| s2-e7-vantage6-native-cnn | E7 | native | [run](https://wandb.ai/hpml_surf-surf/AgnosticFL-stage2/runs/4crdvh5a) | 20 | - | - | - | - | native | - |  |
+| s2-e7-vantage6-native-cnn | E7 | native | [run](https://wandb.ai/hpml_surf-surf/AgnosticFL-stage2/runs/4crdvh5a) | 20 | - | - | - | - | native | 0.000 | native_vs_hub_max_diff; global hash equal in 21/21 rounds |
 | s2-e7-vantage6-hub-payload | E7 | real | [run](https://wandb.ai/hpml_surf-surf/AgnosticFL-stage2/runs/6bq28hx1) | 5 | - | - | - | 82.12 | full-sim | 0.000 |  |
-| s2-e7-vantage6-native-payload | E7 | native | [run](https://wandb.ai/hpml_surf-surf/AgnosticFL-stage2/runs/sp0v1urn) | 5 | - | - | - | - | native | - |  |
+| s2-e7-vantage6-native-payload | E7 | native | [run](https://wandb.ai/hpml_surf-surf/AgnosticFL-stage2/runs/sp0v1urn) | 5 | - | - | - | - | native | 0.000 | native_vs_hub_max_diff; global hash equal in 6/6 rounds |
 | s2-e7-flower-hub-cnn | E7 | real | [run](https://wandb.ai/hpml_surf-surf/AgnosticFL-stage2/runs/mj2qwsza) | 20 | 0.7950 | 0.7827 | 0.9744 | 7.55 | full-sim | 0.000 |  |
-| s2-e7-flower-native-cnn | E7 | native | [run](https://wandb.ai/hpml_surf-surf/AgnosticFL-stage2/runs/zlcfc7ft) | 20 | 0.7950 | 0.7827 | 0.9744 | 9.48 | native | - |  |
+| s2-e7-flower-native-cnn | E7 | native | [run](https://wandb.ai/hpml_surf-surf/AgnosticFL-stage2/runs/zlcfc7ft) | 20 | 0.7950 | 0.7827 | 0.9744 | 9.48 | native | 0.000 | native_vs_hub_max_diff; global hash equal in 21/21 rounds |
 | s2-e7-flower-hub-payload | E7 | real | [run](https://wandb.ai/hpml_surf-surf/AgnosticFL-stage2/runs/yysy845n) | 5 | - | - | - | 8.19 | full-sim | 0.000 |  |
-| s2-e7-flower-native-payload | E7 | native | [run](https://wandb.ai/hpml_surf-surf/AgnosticFL-stage2/runs/elcis89r) | 5 | - | - | - | 7.45 | native | - |  |
-| s2-e7-nvflare-native-cnn | E7 | native | [run](https://wandb.ai/hpml_surf-surf/AgnosticFL-stage2/runs/fp298ask) | 20 | - | - | - | - | native | - |  |
+| s2-e7-flower-native-payload | E7 | native | [run](https://wandb.ai/hpml_surf-surf/AgnosticFL-stage2/runs/elcis89r) | 5 | - | - | - | 7.45 | native | 0.000 | native_vs_hub_max_diff; global hash equal in 6/6 rounds |
+| s2-e7-nvflare-native-cnn | E7 | native | [run](https://wandb.ai/hpml_surf-surf/AgnosticFL-stage2/runs/fp298ask) | 20 | - | - | - | - | native | 0.68 | native_vs_hub_max_diff; global hash equal in 1/21 rounds |
 | s2-e4a-nvflare-512mb | E4 | real | [run](https://wandb.ai/hpml_surf-surf/AgnosticFL-stage2/runs/l835d84m) | 3 | - | - | - | 15.49 | full-sim | 0.000 |  |
 | s2-e4a-flower-512mb | E4 | real | [run](https://wandb.ai/hpml_surf-surf/AgnosticFL-stage2/runs/m62ru6rd) | 3 | - | - | - | 45.78 | full-sim | 0.000 |  |
 | s2-e4a-mixed-128mb | E4 | real | [run](https://wandb.ai/hpml_surf-surf/AgnosticFL-stage2/runs/ruiyc6g4) | 3 | - | - | - | 393.81 | full-sim | 0.000 |  |

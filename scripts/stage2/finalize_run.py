@@ -185,7 +185,7 @@ def append_row(name: str, exp: str, mode: str, url: str | None, summary: dict, n
     row = (f"| {name} | {exp} | {mode} | {f'[run]({url})' if url else '-'} | {summary.get('rounds', '-')} | "
            f"{fmt(acc)} | {fmt(summary.get('final/test_bal_acc'))} | {fmt(summary.get('final/test_auc'))} | "
            f"{fmt(summary.get('round_time_median_s'), 2)} | {summary.get('inv1_method', '-')} | "
-           f"{fmt(summary.get('inv1_max_diff', summary.get('native_vs_hub_max_diff')), 3)} | {notes or ''} |")
+           f"{fmt(summary.get('inv1_max_diff') if summary.get('inv1_max_diff') is not None else summary.get('native_vs_hub_max_diff'), 3)} | {notes or ''} |")
     with open(RUNS_MD, "a") as f:
         f.write(row + "\n")
 
