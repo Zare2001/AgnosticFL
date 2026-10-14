@@ -27,6 +27,7 @@ start() {  # start <name> <command...>: run in the background, keep the pid
 stop() { kill "$(cat "$W/$1.pid")" 2> /dev/null || true; rm -f "$W/$1.pid"; }
 HUB=http://127.0.0.1:$(port)
 cleanup() {  # the services by pid, then whatever of this run still runs (a test or a restart in progress)
+  trap '' INT TERM HUP  # a second signal must not cut the cleanup short (timeout(1) sends SIGTERM twice)
   for p in "$W"/*.pid; do [ -e "$p" ] && { kill "$(cat "$p")" 2> /dev/null || true; }; done
   pkill -f -- "$W|--hub $HUB " 2> /dev/null || true
   rm -rf "$W"
