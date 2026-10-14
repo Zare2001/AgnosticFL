@@ -10,7 +10,7 @@ The example scripts now stop everything they started and remove their temporary 
 
 - `examples/new-framework/check.sh`: the restart command it writes for the conformance suite's restart test recorded the pid of a subshell instead of the restarted adapter's, so every run left the two restarted adapters running. Its cleanup now also stops a test or a restart in progress and is not cut short by a repeated signal, and Ctrl-C ends the whole script instead of only the running step.
 - `examples/nvflare/server/run_local.py`: after a failure, Ctrl-C, `timeout`, SIGTERM or SIGHUP, the processes of NVFlare's simulator no longer outlive the script and its working directory is removed: it ends the relay job, then stops the remaining process tree, and a repeated signal (`timeout` signals the process and then its process group) no longer cuts that clean-up short.
-- `examples/flower/run_local.py` stops the processes it started and removes its working directory also when it is ended with SIGTERM or SIGHUP (for example by `timeout` or a closed terminal); before, they kept running.
+- `examples/flower/run_local.py` stops the processes it started and removes its working directory also when it is ended with SIGTERM or SIGHUP (for example by `timeout` or a closed terminal), and a repeated signal (a second Ctrl-C, or `timeout` signalling the process and then its process group) no longer cuts that clean-up short; before, the processes kept running.
 - `examples/vantage6/client/run_local.py` removes its temporary directory (dataset, site CSV, run token) also when it is ended with SIGTERM or SIGHUP; before, the directory stayed behind.
 
 ## [0.2.1] - 2026-10-14
