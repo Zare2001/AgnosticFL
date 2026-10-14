@@ -718,3 +718,363 @@ Stage-2 part of the agent bus (`tools/bus export`), from STAGE2-START #98 to #98
 - **#286** `2026-10-13T16:13:22+00:00` **central → all** [info] RUN start s2-e4a-flower-256mb 2026-10-13T16:13:22Z
   > config configs/stage2/e4a/s2-e4a-flower-256mb.yaml; sites flw-h5 flw-h6; model payload-256; agg fedavg; rounds 3; netem none
 - **#287** `2026-10-13T16:14:41+00:00` **central → all** [info] RUN end s2-e4a-flower-256mb 2026-10-13T16:14:41Z
+  > status finished rc=0 rounds=3 median_round_s=20.605600762000904 run_dir=/home/zpalanciya/flhub-runtime/runs/stage2/s2-e4a-flower-256mb-20261013T161325Z
+  > r1: 2026-10-13T16:13:27.038Z .. 2026-10-13T16:13:52.638Z
+  > r2: 2026-10-13T16:13:54.125Z .. 2026-10-13T16:14:15.406Z
+  > r3: 2026-10-13T16:14:16.944Z .. 2026-10-13T16:14:39.000Z
+- **#288** `2026-10-13T16:14:50+00:00` **flower → central** [info] file #40: sysmon-flower-s2-e4a-flower-256mb.json
+  > 
+  > fetch with: tools/bus get 40 -o <path>
+- **#289** `2026-10-13T16:14:50+00:00` **flower → central** [info] S4 flower VM s2-e4a-flower-256mb: mem peak 4.9 GB (16 %)
+  > window 2026-10-13T16:13:22Z..2026-10-13T16:14:41Z; VM mem peak 4.9 GB = 16 % of 31 GB (70 % rule ok); cpu peak 69.9 %; RSS peak MB per site (supernode+superexec+clientapp) {flw-h5: 2506, flw-h6: 2538}; ens3 rx 1613.5 MB tx 1614.3 MB
+- **#290** `2026-10-13T16:14:51+00:00` **flower → central** [info] S4 flower s2-e4a-flower-256mb: flagged SuperNode log lines or health
+  > sysmon summary rc=0; flower-vm: HEALTHY
+  > SuperNode log lines flagged during 2026-10-13T16:13:22Z..2026-10-13T16:14:41Z: {'flw-h5': 4, 'flw-h6': 2}
+  > flw-h5: WARNING :   Connection attempt failed, retrying in 0.56 seconds
+  > flw-h5: WARNING :   Connection attempt failed, retrying in 0.10 seconds
+  > flw-h5: WARNING :   Connection attempt failed, retrying in 1.21 seconds
+  > flw-h5: WARNING :   Connection attempt failed, retrying in 2.44 seconds
+  > flw-h6: WARNING :   Connection attempt failed, retrying in 0.39 seconds
+  > flw-h6: WARNING :   Connection attempt failed, retrying in 1.98 seconds
+- **#291** `2026-10-13T16:14:53+00:00` **vantage6 → central** [info] file #41: sysmon-vantage6-s2-e4a-flower-256mb.json
+  > 
+  > fetch with: tools/bus get 41 -o <path>
+- **#292** `2026-10-13T16:14:55+00:00` **nvflare → central** [info] file #42: s2-e4a-flower-256mb-nvflare-sysmon.json
+  > 
+  > fetch with: tools/bus get 42 -o <path>
+- **#293** `2026-10-13T16:15:21+00:00` **central → all** [info] S2 testbed disk limit: s2-e4a-flower-512mb needs 7.0 GB free, have 6.0 GB
+  > Run not started (PLAN.md §7 disk rule).
+- **#294** `2026-10-13T16:15:22+00:00` **central → all** [info] S2 E4a flower: testbed disk limit at 512 MB
+  > sweep stopped for this scope
+- **#295** `2026-10-13T16:18:45+00:00` **vantage6 → central** [info] S2 vantage6 E6a timing: I will arm v6-h3 kill --round 10 --after 0.3 (not 1)
+  > The trigger is the algorithm's training-start line; v6-h3's dir0.3 training (n=5760, cnn-small) takes ~1 s per round on this VM (island log: training-start 14:35:13 -> 'Writing output' 14:35:14; S2-mixed 0.7-1.9 s per site), so +1 s may land after training. +0.3 s (watcher latency ~0.1-0.3 s) lands mid-training. The inject log records whether the container was killed or already gone; I will report it with the outcome.
+- **#296** `2026-10-13T16:19:08+00:00` **central → all** [info] RUN start s2-e4a-vantage6-1mb 2026-10-13T16:19:08Z
+  > config configs/stage2/e4a/s2-e4a-vantage6-1mb.yaml; sites v6-h3 v6-h4; model payload-1; agg fedavg; rounds 3; netem none
+- **#297** `2026-10-13T16:19:29+00:00` **central → all** [info] RUN end s2-e4a-vantage6-1mb 2026-10-13T16:19:29Z
+  > status finished rc=0 rounds=3 median_round_s=6.297428128500542 run_dir=/home/zpalanciya/flhub-runtime/runs/stage2/s2-e4a-vantage6-1mb-20261013T161910Z
+  > r1: 2026-10-13T16:19:10.149Z .. 2026-10-13T16:19:16.711Z
+  > r2: 2026-10-13T16:19:16.732Z .. 2026-10-13T16:19:23.068Z
+  > r3: 2026-10-13T16:19:23.090Z .. 2026-10-13T16:19:29.422Z
+- **#298** `2026-10-13T16:19:32+00:00` **central → all** [info] RUN start s2-e4a-vantage6-8mb 2026-10-13T16:19:32Z
+  > config configs/stage2/e4a/s2-e4a-vantage6-8mb.yaml; sites v6-h3 v6-h4; model payload-8; agg fedavg; rounds 3; netem none
+- **#299** `2026-10-13T16:19:38+00:00` **flower → central** [info] file #43: sysmon-flower-s2-e4a-vantage6-1mb.json
+  > 
+  > fetch with: tools/bus get 43 -o <path>
+- **#300** `2026-10-13T16:19:38+00:00` **flower → central** [info] S4 flower VM s2-e4a-vantage6-1mb: mem peak 1.9 GB (6 %)
+  > window 2026-10-13T16:19:08Z..2026-10-13T16:19:29Z; VM mem peak 1.9 GB = 6 % of 31 GB (70 % rule ok); cpu peak 5.8 %; RSS peak MB per site (supernode+superexec+clientapp) {flw-h5: 726, flw-h6: 467}; ens3 rx 0.0 MB tx 0.0 MB
+- **#301** `2026-10-13T16:19:40+00:00` **vantage6 → central** [info] file #44: sysmon-vantage6-s2-e4a-vantage6-1mb.json
+  > 
+  > fetch with: tools/bus get 44 -o <path>
+- **#302** `2026-10-13T16:19:41+00:00` **vantage6 → central** [info] S4 vantage6 s2-e4a-vantage6-1mb: RAM/disk on the vantage6 VM
+  > VM mem peak 1792 MB of 32097 MB; process RSS peaks: v6-algorithm 585 MB (1.8 %), dockerd 228 MB (0.7 %), v6-h3-node 122 MB (0.4 %); disk free now 5.5 GB; rounds trained {'v6-h3': 3, 'v6-h4': 3}; HEALTHY
+- **#303** `2026-10-13T16:19:43+00:00` **nvflare → central** [info] file #45: s2-e4a-vantage6-1mb-nvflare-sysmon.json
+  > 
+  > fetch with: tools/bus get 45 -o <path>
+- **#304** `2026-10-13T16:20:12+00:00` **central → all** [info] RUN end s2-e4a-vantage6-8mb 2026-10-13T16:20:12Z
+  > status finished rc=0 rounds=3 median_round_s=12.797429817501325 run_dir=/home/zpalanciya/flhub-runtime/runs/stage2/s2-e4a-vantage6-8mb-20261013T161934Z
+  > r1: 2026-10-13T16:19:34.102Z .. 2026-10-13T16:19:46.440Z
+  > r2: 2026-10-13T16:19:46.512Z .. 2026-10-13T16:19:58.877Z
+  > r3: 2026-10-13T16:19:58.944Z .. 2026-10-13T16:20:12.293Z
+- **#305** `2026-10-13T16:20:13+00:00` **nvflare → central** [info] file #46: s2-e4a-vantage6-8mb-nvflare-sysmon.json
+  > 
+  > fetch with: tools/bus get 46 -o <path>
+- **#306** `2026-10-13T16:20:18+00:00` **central → all** [info] RUN start s2-e4a-vantage6-32mb 2026-10-13T16:20:18Z
+  > config configs/stage2/e4a/s2-e4a-vantage6-32mb.yaml; sites v6-h3 v6-h4; model payload-32; agg fedavg; rounds 3; netem none
+- **#307** `2026-10-13T16:20:24+00:00` **flower → central** [info] file #47: sysmon-flower-s2-e4a-vantage6-8mb.json
+  > 
+  > fetch with: tools/bus get 47 -o <path>
+- **#308** `2026-10-13T16:20:24+00:00` **flower → central** [info] S4 flower VM s2-e4a-vantage6-8mb: mem peak 1.9 GB (6 %)
+  > window 2026-10-13T16:19:32Z..2026-10-13T16:20:12Z; VM mem peak 1.9 GB = 6 % of 31 GB (70 % rule ok); cpu peak 10.0 %; RSS peak MB per site (supernode+superexec+clientapp) {flw-h5: 726, flw-h6: 467}; ens3 rx 0.0 MB tx 0.0 MB
+- **#309** `2026-10-13T16:20:26+00:00` **vantage6 → central** [info] file #48: sysmon-vantage6-s2-e4a-vantage6-8mb.json
+  > 
+  > fetch with: tools/bus get 48 -o <path>
+- **#310** `2026-10-13T16:20:27+00:00` **vantage6 → central** [info] S4 vantage6 s2-e4a-vantage6-8mb: RAM/disk on the vantage6 VM
+  > VM mem peak 1973 MB of 32097 MB; process RSS peaks: v6-algorithm 638 MB (2.0 %), v6-h3-node 262 MB (0.8 %), v6-h4-node 261 MB (0.8 %); disk free now 5.4 GB; rounds trained {'v6-h3': 3, 'v6-h4': 3}; HEALTHY
+- **#311** `2026-10-13T16:23:21+00:00` **central → all** [info] RUN end s2-e4a-vantage6-32mb 2026-10-13T16:23:21Z
+  > status finished rc=0 rounds=3 median_round_s=60.120978604500124 run_dir=/home/zpalanciya/flhub-runtime/runs/stage2/s2-e4a-vantage6-32mb-20261013T162019Z
+  > r1: 2026-10-13T16:20:20.003Z .. 2026-10-13T16:21:16.940Z
+  > r2: 2026-10-13T16:21:17.143Z .. 2026-10-13T16:22:18.804Z
+  > r3: 2026-10-13T16:22:19.009Z .. 2026-10-13T16:23:20.545Z
+- **#312** `2026-10-13T16:23:25+00:00` **central → all** [info] RUN start s2-e4a-vantage6-64mb 2026-10-13T16:23:25Z
+  > config configs/stage2/e4a/s2-e4a-vantage6-64mb.yaml; sites v6-h3 v6-h4; model payload-64; agg fedavg; rounds 3; netem none
+- **#313** `2026-10-13T16:23:25+00:00` **flower → central** [info] file #49: sysmon-flower-s2-e4a-vantage6-32mb.json
+  > 
+  > fetch with: tools/bus get 49 -o <path>
+- **#314** `2026-10-13T16:23:25+00:00` **flower → central** [info] S4 flower VM s2-e4a-vantage6-32mb: mem peak 2.0 GB (6 %)
+  > window 2026-10-13T16:20:18Z..2026-10-13T16:23:21Z; VM mem peak 2.0 GB = 6 % of 31 GB (70 % rule ok); cpu peak 14.0 %; RSS peak MB per site (supernode+superexec+clientapp) {flw-h5: 726, flw-h6: 467}; ens3 rx 0.1 MB tx 0.1 MB
+- **#315** `2026-10-13T16:23:28+00:00` **vantage6 → central** [info] file #50: sysmon-vantage6-s2-e4a-vantage6-32mb.json
+  > 
+  > fetch with: tools/bus get 50 -o <path>
+- **#316** `2026-10-13T16:23:29+00:00` **vantage6 → central** [info] S4 vantage6 s2-e4a-vantage6-32mb: RAM/disk on the vantage6 VM
+  > VM mem peak 2362 MB of 32097 MB; process RSS peaks: v6-algorithm 705 MB (2.2 %), v6-h4-node 444 MB (1.4 %), v6-h3-node 374 MB (1.2 %); disk free now 6.2 GB; rounds trained {'v6-h3': 3, 'v6-h4': 3}; HEALTHY
+- **#317** `2026-10-13T16:23:30+00:00` **nvflare → central** [info] file #51: s2-e4a-vantage6-32mb-nvflare-sysmon.json
+  > 
+  > fetch with: tools/bus get 51 -o <path>
+- **#318** `2026-10-13T16:29:29+00:00` **central → all** [info] RUN end s2-e4a-vantage6-64mb 2026-10-13T16:29:29Z
+  > status finished rc=0 rounds=3 median_round_s=115.25584961849927 run_dir=/home/zpalanciya/flhub-runtime/runs/stage2/s2-e4a-vantage6-64mb-20261013T162327Z
+  > r1: 2026-10-13T16:23:27.542Z .. 2026-10-13T16:25:24.348Z
+  > r2: 2026-10-13T16:25:24.760Z .. 2026-10-13T16:27:31.050Z
+  > r3: 2026-10-13T16:27:31.472Z .. 2026-10-13T16:29:28.448Z
+- **#319** `2026-10-13T16:29:32+00:00` **vantage6 → central** [info] file #52: sysmon-vantage6-s2-e4a-vantage6-64mb.json
+  > 
+  > fetch with: tools/bus get 52 -o <path>
+- **#320** `2026-10-13T16:29:32+00:00` **vantage6 → central** [info] S4 vantage6 s2-e4a-vantage6-64mb: RAM/disk on the vantage6 VM
+  > VM mem peak 3322 MB of 32097 MB; process RSS peaks: v6-algorithm 1406 MB (4.4 %), v6-h3-node 1025 MB (3.2 %), v6-h4-node 841 MB (2.6 %); disk free now 6.3 GB; rounds trained {'v6-h3': 3, 'v6-h4': 3}; HEALTHY
+- **#321** `2026-10-13T16:29:32+00:00` **vantage6 → central** [info] S4 vantage6 s2-e4a-vantage6-64mb: flagged node log lines or health
+  > sysmon summary rc=0; HEALTHY; rounds trained {'v6-h3': 3, 'v6-h4': 3}
+  > node log lines flagged during 2026-10-13T16:23:25Z..2026-10-13T16:29:29Z: {'v6-h3': 2, 'v6-h4': 0}
+  > v6-h3: 2026-10-13 16:24:43 - common         - ERROR    - Connection error... Retrying
+  > v6-h3: 2026-10-13 16:26:51 - common         - ERROR    - Connection error... Retrying
+- **#322** `2026-10-13T16:29:33+00:00` **nvflare → central** [info] file #53: s2-e4a-vantage6-64mb-nvflare-sysmon.json
+  > 
+  > fetch with: tools/bus get 53 -o <path>
+- **#323** `2026-10-13T16:29:36+00:00` **central → all** [info] RUN start s2-e4a-vantage6-128mb 2026-10-13T16:29:36Z
+  > config configs/stage2/e4a/s2-e4a-vantage6-128mb.yaml; sites v6-h3 v6-h4; model payload-128; agg fedavg; rounds 3; netem none
+- **#324** `2026-10-13T16:29:43+00:00` **flower → central** [info] file #54: sysmon-flower-s2-e4a-vantage6-64mb.json
+  > 
+  > fetch with: tools/bus get 54 -o <path>
+- **#325** `2026-10-13T16:29:43+00:00` **flower → central** [info] S4 flower VM s2-e4a-vantage6-64mb: mem peak 2.0 GB (6 %)
+  > window 2026-10-13T16:23:25Z..2026-10-13T16:29:29Z; VM mem peak 2.0 GB = 6 % of 31 GB (70 % rule ok); cpu peak 17.6 %; RSS peak MB per site (supernode+superexec+clientapp) {flw-h5: 726, flw-h6: 467}; ens3 rx 0.2 MB tx 2.7 MB
+- **#326** `2026-10-13T16:29:44+00:00` **nvflare → all** [push] e4981de deploy: nvflare follower takes log offsets from the previous poll
+  > paths: deploy/nvflare-vm/run_follow.py; pull: optional; note: short runs (RUN start seen up to 15 s late) no longer miss their first log lines.
+- **#327** `2026-10-13T16:33:36+00:00` **flower → central** [info] S4 flower E4a: 1-256 MB ok, flower VM RAM peak 4.9 GB (16 %); flagged lines = reconnects after purge
+  > From the flower VM for s2-e4a-flower-{1,8,32,64,128,256}mb: VM memory peak 1.9 / 2.0 / 2.1 / 2.5 / 3.6 / 4.9 GB (max 16 % of 31 GB, 70 % rule far away); medians from your RUN end: 5.79 / 6.07 / 7.69 / 9.08 / 13.51 / 20.61 s.
+  > The flagged 'Connection attempt failed, retrying' lines in the 64 MB and 256 MB windows are the SuperNodes reconnecting after purge.sh restarted the SuperLink right before RUN start (their retry backoff straddled the window); all rounds finished, no ERROR/Traceback, both SuperNodes stayed up with the same node ids. 512 MB = testbed disk limit on central (noted for the report: island rehearsal passed 512 MB with ~2.1 GB SuperLink DB+WAL).
+- **#328** `2026-10-13T16:38:55+00:00` **central → all** [info] S4 E4a timing: vantage6 DB mode superlinear (64 MB 118 s/round, 128 MB 536 s/round); 256 MB ~2 h; E4a ends ~19:40Z
+  > vantage6 server = one uwsgi process at 100 % CPU, flhub.sqlite 721 MB during the 128 MB run; node clients log 'Connection error... Retrying' while the server is busy, rounds still complete. I keep the sweep (256 MB est. ~36 min/round, under the 3600 s round deadline; 512 MB = testbed disk limit on central), then the mixed scope 1..128 MB (256 = disk limit). After E4a: E6d dry run, then E1 -> E2 (seed sims fill gaps). vantage6: please keep watching the VM disk at 256 MB (task folders).
+- **#329** `2026-10-13T16:49:15+00:00` **central → all** [info] S4 E4a: vantage6 256 MB will be a testbed disk limit (measured projection), then mixed scope
+  > During s2-e4a-vantage6-128mb the vantage6 server sqlite reached 1.14 GB + 0.20 GB journal (rows are not freed until purge --vacuum), plus hub blobs and the run dir: ~1.6 GB peak at 128 MB. At 256 MB that projects to ~4 GB on central with ~6 GB free after purge, i.e. below PLAN §7's 3 GB floor during the run. run_final.py now takes measured projections (~/flhub-runtime/runs/stage2/disk_projection.json) into the disk check, so the sweep records vantage6 256 MB as a testbed disk limit and goes on with the mixed scope (1..128 MB; 256 = disk limit by the rule). If the owner frees ~1.5 GB (#214) I can rerun vantage6 256 MB at the end of the campaign. Measured vantage6 round times so far: 1 MB ~6 s, 8 MB ~12 s, 32 MB ~60 s, 64 MB ~118 s, 128 MB ~540 s (superlinear, server CPU-bound).
+- **#330** `2026-10-13T16:52:06+00:00` **flower → central** [request] flower (low priority): put the s2-e4a-flower-* metrics.jsonl to flower when convenient
+  > For the RQ4 breakdown in my section: please 'tools/bus put <run_dir>/metrics.jsonl --to flower' for s2-e4a-flower-{1,8,32,64,128,256}mb (they hold site/flw-h5|h6/flower_relay_{prep,push,reply,store}_s and t_result/overhead). Small files; whenever the queue allows, no hurry.
+- **#331** `2026-10-13T16:54:39+00:00` **central → all** [info] RUN end s2-e4a-vantage6-128mb 2026-10-13T16:54:39Z
+  > status finished rc=0 rounds=3 median_round_s=468.22249601600015 run_dir=/home/zpalanciya/flhub-runtime/runs/stage2/s2-e4a-vantage6-128mb-20261013T162938Z
+  > r1: 2026-10-13T16:29:39.036Z .. 2026-10-13T16:38:35.553Z
+  > r2: 2026-10-13T16:38:36.437Z .. 2026-10-13T16:47:52.204Z
+  > r3: 2026-10-13T16:47:52.979Z .. 2026-10-13T16:54:38.122Z
+- **#332** `2026-10-13T16:54:43+00:00` **vantage6 → central** [info] file #55: sysmon-vantage6-s2-e4a-vantage6-128mb.json
+  > 
+  > fetch with: tools/bus get 55 -o <path>
+- **#333** `2026-10-13T16:54:44+00:00` **vantage6 → central** [info] S4 vantage6 s2-e4a-vantage6-128mb: RAM/disk on the vantage6 VM
+  > VM mem peak 5282 MB of 32097 MB; process RSS peaks: v6-algorithm 2134 MB (6.6 %), v6-h3-node 1588 MB (4.9 %), v6-h4-node 1582 MB (4.9 %); disk free now 6.3 GB; rounds trained {'v6-h3': 3, 'v6-h4': 3}; HEALTHY
+- **#334** `2026-10-13T16:54:44+00:00` **nvflare → central** [info] file #56: s2-e4a-vantage6-128mb-nvflare-sysmon.json
+  > 
+  > fetch with: tools/bus get 56 -o <path>
+- **#335** `2026-10-13T16:54:44+00:00` **vantage6 → central** [info] S4 vantage6 s2-e4a-vantage6-128mb: flagged node log lines or health
+  > sysmon summary rc=0; HEALTHY; rounds trained {'v6-h3': 3, 'v6-h4': 3}
+  > node log lines flagged during 2026-10-13T16:29:36Z..2026-10-13T16:54:39Z: {'v6-h3': 67, 'v6-h4': 56}
+  > v6-h3: 2026-10-13 16:31:32 - node           - ERROR    - ('Connection broken: IncompleteRead(2708306 bytes read, 235906626 more expected)', IncompleteRead(2708306 byte
+  > v6-h3: Traceback (most recent call last):
+  > v6-h3: raise IncompleteRead(self._fp_bytes_read, self.length_remaining)
+  > v6-h3: urllib3.exceptions.IncompleteRead: IncompleteRead(2708306 bytes read, 235906626 more expected)
+  > v6-h4: 2026-10-13 16:29:55 - node           - ERROR    - ('Connection broken: IncompleteRead(2708306 bytes read, 116599590 more expected)', IncompleteRead(2708306 byte
+  > v6-h4: Traceback (most recent call last):
+  > v6-h4: raise IncompleteRead(self._fp_bytes_read, self.length_remaining)
+  > v6-h4: urllib3.exceptions.IncompleteRead: IncompleteRead(2708306 bytes read, 116599590 more expected)
+- **#336** `2026-10-13T16:54:51+00:00` **central → all** [info] S2 testbed disk limit: s2-e4a-vantage6-256mb needs 7.0 GB free, have 5.5 GB
+  > Run not started (PLAN.md §7 disk rule).
+- **#337** `2026-10-13T16:54:52+00:00` **central → all** [info] S2 E4a vantage6: testbed disk limit at 256 MB
+  > sweep stopped for this scope
+- **#338** `2026-10-13T16:54:54+00:00` **flower → central** [info] file #57: sysmon-flower-s2-e4a-vantage6-128mb.json
+  > 
+  > fetch with: tools/bus get 57 -o <path>
+- **#339** `2026-10-13T16:54:54+00:00` **flower → central** [info] S4 flower VM s2-e4a-vantage6-128mb: mem peak 1.8 GB (6 %)
+  > window 2026-10-13T16:29:36Z..2026-10-13T16:54:39Z; VM mem peak 1.8 GB = 6 % of 31 GB (70 % rule ok); cpu peak 14.9 %; RSS peak MB per site (supernode+superexec+clientapp) {flw-h5: 726, flw-h6: 330}; ens3 rx 1.0 MB tx 21.0 MB
+- **#340** `2026-10-13T16:55:31+00:00` **central → all** [info] RUN start s2-e4a-mixed-1mb 2026-10-13T16:55:31Z
+  > config configs/stage2/e4a/s2-e4a-mixed-1mb.yaml; sites nvf-h1 nvf-h2 v6-h3 v6-h4 flw-h5 flw-h6; model payload-1; agg fedavg; rounds 3; netem none
+- **#341** `2026-10-13T16:55:52+00:00` **central → all** [info] RUN end s2-e4a-mixed-1mb 2026-10-13T16:55:52Z
+  > status finished rc=0 rounds=3 median_round_s=6.4642584350003744 run_dir=/home/zpalanciya/flhub-runtime/runs/stage2/s2-e4a-mixed-1mb-20261013T165532Z
+  > r1: 2026-10-13T16:55:32.660Z .. 2026-10-13T16:55:39.039Z
+  > r2: 2026-10-13T16:55:39.063Z .. 2026-10-13T16:55:45.463Z
+  > r3: 2026-10-13T16:55:45.491Z .. 2026-10-13T16:55:52.136Z
+- **#342** `2026-10-13T16:55:55+00:00` **flower → central** [info] file #58: sysmon-flower-s2-e4a-mixed-1mb.json
+  > 
+  > fetch with: tools/bus get 58 -o <path>
+- **#343** `2026-10-13T16:55:55+00:00` **flower → central** [info] S4 flower VM s2-e4a-mixed-1mb: mem peak 2.0 GB (6 %)
+  > window 2026-10-13T16:55:31Z..2026-10-13T16:55:52Z; VM mem peak 2.0 GB = 6 % of 31 GB (70 % rule ok); cpu peak 51.4 %; RSS peak MB per site (supernode+superexec+clientapp) {flw-h5: 736, flw-h6: 667}; ens3 rx 6.4 MB tx 6.5 MB
+- **#344** `2026-10-13T16:56:00+00:00` **vantage6 → central** [info] file #59: sysmon-vantage6-s2-e4a-mixed-1mb.json
+  > 
+  > fetch with: tools/bus get 59 -o <path>
+- **#345** `2026-10-13T16:56:00+00:00` **nvflare → central** [info] file #60: s2-e4a-mixed-1mb-nvflare-sysmon.json
+  > 
+  > fetch with: tools/bus get 60 -o <path>
+- **#346** `2026-10-13T16:56:00+00:00` **vantage6 → central** [info] S4 vantage6 s2-e4a-mixed-1mb: RAM/disk on the vantage6 VM
+  > VM mem peak 2335 MB of 32097 MB; process RSS peaks: v6-h3-node 646 MB (2.0 %), v6-algorithm 567 MB (1.8 %), v6-h4-node 516 MB (1.6 %); disk free now 6.3 GB; rounds trained {'v6-h3': 3, 'v6-h4': 3}; HEALTHY
+- **#347** `2026-10-13T16:56:30+00:00` **central → all** [info] RUN start s2-e4a-mixed-8mb 2026-10-13T16:56:29Z
+  > config configs/stage2/e4a/s2-e4a-mixed-8mb.yaml; sites nvf-h1 nvf-h2 v6-h3 v6-h4 flw-h5 flw-h6; model payload-8; agg fedavg; rounds 3; netem none
+- **#348** `2026-10-13T16:57:12+00:00` **central → all** [info] RUN end s2-e4a-mixed-8mb 2026-10-13T16:57:12Z
+  > status finished rc=0 rounds=3 median_round_s=13.314339360498707 run_dir=/home/zpalanciya/flhub-runtime/runs/stage2/s2-e4a-mixed-8mb-20261013T165631Z
+  > r1: 2026-10-13T16:56:31.419Z .. 2026-10-13T16:56:44.724Z
+  > r2: 2026-10-13T16:56:44.803Z .. 2026-10-13T16:56:57.763Z
+  > r3: 2026-10-13T16:56:57.851Z .. 2026-10-13T16:57:11.706Z
+- **#349** `2026-10-13T16:57:16+00:00` **nvflare → central** [info] file #61: s2-e4a-mixed-8mb-nvflare-sysmon.json
+  > 
+  > fetch with: tools/bus get 61 -o <path>
+- **#350** `2026-10-13T16:57:16+00:00` **vantage6 → central** [info] file #62: sysmon-vantage6-s2-e4a-mixed-8mb.json
+  > 
+  > fetch with: tools/bus get 62 -o <path>
+- **#351** `2026-10-13T16:57:17+00:00` **vantage6 → central** [info] S4 vantage6 s2-e4a-mixed-8mb: RAM/disk on the vantage6 VM
+  > VM mem peak 2129 MB of 32097 MB; process RSS peaks: v6-algorithm 596 MB (1.9 %), v6-h3-node 409 MB (1.3 %), v6-h4-node 265 MB (0.8 %); disk free now 6.2 GB; rounds trained {'v6-h3': 3, 'v6-h4': 3}; HEALTHY
+- **#352** `2026-10-13T16:57:26+00:00` **flower → central** [info] file #63: sysmon-flower-s2-e4a-mixed-8mb.json
+  > 
+  > fetch with: tools/bus get 63 -o <path>
+- **#353** `2026-10-13T16:57:26+00:00` **flower → central** [info] S4 flower VM s2-e4a-mixed-8mb: mem peak 2.2 GB (7 %)
+  > window 2026-10-13T16:56:29Z..2026-10-13T16:57:12Z; VM mem peak 2.2 GB = 7 % of 31 GB (70 % rule ok); cpu peak 52.0 %; RSS peak MB per site (supernode+superexec+clientapp) {flw-h5: 848, flw-h6: 767}; ens3 rx 50.6 MB tx 50.6 MB
+- **#354** `2026-10-13T16:57:26+00:00` **flower → central** [info] S4 flower s2-e4a-mixed-8mb: flagged SuperNode log lines or health
+  > sysmon summary rc=0; flower-vm: HEALTHY
+  > SuperNode log lines flagged during 2026-10-13T16:56:29Z..2026-10-13T16:57:12Z: {'flw-h5': 3, 'flw-h6': 3}
+  > flw-h5: WARNING :   Connection attempt failed, retrying in 0.02 seconds
+  > flw-h5: WARNING :   Connection attempt failed, retrying in 1.94 seconds
+  > flw-h5: WARNING :   Connection attempt failed, retrying in 3.91 seconds
+  > flw-h6: WARNING :   Connection attempt failed, retrying in 0.24 seconds
+  > flw-h6: WARNING :   Connection attempt failed, retrying in 1.97 seconds
+  > flw-h6: WARNING :   Connection attempt failed, retrying in 0.89 seconds
+- **#355** `2026-10-13T16:57:55+00:00` **central → all** [info] RUN start s2-e4a-mixed-32mb 2026-10-13T16:57:55Z
+  > config configs/stage2/e4a/s2-e4a-mixed-32mb.yaml; sites nvf-h1 nvf-h2 v6-h3 v6-h4 flw-h5 flw-h6; model payload-32; agg fedavg; rounds 3; netem none
+- **#356** `2026-10-13T16:59:47+00:00` **nvflare → central** [request] S4 nvflare: please send the s2-e4a-nvflare-* metrics.jsonl + summary.json when convenient
+  > For the NVFlare E4a analysis (round-time breakdown with site/<id>/nvflare_relay_{prep,reply,store}_s, train_time_s, overhead_s, t_result_s): a small tar of metrics.jsonl, summary.json, config.json (no checkpoints/blobs) of s2-e4a-nvflare-{1,8,32,64,128,256}mb and s2-e4a-mixed-* (when done), e.g. tools/bus put <tar> --to nvflare. Low priority, any time between runs. Later the same for my E5/E6/E7 runs.
+- **#357** `2026-10-13T17:01:02+00:00` **central → all** [info] RUN end s2-e4a-mixed-32mb 2026-10-13T17:01:02Z
+  > status finished rc=0 rounds=3 median_round_s=58.8890177305002 run_dir=/home/zpalanciya/flhub-runtime/runs/stage2/s2-e4a-mixed-32mb-20261013T165756Z
+  > r1: 2026-10-13T16:57:56.748Z .. 2026-10-13T16:58:57.167Z
+  > r2: 2026-10-13T16:58:57.455Z .. 2026-10-13T16:59:59.890Z
+  > r3: 2026-10-13T17:00:00.148Z .. 2026-10-13T17:01:01.462Z
+- **#358** `2026-10-13T17:01:03+00:00` **nvflare → central** [info] file #64: s2-e4a-mixed-32mb-nvflare-sysmon.json
+  > 
+  > fetch with: tools/bus get 64 -o <path>
+- **#359** `2026-10-13T17:01:03+00:00` **vantage6 → central** [info] file #65: sysmon-vantage6-s2-e4a-mixed-32mb.json
+  > 
+  > fetch with: tools/bus get 65 -o <path>
+- **#360** `2026-10-13T17:01:04+00:00` **vantage6 → central** [info] S4 vantage6 s2-e4a-mixed-32mb: RAM/disk on the vantage6 VM
+  > VM mem peak 2506 MB of 32097 MB; process RSS peaks: v6-h3-node 518 MB (1.6 %), v6-algorithm 406 MB (1.3 %), v6-h4-node 393 MB (1.2 %); disk free now 6.2 GB; rounds trained {'v6-h3': 3, 'v6-h4': 3}; HEALTHY
+- **#361** `2026-10-13T17:01:13+00:00` **flower → central** [info] file #66: sysmon-flower-s2-e4a-mixed-32mb.json
+  > 
+  > fetch with: tools/bus get 66 -o <path>
+- **#362** `2026-10-13T17:01:13+00:00` **flower → central** [info] S4 flower VM s2-e4a-mixed-32mb: mem peak 2.2 GB (7 %)
+  > window 2026-10-13T16:57:55Z..2026-10-13T17:01:02Z; VM mem peak 2.2 GB = 7 % of 31 GB (70 % rule ok); cpu peak 57.2 %; RSS peak MB per site (supernode+superexec+clientapp) {flw-h5: 956, flw-h6: 855}; ens3 rx 201.9 MB tx 202.0 MB
+- **#363** `2026-10-13T17:01:14+00:00` **flower → central** [info] S4 flower s2-e4a-mixed-32mb: flagged SuperNode log lines or health
+  > sysmon summary rc=0; flower-vm: HEALTHY
+  > SuperNode log lines flagged during 2026-10-13T16:57:55Z..2026-10-13T17:01:02Z: {'flw-h5': 3, 'flw-h6': 0}
+  > flw-h5: WARNING :   Connection attempt failed, retrying in 0.98 seconds
+  > flw-h5: WARNING :   Connection attempt failed, retrying in 0.11 seconds
+  > flw-h5: WARNING :   Connection attempt failed, retrying in 2.85 seconds
+- **#364** `2026-10-13T17:01:44+00:00` **flower → all** [push] 4ab9ab8 deploy: flower follower counts reconnect retries apart from errors
+  > paths: deploy/flower-vm/run_follow.py; pull: optional; note: SuperNode 'Connection attempt failed' retries (e.g. after purge.sh restarts the SuperLink) are recorded but no longer raise a bus alert; alerts only for ERROR/Traceback/crash/node-unavailable lines or unhealthy status.
+- **#365** `2026-10-13T17:01:44+00:00` **central → all** [info] RUN start s2-e4a-mixed-64mb 2026-10-13T17:01:44Z
+  > config configs/stage2/e4a/s2-e4a-mixed-64mb.yaml; sites nvf-h1 nvf-h2 v6-h3 v6-h4 flw-h5 flw-h6; model payload-64; agg fedavg; rounds 3; netem none
+- **#366** `2026-10-13T17:07:50+00:00` **central → all** [info] RUN end s2-e4a-mixed-64mb 2026-10-13T17:07:50Z
+  > status finished rc=0 rounds=3 median_round_s=116.20021550549791 run_dir=/home/zpalanciya/flhub-runtime/runs/stage2/s2-e4a-mixed-64mb-20261013T170146Z
+  > r1: 2026-10-13T17:01:46.900Z .. 2026-10-13T17:03:45.276Z
+  > r2: 2026-10-13T17:03:45.769Z .. 2026-10-13T17:05:46.301Z
+  > r3: 2026-10-13T17:05:46.806Z .. 2026-10-13T17:07:50.013Z
+- **#367** `2026-10-13T17:07:51+00:00` **flower → central** [info] file #67: sysmon-flower-s2-e4a-mixed-64mb.json
+  > 
+  > fetch with: tools/bus get 67 -o <path>
+- **#368** `2026-10-13T17:07:51+00:00` **nvflare → central** [info] file #68: s2-e4a-mixed-64mb-nvflare-sysmon.json
+  > 
+  > fetch with: tools/bus get 68 -o <path>
+- **#369** `2026-10-13T17:07:51+00:00` **flower → central** [info] S4 flower VM s2-e4a-mixed-64mb: mem peak 2.9 GB (9 %)
+  > window 2026-10-13T17:01:44Z..2026-10-13T17:07:50Z; VM mem peak 2.9 GB = 9 % of 31 GB (70 % rule ok); cpu peak 59.3 %; RSS peak MB per site (supernode+superexec+clientapp) {flw-h5: 1319, flw-h6: 1250}; ens3 rx 403.7 MB tx 403.9 MB
+- **#370** `2026-10-13T17:07:52+00:00` **vantage6 → central** [info] file #69: sysmon-vantage6-s2-e4a-mixed-64mb.json
+  > 
+  > fetch with: tools/bus get 69 -o <path>
+- **#371** `2026-10-13T17:07:53+00:00` **vantage6 → central** [info] S4 vantage6 s2-e4a-mixed-64mb: RAM/disk on the vantage6 VM
+  > VM mem peak 3443 MB of 32097 MB; process RSS peaks: v6-algorithm 1199 MB (3.7 %), v6-h3-node 865 MB (2.7 %), v6-h4-node 688 MB (2.1 %); disk free now 6.0 GB; rounds trained {'v6-h3': 3, 'v6-h4': 3}; HEALTHY
+- **#372** `2026-10-13T17:07:53+00:00` **vantage6 → central** [info] S4 vantage6 s2-e4a-mixed-64mb: flagged node log lines or health
+  > sysmon summary rc=0; HEALTHY; rounds trained {'v6-h3': 3, 'v6-h4': 3}
+  > node log lines flagged during 2026-10-13T17:01:44Z..2026-10-13T17:07:50Z: {'v6-h3': 8, 'v6-h4': 9}
+  > v6-h3: 2026-10-13 17:04:09 - node           - ERROR    - ('Connection broken: IncompleteRead(2708306 bytes read, 116599590 more expected)', IncompleteRead(2708306 byte
+  > v6-h3: Traceback (most recent call last):
+  > v6-h3: raise IncompleteRead(self._fp_bytes_read, self.length_remaining)
+  > v6-h3: urllib3.exceptions.IncompleteRead: IncompleteRead(2708306 bytes read, 116599590 more expected)
+  > v6-h4: 2026-10-13 17:03:12 - common         - ERROR    - Connection error... Retrying
+  > v6-h4: 2026-10-13 17:06:12 - node           - ERROR    - ('Connection broken: IncompleteRead(2708306 bytes read, 116599590 more expected)', IncompleteRead(2708306 byte
+  > v6-h4: Traceback (most recent call last):
+  > v6-h4: raise IncompleteRead(self._fp_bytes_read, self.length_remaining)
+- **#373** `2026-10-13T17:08:29+00:00` **central → all** [info] S2 testbed disk limit: s2-e4a-mixed-128mb needs 6.0 GB free, have 5.5 GB
+  > Run not started (PLAN.md §7 disk rule).
+- **#374** `2026-10-13T17:08:30+00:00` **central → all** [info] S2 E4a mixed: testbed disk limit at 128 MB
+  > sweep stopped for this scope
+- **#375** `2026-10-13T17:08:59+00:00` **central → nvflare** [info] file #70: e4a-nvflare-runs.tgz
+  > E4a run data (nvflare scope): metrics.jsonl, summary.json, config.json, rounds/*.json, sweep state
+  > fetch with: tools/bus get 70 -o <path>
+- **#376** `2026-10-13T17:08:59+00:00` **central → nvflare** [info] file #71: e4a-mixed-runs.tgz
+  > E4a run data (mixed scope)
+  > fetch with: tools/bus get 71 -o <path>
+- **#377** `2026-10-13T17:08:59+00:00` **central → vantage6** [info] file #72: e4a-vantage6-runs.tgz
+  > E4a run data (vantage6 scope): metrics.jsonl, summary.json, config.json, rounds/*.json, sweep state
+  > fetch with: tools/bus get 72 -o <path>
+- **#378** `2026-10-13T17:08:59+00:00` **central → vantage6** [info] file #73: e4a-mixed-runs.tgz
+  > E4a run data (mixed scope)
+  > fetch with: tools/bus get 73 -o <path>
+- **#379** `2026-10-13T17:08:59+00:00` **central → flower** [info] file #74: e4a-flower-runs.tgz
+  > E4a run data (flower scope): metrics.jsonl, summary.json, config.json, rounds/*.json, sweep state
+  > fetch with: tools/bus get 74 -o <path>
+- **#380** `2026-10-13T17:08:59+00:00` **central → flower** [info] file #75: e4a-mixed-runs.tgz
+  > E4a run data (mixed scope)
+  > fetch with: tools/bus get 75 -o <path>
+- **#381** `2026-10-13T17:09:08+00:00` **central → all** [milestone] S2 S4-E4a payload sweep done: no framework limit hit; testbed disk limits at 512 (nvflare, flower), 256 (vantage6), 128 MB (mixed)
+  > Round time (median of rounds 2-3): nvflare 2.5 s (1 MB) .. 3.7 (64) .. 5.1 (128) .. 10.3 s (256 MB); flower 5.8 .. 9.1 .. 13.5 .. 20.6 s; vantage6 6.3 .. 115 (64) .. 468 s (128 MB, superlinear: DB mode, server single-thread CPU bound); mixed 1-64 MB ok (64 MB 366 s run, dominated by vantage6).
+  > Stops (PLAN §7 disk rule on central, 5.5-6.0 GB free): nvflare/flower 512 MB need 7 GB; vantage6 256 MB projected 4 GB peak (sqlite 1.14 GB + 0.2 GB journal at 128 MB); mixed 128 MB needs 6 GB. All are testbed limits, not framework limits; owner asked (#214) about 1.5 GB; if freed I extend the sweep at the end of S4.
+  > INV-1: every successful E4a run is checked (hash-equal per round) and uploaded by postproc; 12 done, vantage6/mixed in the queue now. Run data sent to each of you (bus files #70-#75). RAM peaks on all VMs far below 70 %.
+  > Next: E6d dry run (6 rounds, kill after round 3, resume; not a final run), then E1 -> E2 from ~17:20Z.
+- **#382** `2026-10-13T17:09:15+00:00` **central → all** [info] RUN start dry-e6d 2026-10-13T17:09:15Z
+  > E6d: SIGKILL orchestrator + adapters after round 3, then --resume; config configs/dev/dry-e6d.yaml
+- **#383** `2026-10-13T17:09:52+00:00` **central → all** [info] E6 inject SIGKILL orchestrator+3 adapters at 2026-10-13T17:09:52Z
+  > {"orchestrator": [288002], "nvflare": [214751], "vantage6": [216447], "flower": [286332]}
+- **#384** `2026-10-13T17:10:32+00:00` **central → all** [info] RUN end dry-e6d 2026-10-13T17:10:32Z
+  > status finished rc=0 resumed after round 3; run_dir=/home/zpalanciya/flhub-runtime/runs-dev/dry-e6d-20261013T170917Z
+- **#385** `2026-10-13T17:10:38+00:00` **flower → central** [info] file #76: sysmon-flower-dry-e6d.json
+  > 
+  > fetch with: tools/bus get 76 -o <path>
+- **#386** `2026-10-13T17:10:38+00:00` **nvflare → central** [info] file #77: dry-e6d-nvflare-sysmon.json
+  > 
+  > fetch with: tools/bus get 77 -o <path>
+- **#387** `2026-10-13T17:10:39+00:00` **vantage6 → central** [info] file #78: sysmon-vantage6-dry-e6d.json
+  > 
+  > fetch with: tools/bus get 78 -o <path>
+- **#388** `2026-10-13T17:10:40+00:00` **vantage6 → central** [info] S4 vantage6 dry-e6d: RAM/disk on the vantage6 VM
+  > VM mem peak 2459 MB of 32097 MB; process RSS peaks: v6-algorithm 881 MB (2.7 %), v6-h3-node 519 MB (1.6 %), v6-h4-node 346 MB (1.1 %); disk free now 6.3 GB; rounds trained {'v6-h3': 6, 'v6-h4': 6}; HEALTHY
+- **#389** `2026-10-13T17:10:40+00:00` **nvflare → all** [push] 3eeef03 docs: nvflare E4a breakdown and the 2 s task-request floor
+  > paths: docs/report/stage2/evidence/nvflare/e4a-breakdown.md, deploy/nvflare-vm/analysis/, worklog; pull: optional; note: NVFlare rounds have a ~2.3 s floor below 64 MB: the server tells clients to wait task_request_interval (default 2 s) before the next task request (server-side job knob, unchanged/frozen; same for native E7). 256 MB: transfer 6.3 s, hub prep 0.67 + store 1.0 s.
+- **#390** `2026-10-13T17:11:40+00:00` **central → all** [info] S4 E6d dry run bit-exact; E1 -> E2 campaign started 17:12Z
+  > dry-e6d (configs/dev/dry-e6d.yaml: dir0.3, fedavgm, 6 rounds): SIGKILL orchestrator + nvflare/vantage6/flower adapters 3 s after round 3 (17:09:52Z, round 4 in flight); adapters back after 1.1 / 2.2 / 6.0 s (start.sh, start.sh, restart.sh adapter); --resume from round 3; rounds 4-6 completed without retry; hub.sim compare: global_ref equal in all rounds 0-6 (incl. fedavgm momentum state). Not a final run.
+  > E1 now: references (centralized, local-iid, local-dir0.1) queued as sims; real runs s2-e1-{iid,dir1.0,dir0.3,dir0.1,qty,fwcorr,mix}-fedavg (50 rounds, ~9 min each), then E2 (15 runs). Seed 2027/2028 sims run on central with nice 19 and 2 workers while real runs go on. Keep followers running; report anomalies.
+- **#391** `2026-10-13T17:11:42+00:00` **central → all** [info] RUN start s2-e1-iid-fedavg 2026-10-13T17:11:42Z
+  > config configs/stage2/e1/s2-e1-iid-fedavg.yaml; sites nvf-h1 nvf-h2 v6-h3 v6-h4 flw-h5 flw-h6; model cnn-small; agg fedavg; rounds 50; netem none
+- **#392** `2026-10-13T17:11:46+00:00` **central → central** [info] S2 post-processing FAILED for s2-e1-centralized (reference)
+  > log: /home/zpalanciya/flhub-runtime/runs/stage2/logs/s2-e1-centralized.post.log on central; files kept, nothing uploaded
+- **#393** `2026-10-13T17:11:50+00:00` **central → central** [info] S2 post-processing FAILED for s2-e1-local-iid (reference)
+  > log: /home/zpalanciya/flhub-runtime/runs/stage2/logs/s2-e1-local-iid.post.log on central; files kept, nothing uploaded
+- **#394** `2026-10-13T17:11:53+00:00` **central → central** [info] S2 post-processing FAILED for s2-e1-local-dir0.1 (reference)
+  > log: /home/zpalanciya/flhub-runtime/runs/stage2/logs/s2-e1-local-dir0.1.post.log on central; files kept, nothing uploaded
+- **#395** `2026-10-13T17:12:38+00:00` **vantage6 → central** [info] S4 vantage6: server DB grows ~1.5 MB per cnn-small round (~1.6 GB over E1+E2) -> purge.sh --vacuum between experiments
+  > For models < 16 MB the adapter keeps the vantage6 tasks (2 per round, input+result ~0.37 MB each in sqlite) -> ~1.5 MB per round; E1+E2 (~1100 rounds) ~1.6 GB in ~/.local/share/vantage6/server/flhub/flhub.sqlite on central. If your disk projection needs it: bash deploy/central/vantage6/purge.sh --vacuum between runs or experiments (refuses while a task is open; ~20 s incl. server restart; the nodes reconnect by themselves). E6d dry run from the vantage6 side: nodes trained r1-r4 at 17:11-17:12Z without errors; follower reports nominal.
+- **#396** `2026-10-13T17:15:26+00:00` **central → all** [milestone] S2 S3-frozen 975a949 (re-freeze: hub-only fix of the E1 reference modes)
+  > New frozen SHA 975a9491b2b7d22d769f8695846c9c52af875728. Change vs 96c44c9 in frozen paths: hub/orchestrator/run.py (1 line: config.json partition_sizes skips sites that are not in the manifest - only the 'pooled' pseudo-site of the centralized reference), hub/sim/__main__.py + new hub/sim/local.py (the local-only reference's worker function moved to an importable module: spawned workers could not load it from __main__). Both bugs made the three E1 reference jobs fail at start (nothing uploaded).
+  > Final runs made before: the 21 E4a runs (96c44c9) and s2-e1-iid-fedavg (running) are unaffected: real runs and federated/INV-1 sims execute the same code; the changed lines run only in --mode centralized/local and for sites absent from the manifest. W&B configs keep the SHA they ran with.
+  > Nothing changed in flhub_core, clients, adapters, deploy/central or configs/stage2: please reply 'confirm 975a949' (your diff criteria are unchanged).
+- **#397** `2026-10-13T17:15:32+00:00` **vantage6 → central** [reply] confirm 975a949 (vantage6)
+  > git diff 96c44c9 975a949 -- flhub_core clients/vantage6 adapters/vantage6 adapters/common deploy/central/vantage6: empty. Image v6-train:a43cef3f75c0 (code_version 0.2.0+fe357a1dbec1) unchanged; status.sh HEALTHY; sysmon + follower running.
+- **#398** `2026-10-13T17:15:37+00:00` **nvflare → central** [reply] confirm 975a949 (nvflare)
+  > (a) git diff 3212150 975a949 -- flhub_core clients/nvflare adapters/nvflare adapters/common deploy/central/nvflare: empty. (b) nvf-h1/nvf-h2 in relay job da5a973a with flhub_core 0.2.0+fe357a1dbec1. (c) status HEALTHY; sysmon and run follower running.
+- **#399** `2026-10-13T17:18:27+00:00` **central → vantage6** [reply] re #395: vacuum purge between E1 and E2 (and between later experiments)
+  > Agreed. run_final.py now honours a PAUSE file between runs; I will hold the campaign after the last E1 run, run bash deploy/central/vantage6/purge.sh --vacuum, check status, and resume E2. Same between E2/E6 and before E3.
+- **#400** `2026-10-13T17:19:20+00:00` **flower → central** [reply] confirm 975a949 (flower)
+  > git diff 96c44c9 975a949 -- flhub_core clients/flower adapters/flower adapters/common deploy/central/flower: empty. Hospitals unchanged: FAB agnosticfl.flhub-flower.0.2.0.6345f77d, flhub_core 0.2.0+fe357a1dbec1; flower-vm HEALTHY; sysmon + follower running. Thanks for files #74/#75.
+- **#401** `2026-10-13T17:20:02+00:00` **flower → all** [push] eae2816 report: flower E4a time breakdown (relay timings)
+  > paths: deploy/flower-vm/analysis/e4a_breakdown.py, docs/report/stage2/flower.md; pull: optional; note: Flower fixed cost ~5 s/round (fresh ClientApp per message + pulls), +~0.03 s/MB transport; hub side 0.1 s (1 MB) .. 4.9 s (256 MB). Table in docs/report/stage2/flower.md section 4.
+- **#402** `2026-10-13T17:20:58+00:00` **central → all** [info] RUN end s2-e1-iid-fedavg 2026-10-13T17:20:58Z
+  > status finished rc=0 rounds=50 median_round_s=9.110590095999214 run_dir=/home/zpalanciya/flhub-runtime/runs/stage2/s2-e1-iid-fedavg-20261013T171144Z
+  > r1: 2026-10-13T17:11:46.054Z .. 2026-10-13T17:11:57.231Z
+  > ...
+  > r50: 2026-10-13T17:20:45.982Z .. 2026-10-13T17:20:57.695Z
+- **#403** `2026-10-13T17:20:59+00:00` **vantage6 → central** [info] file #79: sysmon-vantage6-s2-e1-iid-fedavg.json
+  > 
+  > fetch with: tools/bus get 79 -o <path>
+- **#404** `2026-10-13T17:21:00+00:00` **vantage6 → central** [info] S4 vantage6 s2-e1-iid-fedavg: RAM/disk on the vantage6 VM
+  > VM mem peak 2505 MB of 32097 MB; process RSS peaks: v6-algorithm 884 MB (2.8 %), v6-h3-node 352 MB (1.1 %), dockerd 253 MB (0.8 %); disk free now 6.3 GB; rounds trained {'v6-h3': 50, 'v6-h4': 50}; HEALTHY
+- **#405** `2026-10-13T17:21:02+00:00` **central → all** [info] RUN start s2-e1-dir1.0-fedavg 2026-10-13T17:21:02Z
+  > config configs/stage2/e1/s2-e1-dir1.0-fedavg.yaml; sites nvf-h1 nvf-h2 v6-h3 v6-h4 flw-h5 flw-h6; model cnn-small; agg fedavg; rounds 50; netem none
+- **#406** `2026-10-13T17:21:12+00:00` **flower → central** [info] file #80: sysmon-flower-s2-e1-iid-fedavg.json
+  > 
+  > fetch with: tools/bus get 80 -o <path>
+- **#407** `2026-10-13T17:21:12+00:00` **nvflare → central** [info] file #81: s2-e1-iid-fedavg-nvflare-sysmon.json
