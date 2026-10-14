@@ -7,7 +7,7 @@ build-backend = "setuptools.build_meta"
 # Framework venvs install it too, so adapters can import adapters.common. Stdlib-only on purpose.
 [project]
 name = "agnosticfl-hub"
-version = "0.2.0"
+version = "0.2.1"
 description = "Framework-agnostic federated-learning hub: one server across NVFlare, vantage6 and Flower"
 readme = "README.md"
 authors = [{ name = "Zare Palanciyan" }]

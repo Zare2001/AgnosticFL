@@ -11,7 +11,7 @@ authors:
   - given-names: Zare
     family-names: Palanciyan
     affiliation: SURF
-version: 0.2.0
+version: 0.2.1
 date-released: 2026-10-14
 repository-code: "https://github.com/Zare2001/AgnosticFL"
 url: "https://github.com/Zare2001/AgnosticFL"
