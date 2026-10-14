@@ -81,7 +81,7 @@ E4a on the real system (central runs `s2-e4a-flower-<S>mb`, 3 rounds, `purge.sh`
 | 64 MB | 9.08 s | 2.5 GB | finished |
 | 128 MB | 13.51 s | 3.6 GB | finished |
 | 256 MB | 20.61 s | 4.9 GB (16 %) | finished |
-| 512 MB | — | — | testbed disk limit on central (7.0 GB free needed, 6.0 GB available); passed on the island |
+| 512 MB | 45.78 s | 7.5 GB (24 %) | finished in the E4a extension (2026-10-14, after central freed disk; first attempt was a testbed disk limit); flower VM ens3 3227 MB in / 3231 MB out for 3 rounds × 2 sites × 537 MB = 3221 MB (1.002×) |
 
 Where the time goes (`deploy/flower-vm/analysis/e4a_breakdown.py` on the run dirs central sent, bus files #74/#75; medians over rounds 2–3 and both sites; relay timings from 66e806e):
 
@@ -131,7 +131,7 @@ E4b on the real system: (S4 results).
   - Processes and memory on central (sysmon peaks, `sysmon/central.json` in the run dirs): hub path C1 = relay ServerApp 139 MB + adapter 44 MB + hub core 47 MB + orchestrator 377 MB (evaluation) = 0.6 GB; native C1 = one ServerApp 624 MB (strategy + the same evaluation). C2: hub path 390 + 44 + 47 + 566 MB = 1.05 GB, native ServerApp 887 MB; the SuperLink peaks at about 0.93 GB in both (object store). The hub path adds two small long-lived processes (adapter, hub core); the relay ServerApp stays up between runs.
   - The native run ran next to the idle relay run on the same SuperLink; nothing was paused, and the hospitals received the native FAB (`agnosticfl.flhub-native.0.2.0.82153140`) automatically with its first message.
 - E5 (flower side): `flw-h11` and `flw-h12` started with `extra.sh start` on `E5 EXTRAS UP` (06:08:01Z), connected and mapped by the relay 12 s later, trained all 20 rounds of `s2-e5-12sites`, and were stopped with their watchdog entry on `E5 EXTRAS DOWN` (06:13:22Z).
-- Final-run results (E4b, E4a 512 MB extension): (S4 results).
+- Final-run results (E4b): (S4 results).
 
 ## 6. Problems and fixes
 
