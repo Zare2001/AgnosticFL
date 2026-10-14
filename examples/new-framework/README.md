@@ -39,7 +39,7 @@ export FLHUB_DATA_DIR=/tmp/agnosticfl/data
 bash examples/new-framework/check.sh
 ```
 
-The script starts a temporary hub core, then each skeleton (the relay pattern as two processes, adapter and relay), on free local ports in a temporary directory, and removes everything at the end. It runs `pytest tests/conformance` against each skeleton, with the sites `nvf-h1` and `nvf-h2` (benchmark sites, whose partitions the suite trains directly as the reference), a registered site `toy-h7` that is not connected, and a restart command for the adapter. Between the two, the orchestrator runs [`run.yaml`](run.yaml) (three rounds) through the direct skeleton and `hub.sim --compare` checks the run against the framework-free simulation. With `FLHUB_VARIANT=organamnist-dir0.3` the script first builds that partition (downloading OrganAMNIST once) and also runs the data-variant test.
+The script starts a temporary hub core, then each skeleton (the relay pattern as two processes, adapter and relay), on free local ports in a temporary directory, and removes everything at the end, also when it is interrupted (Ctrl-C, `timeout`, `kill`, a closed terminal). It runs `pytest tests/conformance` against each skeleton, with the sites `nvf-h1` and `nvf-h2` (benchmark sites, whose partitions the suite trains directly as the reference), a registered site `toy-h7` that is not connected, and a restart command for the adapter. Between the two, the orchestrator runs [`run.yaml`](run.yaml) (three rounds) through the direct skeleton and `hub.sim --compare` checks the run against the framework-free simulation. With `FLHUB_VARIANT=organamnist-dir0.3` the script first builds that partition (downloading OrganAMNIST once) and also runs the data-variant test.
 
 By hand, with the ports of [`run.yaml`](run.yaml):
 
@@ -52,12 +52,13 @@ python -m hub.orchestrator run --config examples/new-framework/run.yaml --runs-d
 
 ## Tested
 
-A fresh clone of `examples/library-examples` at `bcdac83` in a fresh virtual environment, installed as in [getting started](../../docs/getting-started.md) (Python 3.11.17, torch 2.14.1+cpu, numpy 2.4.4, `flhub_core` 0.2.0+fe357a1dbec1), Ubuntu 24.04 on AMD EPYC-Rome, 2026-10-14:
+A fresh clone of `fix/examples-check-cleanup` at `d4065ad` in a fresh virtual environment, installed as in [getting started](../../docs/getting-started.md) (Python 3.11.17, torch 2.14.1+cpu, numpy 2.4.4, `flhub_core` 0.2.0+fe357a1dbec1), Ubuntu 24.04 on AMD EPYC-Rome, 2026-10-14:
 
 | Command | Result |
 |---|---|
-| `bash examples/new-framework/check.sh` | direct skeleton: 12 passed, 1 skipped (the data-variant test); orchestrator `"status": "finished"`, `"final/test_acc": 0.625` after three rounds; `INV-1 full sim vs …/toy-3r-latest: hashes_equal=True max_abs_diff=0.000e+00 -> PASS`; relay skeleton: 12 passed, 1 skipped; 45 s including the first PneumoniaMNIST download |
-| `FLHUB_VARIANT=organamnist-dir0.3 bash examples/new-framework/check.sh` | both skeletons 13 passed; orchestrator and INV-1 as above; 5 min including the OrganAMNIST download |
+| `bash examples/new-framework/check.sh` | direct skeleton: 12 passed, 1 skipped (the data-variant test); orchestrator `"status": "finished"`, `"final/test_acc": 0.625` after three rounds; `INV-1 full sim vs …/toy-3r-latest: hashes_equal=True max_abs_diff=0.000e+00 -> PASS`; relay skeleton: 12 passed, 1 skipped; 44 s including the first PneumoniaMNIST download; afterwards no process of the run is left |
+| `FLHUB_VARIANT=organamnist-dir0.3 bash examples/new-framework/check.sh` | both skeletons 13 passed; orchestrator and INV-1 as above; 50 s with OrganAMNIST already downloaded (the download, 38 MB, took most of 11 min in another run); no process left |
+| The script interrupted 12 s after its start, during the direct skeleton's conformance run: `timeout 12`, SIGHUP to the script, Ctrl-C (SIGINT to its process group), SIGTERM to its process group, SIGTERM to the script (`kill`) | exit 124, 129, 130, 143 and 143 (in this order); the script ends at once, after Ctrl-C within 1.2 s; 5, 30 and 90 s later no process of the run and no temporary directory is left |
 | `python -m pytest`; `python -m pytest tests/conformance --adapter mock` | 79 passed, 16 skipped; 12 passed, 1 skipped, as in getting started (the examples add no tests to the default run) |
 
 ## From the skeleton to an adapter
