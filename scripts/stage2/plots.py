@@ -210,7 +210,7 @@ def breakdown(run: Run) -> dict[str, dict[str, float]]:
                 for r in rows]
         if any(np.isfinite(train)):
             out[fw] = {"train": float(np.nanmedian(train)), "overhead": float(np.nanmedian(over))}
-    evals = [r["round/eval_s"] for r in rows if r.get("round/eval_s")]
+    evals = [r["round/eval_s"] for r in rows if (r.get("round/eval_s") or 0) > 0.01]  # evaluated rounds only
     out["hub"] = {"agg": med([r["round/agg_s"] for r in rows]) or 0.0, "eval": med(evals) or 0.0}
     return out
 

@@ -134,7 +134,7 @@ def main(argv: list[str] | None = None) -> int:
                                 [(a, f"s2-e1-{pid}-fedavg" if a == "fedavg" else f"s2-e2-{pid}-{a}") for a in AGGS],
                                 target)
     # E3
-    lines += ["### E3 — round-time breakdown (median over rounds >= 2; seconds)", "",
+    lines += ["### E3 — round-time breakdown (median over rounds >= 2; hub eval: median over the evaluated rounds; seconds)", "",
               "| run | params | framework | train | overhead | fan-out | hub agg | hub eval | round | test acc % |",
               "|---|---|---|---|---|---|---|---|---|---|"]
     for name in ["s2-e1-dir0.3-fedavg", "s2-e2-dir0.3-fedavgm", "s2-e3-cnn-medium-fedavg", "s2-e3-cnn-medium-fedavgm",
@@ -149,7 +149,7 @@ def main(argv: list[str] | None = None) -> int:
             lines.append(f"| {name} | {cfg.get('model_params')} | {fw} | {fmt(med([fw_mean(r, 'train_time_s', fw) for r in rows]), 2)} | "
                          f"{fmt(med([fw_mean(r, 'overhead_s', fw) for r in rows]), 2)} | "
                          f"{fmt(med([r.get(f'adapter/{fw}/fanout_s') for r in rows]), 2)} | "
-                         f"{fmt(med([r['round/agg_s'] for r in rows]), 3)} | {fmt(med([r['round/eval_s'] for r in rows]), 2)} | "
+                         f"{fmt(med([r['round/agg_s'] for r in rows]), 3)} | {fmt(med([r['round/eval_s'] for r in rows if (r.get('round/eval_s') or 0) > 0.01]), 2)} | "
                          f"{fmt(med([r['round/duration_s'] for r in rows]), 2)} | {fmt(last(run, 'global/test_acc'), pct=True)} |")
     lines.append("")
     # E4a
