@@ -88,6 +88,18 @@ def stop_tree(proc: subprocess.Popen) -> None:
     psutil.wait_procs(alive, timeout=10)
 
 
+def ignore_signals() -> None:
+    """From here on the clean-up must run to its end. timeout(1), for example, signals the process and
+    then its whole process group, so a second SIGTERM follows the first at once."""
+    for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
+        signal.signal(sig, signal.SIG_IGN)
+
+
+def on_signal(sig: int, _frame) -> None:
+    ignore_signals()
+    sys.exit(128 + sig)  # as SystemExit, the finally block of main() stops everything
+
+
 def write_config(path: Path, rounds: int, hub_url: str, adapter_url: str) -> None:
     """A run configuration in the format of configs/mock-3r.yaml, with this run's ports."""
     path.write_text(
@@ -113,7 +125,7 @@ def main() -> int:
     # session) would end Python without running the clean-up below; as SystemExit they stop the started
     # processes and remove the working directory.
     for sig in (signal.SIGTERM, signal.SIGHUP):
-        signal.signal(sig, lambda s, _: sys.exit(128 + s))
+        signal.signal(sig, on_signal)
 
     work = Path(args.workdir).resolve()
     shutil.rmtree(work, ignore_errors=True)
@@ -160,6 +172,7 @@ def main() -> int:
         print("\n".join(line for line in check.stdout.splitlines() + check.stderr.splitlines() if "INV-1" in line))
         return check.returncode
     finally:
+        ignore_signals()  # a further Ctrl-C or SIGTERM must not cut the clean-up short
         if sim is not None and sim.poll() is None and adapter is not None:  # e.g. after a failure or Ctrl-C:
             adapter.request_relay_shutdown()  # the normal way out, as on success: the relay ends the job
             with contextlib.suppress(subprocess.TimeoutExpired):
