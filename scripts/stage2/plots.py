@@ -379,7 +379,10 @@ def fig_e5(out: Path) -> None:
     ax.set_xticks(x, ["6 sites", "12 sites"])
     ax.set_ylabel("seconds (median, rounds >= 2)")
     ax.set_title("E5: round time and per-framework fan-out, 6 vs 12 sites", loc="left")
-    ax.legend(fontsize=8)
+    for bar in ax.patches:
+        ax.annotate(f"{bar.get_height():.1f}", (bar.get_x() + bar.get_width() / 2, bar.get_height()), xytext=(0, 3),
+                    textcoords="offset points", ha="center", fontsize=7, color=TEXT)
+    ax.legend(ncol=4, fontsize=8, loc="upper center", bbox_to_anchor=(0.5, -0.1), frameon=False)
     save(fig, "e5_scaling", out)
 
 

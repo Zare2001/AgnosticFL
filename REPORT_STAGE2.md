@@ -242,6 +242,8 @@ The model explains NVFlare and Flower within 8 % across a 200× range of model s
 
 `iid` over the 6 base sites against `iid12` over 12 sites (4 per framework; the 6 extra sites hold half as much data each, so the total per round is the same), FedAvg, 20 rounds, real system; INV-1 full simulation, hash-equal. The extra sites were started for this experiment only, with the framework agents' standard scripts: online 16 s (vantage6), 22 s (Flower) and 62 s (NVFlare) after the request, and stopped again right after the run.
 
+![e5](docs/report/stage2/figures/e5_scaling.png)
+
 | | 6 sites | 12 sites |
 |---|---|---|
 | round time (median, s) | 9.1 | 10.4 (+14 %) |
