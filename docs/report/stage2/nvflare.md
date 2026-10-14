@@ -122,7 +122,19 @@ E4b on the real system: (S4 results).
     585 MB (payload-45).
 - E4a extension: `s2-e4a-nvflare-512mb` ran after the owner freed disk on central: median round 15.5 s, VM memory peak
   5.0 GB, client job RSS 2.1 GB, wire ≈ 1.06 × payload: NVFlare carried every size of the sweep with default knobs.
-- E4b: (S4 results).
+- E4b (payload-45, mixed scope, central + this VM shaping both directions with `netem.sh`; central #958): NVFlare fan-out
+  per round (median r2–3) against the lower bound 4 × P / rate:
+
+  | profile | NVFlare fan-out (s) | lower bound (s) | efficiency (bound ÷ measured) |
+  |---|---|---|---|
+  | none | 3.3 | — | — |
+  | wan1g (1 Gbit/s, 5 ms) | 4.3 | 1.5 | 0.35 |
+  | wan100 (100 Mbit/s, 20 ms) | 17.0 | 15.1 | 0.89 |
+  | wan20 (20 Mbit/s, 40 ms) | 80.3 | 75.5 | 0.94 |
+
+  On slow links NVFlare's streamed download service gets close to the wire limit (0.94 at 20 Mbit/s, the best of the
+  three frameworks; Flower 0.89, vantage6 0.16); on fast links the fixed ~2.5 s task-request floor dominates. The netem
+  band on this VM carried 288–313 MB per run with no drops; rules and revert timers were cleared after every profile.
 
 ## 6. Problems and fixes
 
