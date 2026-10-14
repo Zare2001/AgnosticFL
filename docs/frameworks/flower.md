@@ -534,7 +534,19 @@ On fast links Flower's fixed cost per round dominates; on the 20 Mbit/s link the
 
 At 512 MiB a hospital's ClientApp peaks at about 4.8 × the payload and its SuperNode at 2.2–2.3 ×. With real training (E3) the largest Flower process was a ClientApp of 432 MiB (`cnn-small`), 524–532 MiB (`cnn-medium`) and 998–1,012 MiB (`resnet18-gn`), and the hospital VM peaked at 2,152, 2,432–2,475 and 3,395–3,487 MiB ([tables.md](../results/evidence/stage2/tables.md), E3 resources).
 
-**Central host.** The relay ServerApp's peak RSS grew to about 7.6 × the payload in the E4a sweep ([stage-2 report](https://github.com/Zare2001/AgnosticFL/blob/stage2-final/REPORT_STAGE2.md) §6.1); [e4a_peak_rss_vs_payload.png](../results/figures/e4a_peak_rss_vs_payload.png) shows the SuperLink and the other central components in the mixed scope.
+**Central host** (Flower-only E4a runs; peak RSS per process, factor = RSS ÷ payload from 32 MiB on; [central-e4a-memory.md](../results/evidence/stage2/central-e4a-memory.md)):
+
+| Payload (MiB) | relay ServerApp | SuperLink | adapter | hub core | orchestrator | central host, memory in use |
+|---|---|---|---|---|---|---|
+| 1 | 141 MiB | 178 MiB | 41 MiB | 42 MiB | 239 MiB | 4,250 MiB |
+| 8 | 208 MiB | 320 MiB | 41 MiB | 42 MiB | 306 MiB | 4,548 MiB |
+| 32 | 344 MiB (10.7×) | 494 MiB (15.4×) | 41 MiB | 42 MiB | 478 MiB (14.9×) | 4,953 MiB |
+| 64 | 545 MiB (8.5×) | 735 MiB (11.5×) | 41 MiB | 42 MiB | 752 MiB (11.7×) | 5,384 MiB |
+| 128 | 1,078 MiB (8.4×) | 1,033 MiB (8.1×) | 40 MiB | 42 MiB | 1,022 MiB (8.0×) | 6,401 MiB |
+| 256 | 1,941 MiB (7.6×) | 915 MiB (3.6×) | 41 MiB | 42 MiB | 2,050 MiB (8.0×) | 7,910 MiB |
+| 512 | 3,647 MiB (7.1×) | 1,028 MiB (2.0×) | 40 MiB | 47 MiB | 4,266 MiB (8.3×) | 12,077 MiB |
+
+The relay ServerApp needs about 7–8 × the payload from 128 MiB on, as much as the orchestrator. The adapter stays at about 41 MiB at every size, because the weights never pass through it, and the hub core stays at 42–47 MiB. The SuperLink peaked at about 1 GiB. [e4a_peak_rss_vs_payload.png](../results/figures/e4a_peak_rss_vs_payload.png) shows the central components in the mixed scope (its axis label "MB" means MiB).
 
 **SuperLink disk.** With `--database` the SuperLink keeps message objects (the weights, in 5 MiB chunks) in SQLite. They are deleted once delivered, but SQLite keeps the freed pages and the write-ahead log, so the database stays at its peak size: about 4 × the payload with two sites (2,082 MiB after a 512 MiB run in a single-VM test). [`purge.sh`](../../deploy/central/flower/purge.sh) stops the adapter and the SuperLink, checkpoints the log, runs `VACUUM` and starts both again; this brought the database to about 1 MiB in about 35 s. Node rows survive, so the SuperNodes reconnect with their ids. Plan free disk on the central host accordingly for large models; more than two Flower sites were not measured.
 
