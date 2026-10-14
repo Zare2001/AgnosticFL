@@ -117,7 +117,19 @@ E4b on the real system: (S4 results).
   - `s2-e6a-strict` and `s2-e6a-minsites`: `inject.sh` killed the flw-h5 SuperNode tree (SuperNode, SuperExec, ClientApp) 4 s after round 15's train message (21:29:00.75Z and 21:34:38.48Z); the supervisor logged `exited rc=137, restarting in 10 s` and the SuperNode registered again after 11.1 s both times (new node id). Both runs finished 20/20; no manual action.
   - `s2-e6b-straggler`: flw-h6 was moved into its CPU scope before the run (`straggler.sh prepare`); the quota went to 10 % 40 ms after round 14's train message reached flw-h6. The throttled ClientApps finished after the 20 s deadline; their reply pushes failed at the SuperNode (`NoObjectInStoreError`, `Failed to push reply message`) because the messages had expired (TTL = deadline), so Flower dropped the late results on the hospital side; the SuperNode kept running. The limit stayed on for the first 17 s of `s2-e6c-fedavg` (central started it right after the RUN end); weights are unaffected, only that run's warm-up timing at flw-h6.
   - `s2-e6e-server-restart`: central restarted the SuperLink after round 15 and in the middle of round 18; neither SuperNode restarted, both kept their node ids (persistent `--database`), flw-h6 logged three reconnect retries; the run finished 20/20 with no manual action.
-- Final-run results (E4b, E5, E7): (S4 results).
+- E7 final runs (central ran `deploy/central/flower/native/run.sh` with `configs/stage2/e7/s2-e7-flower-hub-{cnn,payload}.yaml` and the hub runs of the same configs; `native/compare.py` and central's `native_vs_hub.json` on the run dirs, bus file #220):
+
+| config | native median round | hub median round | hub overhead | native vs hub weights |
+|---|---|---|---|---|
+| C1 `cnn-small`, `iid`, 20 rounds | 9.48 s | 7.55 s | −1.93 s (−20 %) | hash-equal in all 20 rounds (max abs diff 0.0) |
+| C2 `payload-45`, 5 rounds | 7.45 s | 8.19 s | +0.73 s (+9.8 %) | hash-equal in all 5 rounds |
+
+  - Equality: both Flower sites hold the same number of examples (5760 for `iid`, 784 for the stage-1 data used by the echo), so p_k = 0.5; Flower's FedAvg multiplies in float32, but 0.5 × w is exact and both paths round the same exact sum once. With unequal sizes the float32 accumulation differs from the hub's float64 one (island `qty`: 3.0e-8 after round 1, growing to about 2e-2 by round 6 through SGD).
+  - Timing: for the CNN the hub path is faster, because `Grid.send_and_receive` (the built-in strategy's exchange) sleeps 3 s between pulls, which quantises native rounds to about 9.5 s; the relay pulls every second. For the 45 MB echo the hub path pays the weights' round trip through the hub core (per site: relay prep 0.12 s, push 0.63 s, store 0.19 s; push → reply 6.15 s; t_result 7.18 s).
+  - Flower's own accounting of the native runs (`flwr ls --format json`): 17.2 MB on the wire for C1 (20 rounds × 2 sites × 2 × 209 KB = 16.7 MB) and 943.9 MB for C2 (= 20 × 47.2 MB), compute 237 s ServerApp + 125 s ClientApps for C1.
+  - The native run ran next to the idle relay run on the same SuperLink; nothing was paused, and the hospitals received the native FAB (`agnosticfl.flhub-native.0.2.0.82153140`) automatically with its first message.
+- E5 (flower side): `flw-h11` and `flw-h12` started with `extra.sh start` on `E5 EXTRAS UP` (06:08:01Z), connected and mapped by the relay 12 s later, trained all 20 rounds of `s2-e5-12sites`, and were stopped with their watchdog entry on `E5 EXTRAS DOWN` (06:13:22Z).
+- Final-run results (E4b, E4a 512 MB extension): (S4 results).
 
 ## 6. Problems and fixes
 
