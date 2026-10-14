@@ -20,6 +20,8 @@ Sources for this guide. Full stage reports and Flower sections at their tags: [s
 
 ## 2. Server side: how the adapter maps flhub onto Flower
 
+A runnable, annotated version of this server side (adapter launcher, relay ServerApp, `flwr` connection) is in [`examples/flower/server/`](../../examples/flower/server/), explained in the [example's README](../../examples/flower/README.md#3-server).
+
 ### 2.1 Components
 
 All server-side components run on the central host, next to the hub.
@@ -142,6 +144,8 @@ The reference scripts in [`deploy/central/flower/`](../../deploy/central/flower/
 | `bash deploy/central/flower/purge.sh [--online]` | reclaims SuperLink database space (§5.5); `--online` only checkpoints the WAL |
 
 ## 3. Client side: what the hospital code must contain
+
+A copyable, commented version of this client is [`examples/flower/client/client_app.py`](../../examples/flower/client/client_app.py); [`examples/flower/run_local.py`](../../examples/flower/run_local.py) runs it in two local SuperNodes and checks the result against the simulation ([example's README](../../examples/flower/README.md#2-client)).
 
 ### 3.1 What runs at a hospital
 
