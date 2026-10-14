@@ -172,11 +172,11 @@ Hyperparameters from S3 (tuned on `dir0.3`, validation split): fedavgm η 1.0 (�
 |---|---|---|---|---|---|---|
 | `cnn-small` (E1/E2) | 52,203 | 0.2 | 50 | 77.0 (54.3) | 78.3 (63.8) | 70.0 |
 | `cnn-medium` | 1,676,779 | 6.4 | 50 | **81.5** (63.3); target 80.5 % reached at round 36 | 11.1: diverged at round 9 | 73.7 |
-| `resnet18-gn` | 11,173,323 | 42.6 | 20 | 42.7 (15.3) | *(pending)* | 42.7 |
+| `resnet18-gn` | 11,173,323 | 42.6 | 20 | 42.7 (15.3) | **50.7** (27.8) | 42.7 |
 
 - **The wider CNN pays off within 50 rounds.** `cnn-medium` gains 4.5 pp over `cnn-small` with FedAvg and is the only `dir0.3` run of the campaign that reaches the target (round 36).
 - **ResNet-18 needs more rounds than the budget allows.** After 20 rounds of one local epoch, `resnet18-gn` is at 42.7 % and still rising (15.1, 26.1, 41.5 and 42.7 % at rounds 5, 10, 15 and 20). PLAN.md §7 caps a `resnet18-gn` run at about 3 h on these CPUs; this run took 2.1 h, including a 30 min stall (§6.3).
-- **The S3 server step does not transfer to the larger model.** FedAvgM with η 1.0 and β 0.9, best for `cnn-small`, reaches 50 % at round 7 with `cnn-medium` and then collapses to chance level (11.1 %, test loss 2.5) from round 9 on. `hub.sim` reproduces the collapse bit for bit, so it is the optimizer, as with partial participation in E6c. Server learning rates have to be tuned per model.
+- **The S3 server step does not transfer reliably to larger models.** FedAvgM with η 1.0 and β 0.9, best for `cnn-small`, reaches 50 % at round 7 with `cnn-medium` and then collapses to chance level (11.1 %, test loss 2.5) from round 9 on. `hub.sim` reproduces the collapse bit for bit, so it is the optimizer, as with partial participation in E6c. With `resnet18-gn` the same values do not diverge and speed up the slow start: 50.7 % after 20 rounds against 42.7 % for FedAvg (28.6 against 15.1 % at round 5). Server learning rates have to be tuned per model.
 
 ## 6. RQ4 — Performance (E3, E4, E5, E7)
 
