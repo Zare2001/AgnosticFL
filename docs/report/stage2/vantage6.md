@@ -80,6 +80,7 @@ Evidence: vantage6 4.15.2 source (server/node wheels, client, algorithm tools) a
   - `restart` mid-round: the node re-runs the open run after reconnecting; the round completes without a retry (19.6 s vs 8 s).
   - `straggle:10` rounds N..M-1 (`docker update --cpus 0.10` per training container): 44 s vs 11.5 s per round.
   - Server restart (E6e, `restart_server.sh`): rounds complete without a retry (29-48 s with 0-20 s extra downtime); `discover` answers `unknown` within 2.2 s during the outage.
+- E3 (vantage6 side): resnet18-gn trains ~3.9 min per round on v6-h3 (1 thread, n=5760); the 116 MB task folder per site-round is removed by the GC after the round. In round 2 of s2-e3-resnet18-gn-fedavg the response to v6-h3's status PATCH (the whole run incl. its 79 MB input) was cut by uWSGI while the worker was busy (`IncompleteRead`, logged as an error in `run_forever`); the PATCH had reached the server, the training container kept running and the result was delivered (no effect on the round).
 - E7 native (ADR-022): central function `v6_native.fedavg` on the hub-operator node; island C1 hashes equal to the hub run in every round (8.5 s vs 8.1-8.8 s per round); final comparison _(to be filled)_.
 
 ## 6. Problems and fixes
