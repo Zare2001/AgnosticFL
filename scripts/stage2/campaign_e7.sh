@@ -16,7 +16,10 @@ for fw in ${fws[@]}; do
     "$PY" scripts/stage2/run_final.py native "$fw" "$cfg" --hub-run "s2-e7-$fw-hub-$c" --name "s2-e7-$fw-native-$c" \
       || echo "FAILED native $fw $c"
     "$PY" scripts/stage2/run_final.py real "$cfg" || echo "FAILED hub $fw $c"
-    if [ "$fw" = vantage6 ] && [ "$c" = payload ]; then bash deploy/central/vantage6/purge.sh --vacuum || true; fi
+    if [ "$fw" = vantage6 ] && [ "$c" = payload ]; then  # delete by id first (purge.sh's listing stalls on big rows)
+      ~/venvs/v6/bin/python scripts/stage2/v6_delete_tasks.py || true
+      bash deploy/central/vantage6/purge.sh --vacuum || true
+    fi
     [ "$c" = payload ] && [ -f "deploy/central/$fw/purge.sh" ] && [ "$fw" != vantage6 ] && bash "deploy/central/$fw/purge.sh" || true
   done
 done

@@ -42,6 +42,9 @@ def purge(fws: list[str]) -> dict:
         if not script.exists():
             out[fw] = "no purge.sh"
             continue
+        if fw == "vantage6":  # delete by id first: purge.sh's task listing stalls on large run rows
+            subprocess.run([str(Path.home() / "venvs" / "v6" / "bin" / "python"), "scripts/stage2/v6_delete_tasks.py"],
+                           cwd=REPO, capture_output=True, text=True, timeout=1800)
         p = subprocess.run(["bash", str(script)], cwd=REPO, capture_output=True, text=True, timeout=900)
         out[fw] = f"rc={p.returncode} {(p.stdout + p.stderr).strip()[-300:]}"
     return out
