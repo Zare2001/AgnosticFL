@@ -6,7 +6,7 @@ What it costs to build the framework-agnostic hub, to bring it to hospitals that
 
 | Cost dimension | NVFlare 2.9.0 | vantage6 4.15.2 | Flower 1.39.0 | Hub-wide | Source |
 |---|---|---|---|---|---|
-| Adapter code (code lines) | 604 | 290 | 553 (adapter 210, relay ServerApp 342) | shared adapter base 1,182; hub 1,601 | [loc.md](results/evidence/loc.md) |
+| Adapter code (code lines) | 604 | 290 | 553 (adapter 210, relay ServerApp 342, package marker 1) | shared adapter base 1,182; hub 1,601 | [loc.md](results/evidence/loc.md) |
 | Hospital code (code lines) | 39 | 54 + 11 config | 75 + 26 config | shared training library `flhub_core` 1,009 | [loc.md](results/evidence/loc.md) |
 | Hospital code changed in stage 2 | 0 lines | 0 lines | 0 lines | aggregators, models, data, participation changed on the hub only | [hospital ledger](results/evidence/hospital-ledger.md) |
 | Hospital steps per new `flhub_core` version | 0 | 0 | 0 | | [ledger](results/evidence/hospital-ledger.md) |
@@ -55,17 +55,17 @@ A hospital keeps its framework, its standard client and its credentials. What it
 |---|---|---|---|
 | Code the hospital writes or changes | none: `client.py` arrives inside the relay job | none: the training code is the algorithm image | none: the ClientApp arrives inside the FAB |
 | Software | `nvflare`, torch, numpy, safetensors; **no** `flhub_core` (the job ships it) | the standard vantage6 node (CLI, Docker, node image); no torch on the host | `flwr`, torch, numpy, safetensors (`flhub_core` ships in the FAB) |
-| Credentials | the NVFlare startup kit from the operator (mTLS) | the node's API key from the vantage6 server | none on the testbed (`--insecure`); TLS and SuperNode authentication in production |
-| Configuration | the server name resolves; the data path (`FLHUB_DATA_PATH` or `FLHUB_DATA_DIR`) | node YAML: server URL, API key, one CSV database per data variant, image policy allowing the operator's image | SuperNode `--superlink <central-host>:9092` and node config `site-id` (+ optional `data-path`) |
+| Credentials | the NVFlare startup kit from the operator (mTLS) | the node's API key from the vantage6 server | none on the testbed (`--insecure`, restricted by the cloud firewall); a production federation adds TLS and SuperNode authentication (not tested) |
+| Configuration | the server name resolves; the data path (`FLHUB_DATA_PATH` or `FLHUB_DATA_DIR`) | node YAML: server URL, API key, one CSV database per data variant, image policy allowing the operator's image, `share_config: false`; on the testbed also the operator's plain-HTTP registry in Docker's `insecure-registries` | SuperNode `--superlink <central-host>:9092` and node config `site-id` (+ optional `data-path`) |
 | Rollout channel for new training code | the next relay job (`custom/`) | the next algorithm image tag, pulled per task | the next FAB, sent with the run |
 | Steps per later code update | 0 | 0 (optional pre-pull, 12.6 s) | 0 |
 | One-time steps in stage 2 | remove an installed `flhub_core`, restart the client once: 50.3 s offline per site (82.6 s for the switch of both) | data-variant node config, 1 restart per node: 14.7 s offline (both nodes together) | none |
-| Data provisioning (all frameworks) | sha256-verified CSV files, one per data variant: 12.9 s | the same, as labelled node databases | the same: 44 s for 4 sites |
+| Data provisioning (all frameworks) | sha256-verified CSV files, one per data variant: 12.9 s | the same (under 1 min for 2 sites), each file a labelled node database | the same: 44 s for 4 sites |
 | Operations | none beyond the framework's own | clean up `task-<run id>` folders, which nodes never delete (about 2.7× the model per site and round) | none beyond the framework's own |
 
 Sources: [hospital ledger](results/evidence/hospital-ledger.md) (23 stage-2 rows, the `clients/` diff), [NVFlare guide](frameworks/nvflare.md) §3, [vantage6 guide](frameworks/vantage6.md) §3, [Flower guide](frameworks/flower.md) §3, [client contract](client-contract.md).
 
-**Server-side rollout of a new `flhub_core` version** (on the operator's machine): NVFlare rebuilds and resubmits the relay job; vantage6 builds and pushes a new image tag (98 s) and restarts the adapter (2 s); Flower restarts the adapter with a new FAB (healthy after 29.6 s, the SuperNodes had the new FAB 21.5 s after the old relay stopped). Every stage-2 change after the rollout (aggregators, FedProx μ, partitions, models, participation, resume) needed **no** hospital step: FedProx's μ, for example, travels inside the opaque `train_config`.
+**Server-side rollout of a new `flhub_core` version** (on the operator's machine): NVFlare rebuilds and resubmits the relay job; vantage6 builds and pushes a new image tag (98 s) and restarts the adapter (2 s); Flower restarts the adapter, which stages a new FAB and starts a new relay run (healthy after 29.6 s; the SuperNodes had the new FAB 21.5 s after the adapter's SIGTERM). Every stage-2 change after the rollout (aggregators, FedProx μ, partitions, models, participation, resume) needed **no** hospital step: FedProx's μ, for example, travels inside the opaque `train_config`.
 
 ## 4. Runtime overhead
 
@@ -83,7 +83,7 @@ The same two hospitals, the same `flhub_core.train` and configuration, once thro
 
 Sources: [tables.md](results/evidence/stage2/tables.md) (E7), [nvflare/e7-native-vs-hub.md](results/evidence/stage2/nvflare/e7-native-vs-hub.md) (NVFlare: a round is "model sent → aggregated model", which adds the hub's aggregation step; the generated table's C2 value without it is 2.55 s, +1.4 %).
 
-Where the hub path is slower it pays for the weights' round trip through the hub core (Flower C2). It is faster where the native exchange waits longer: Flower's `Grid.send_and_receive` sleeps 3 s between pulls while the relay pulls every second, and vantage6's native central function routes inputs and results through one multi-organisation subtask while the adapter handles each site as soon as it is done ([stage-2 results](results/stage2.md)).
+Where the hub path is slower it pays for the weights' round trip through the hub core (Flower C2). It is faster where the native exchange waits longer: Flower's `Grid.send_and_receive` sleeps 3 s between pulls while the relay pulls every second, and vantage6's native central function moves every input and result through the node's proxy and waits for one multi-organisation subtask, while the adapter uploads per site in parallel and fetches each result as soon as that site is done ([stage-2 results](results/stage2.md)).
 
 ### 4.2 Where the time of a round goes (E3)
 
@@ -116,8 +116,8 @@ Source: [cost_model.md](results/evidence/stage2/cost_model.md). With link transf
 **Fixed floors per round and their causes:**
 
 - **NVFlare, about 2.5 s:** the server tells each client to wait `task_request_interval` (default 2 s) before its next task request. A server-side job setting that changes latency only ([nvflare/e4a-breakdown.md](results/evidence/stage2/nvflare/e4a-breakdown.md)).
-- **Flower, about 5.5 s:** relay and SuperNode message handling, and one ClientApp process per message, which imports torch every time ([flower/e4a-breakdown.md](results/evidence/stage2/flower/e4a-breakdown.md)).
-- **vantage6, 6.3 s at 1 MiB:** one algorithm container per task and site, plus the task and result round trips through the server; real training adds about 0.8 s per task (reading the CSV database into a DataFrame), which is why the line underestimates small models ([vantage6 guide](frameworks/vantage6.md) §5).
+- **Flower, about 5.5 s:** a fresh ClientApp process for every message. At a hospital the process started 0.3 s after the train message, but training began only about 3.2 s after it (process start-up and imports such as torch); pull intervals add the rest ([flower/e4a-breakdown.md](results/evidence/stage2/flower/e4a-breakdown.md), [Flower guide](frameworks/flower.md) §5.3).
+- **vantage6, 6.3 s at 1 MiB:** one algorithm container per task and site, plus the task and result round trips through the server. The straight line (a = 4.13 s) underestimates this floor, and real training adds about 0.8 s per task that the echo runs do not have (reading the CSV database into a DataFrame, a slower container exit after a torch run), so it predicts `cnn-small` rounds 31–38 % too short ([vantage6 guide](frameworks/vantage6.md) §5.3; [stage-2 report](https://github.com/Zare2001/AgnosticFL/blob/stage2-final/REPORT_STAGE2.md) §6.6).
 
 ## 5. Network efficiency
 
@@ -128,7 +128,7 @@ Interface byte counters of each framework's hospital VM during the payload sweep
 ![Bytes on the wire per byte of model update](results/figures/cost_bytes_on_wire.png)
 
 - **NVFlare 1.005–1.064 and Flower 1.002–1.005:** each update crosses the link once; the small excess is protocol framing and, at 1 MiB, background traffic. Two rows read below 1 (NVFlare 8 MiB 0.840, Flower 1 MiB 0.938): counter artefacts, since every round of those runs finished with weights hash-equal to the simulation.
-- **vantage6 4.97–5.53 up to 64 MiB, 9.08 at 128 MiB:** by design, a 4.15.2 node receives the run input four times per site and round (run list, two PATCH responses, an extra `GET run/<id>`), and the input is the weights base64-encoded inside JSON that is base64-encoded again (1.78× the update). Per VM link and round with two sites that is 2 × (4 + 1) × 1.78 = 17.8 × P, i.e. 4.45× the payload; the measured excess above that comes from connections the single server worker drops under load.
+- **vantage6 4.97–5.53 up to 64 MiB, 9.08 at 128 MiB:** by design, a 4.15.2 node receives the run input four times per site and round (run list, two PATCH responses, an extra `GET run/<id>`), and the input is the weights base64-encoded inside JSON that is base64-encoded again (1.78× the update). Per VM link and round with two sites that is 2 × (4 + 1) × 1.78 = 17.8 × P, i.e. 4.45× the payload; the excess above that grows with load: at 64 MiB a node downloaded 8.8× the update per site and round instead of 7.1×, at 128 MiB about 16×, because it retried requests after the busy server dropped the connection.
 
 Source: [e4_bytes.md](results/evidence/stage2/e4_bytes.md), [vantage6 guide](frameworks/vantage6.md) §5.
 
@@ -167,7 +167,7 @@ Source: [cost_model.md](results/evidence/stage2/cost_model.md) (E4b table), [tab
 | Adapters of NVFlare and Flower | 40–170 MiB, independent of P (the relay holds the weights) | |
 | Whole machine (31.3 GiB) | | 11.8 GiB at 512 MiB (Flower run), 9.1 GiB (NVFlare run) |
 
-**Hospital VMs** (two sites each, memory in use on the whole VM): NVFlare 1.68 GiB at 1 MiB to 5.01 GiB at 512 MiB, one client job process up to 2.11 GiB ([nvflare/e4a-memory.md](results/evidence/stage2/nvflare/e4a-memory.md)); Flower 1.88 GiB to 7.54 GiB (24 % of RAM) at 512 MiB, each ClientApp about 4.8× P ([flower/e4a-flower-vm-memory.md](results/evidence/stage2/flower/e4a-flower-vm-memory.md)); vantage6 1.75 GiB to 5.16 GiB at 128 MiB ([vantage6/e4a-vm-memory.md](results/evidence/stage2/vantage6/e4a-vm-memory.md)). With real training (`resnet18-gn`), one training process needed 1.0–1.1 GiB (vantage6's algorithm container 2.1 GiB) and the central orchestrator 1.7 GiB ([tables.md](results/evidence/stage2/tables.md), E3).
+**Hospital VMs** (two sites each, memory in use on the whole VM): NVFlare 1.68 GiB at 1 MiB to 5.01 GiB at 512 MiB, one client job process up to 2.11 GiB ([nvflare/e4a-memory.md](results/evidence/stage2/nvflare/e4a-memory.md)); Flower 1.88 GiB to 7.54 GiB (24 % of RAM) at 512 MiB, each ClientApp about 4.8× P ([flower/e4a-flower-vm-memory.md](results/evidence/stage2/flower/e4a-flower-vm-memory.md)); vantage6 1.75 GiB to 5.16 GiB at 128 MiB ([vantage6/e4a-vm-memory.md](results/evidence/stage2/vantage6/e4a-vm-memory.md)). With real training (`resnet18-gn`), one training process needed 1.0–1.1 GiB (vantage6: 2.1 GiB for its two training containers together) and the central orchestrator 1.7–2.1 GiB ([tables.md](results/evidence/stage2/tables.md), E3).
 
 ### 6.2 Disk
 
@@ -178,9 +178,9 @@ The hub core keeps blobs with a rolling clean-up during runs. The framework stor
 | NVFlare server job store | one entry per job; the relay is one long-running job | [`deploy/central/nvflare/purge.sh`](../deploy/central/nvflare/purge.sh) deletes finished jobs |
 | vantage6 server database (SQLite) | every task keeps its input and result, each 1.78× the update (about 456 MiB per site and direction at 256 MiB, ADR-020) | the adapter deletes a round's tasks for models ≥ 16 MiB; [`purge.sh --vacuum`](../deploy/central/vantage6/purge.sh) between runs |
 | vantage6 node task folders (hospital) | `task-<run id>` folders are never deleted: about 2.7× the model per site and round | a clean-up next to the node ([`taskdir_gc.sh`](../deploy/vantage6-vm/taskdir_gc.sh)) |
-| Flower SuperLink database | message objects are deleted after delivery, but SQLite keeps the space: about 4× the payload with two sites | [`deploy/central/flower/purge.sh`](../deploy/central/flower/purge.sh) (a short SuperLink restart) |
+| Flower SuperLink database | message objects are deleted after delivery, but SQLite keeps the space: about 4× the payload with two sites | [`deploy/central/flower/purge.sh`](../deploy/central/flower/purge.sh): stops the adapter and the SuperLink, runs `VACUUM`, starts both (about 35 s; refuses while a round is in flight) |
 
-Sources: the framework guides ([NVFlare](frameworks/nvflare.md) §2.5, [vantage6](frameworks/vantage6.md) §5–§6, [Flower](frameworks/flower.md) §5.5), [stage-2 results](results/stage2.md). On the testbed's 19 GB central disk, these stores (plus run checkpoints) stopped the payload sweep at 512 MiB for one framework and at 128 MiB for the three-framework federation; those stops are testbed limits, not framework limits.
+Sources: the framework guides ([NVFlare](frameworks/nvflare.md) §2.5, [vantage6](frameworks/vantage6.md) §5–§6, [Flower](frameworks/flower.md) §5.5), [stage-2 results](results/stage2.md). On the testbed's 19 GB central disk, these stores (plus run checkpoints) limited the payload sweep to 512 MiB for a single framework (1024 MiB did not fit) and to 128 MiB for the three-framework federation (256 MiB did not fit); those are testbed limits, not framework limits.
 
 ## 7. Scaling
 
@@ -194,16 +194,16 @@ Sources: the framework guides ([NVFlare](frameworks/nvflare.md) §2.5, [vantage6
 
 Source: [tables.md](results/evidence/stage2/tables.md) (E5), [stage-2 results](results/stage2.md). Twelve sites with half the data each cost the hub almost nothing; NVFlare stayed flat, vantage6 and Flower grew by 1.3 s and 0.7 s because four training processes now share each 4-vCPU hospital VM.
 
-**A mixed federation runs at the pace of its slowest framework.** The hub waits for every participating site (or for `min_sites` and the deadline), so the round time is the slowest fan-out: vantage6 set the round time of every mixed run in stage 2, for example 393.8 s at 128 MiB while NVFlare needed 5.5 s and Flower 12.7 s of it ([tables.md](results/evidence/stage2/tables.md), E4a).
+**A mixed federation runs at the pace of its slowest framework.** The hub waits for every participating site (or for `min_sites` and the deadline), so the round time is the slowest fan-out: vantage6 had the slowest fan-out in every mixed run with per-framework timings in the evidence (E1/E2 `dir0.3`, E3, E4a, E4b, E5), for example 392.3 s of the 393.8 s round at 128 MiB, while NVFlare needed 5.5 s and Flower 12.7 s ([tables.md](results/evidence/stage2/tables.md), E4a).
 
 ## 8. Robustness cost
 
-Every injected fault recovered without manual action, and every run still ended with weights equal to the simulation of the same participants ([e6.md](results/evidence/stage2/e6.md)).
+Every injected fault recovered without manual action, and every run still ended with weights equal to the simulation of the same participants (the resumed run: equal to the uninterrupted run) ([e6.md](results/evidence/stage2/e6.md)).
 
 | Scenario | NVFlare | vantage6 | Flower |
 |---|---|---|---|
 | Hospital killed mid-round, all sites required: detected / round done after the kill | 33.1 s / 74.0 s (1 retry) | 2.1 s / 15.2 s (1 retry) | 20.7 s / 31.3 s (1 retry) |
-| Same with `min_sites: 5` | round done with 5 sites after 34.0 s; site out for 4 rounds | 2.1 s, then 1 retry because a second site was still out | round done with 5 sites after 26.1 s; back next round |
+| Same with `min_sites: 5` | round done with 5 sites after 34.0 s; site out for 4 rounds | 2.1 s, then 1 retry because an NVFlare site was still out (4 sites < `min_sites` 5); round done 32.3 s after the kill | round done with 5 sites after 26.1 s; back next round |
 | Straggler at 10 % CPU, `deadline_s` 20 | in time in all 6 rounds | dropped at the deadline in 7 rounds (round 20.3 s) | dropped at the deadline in 7 rounds (round 20.2 s) |
 | Framework server restarted between rounds: next round done after | 84.9 s | 26.9 s | 47.7 s |
 | Framework server restarted mid-round: round done after the restart | 96.1 s (1 retry) | 20.4 s (no retry) | 54.6 s (1 retry) |
@@ -214,7 +214,7 @@ Every injected fault recovered without manual action, and every run still ended 
 
 More timelines: [all sites required](results/figures/e6_timeline_s2-e6a-strict.png), [framework server restarts](results/figures/e6_timeline_s2-e6e-server-restart.png), [hub crash and resume](results/figures/e6_timeline_s2-e6d-resume.png).
 
-Detection time is a framework property: vantage6 reports a dead algorithm container at once; NVFlare and Flower see a dead client only through liveness checks (the NVFlare adapter's 30 s offline rule, Flower's heartbeat). Retried rounds do not change the result: a retry re-trains from the same global model with the same seed-derived data order.
+Detection time is a framework property: vantage6 reports a dead algorithm container at once; NVFlare and Flower see a dead client only through liveness checks (the NVFlare adapter's 30 s offline rule; Flower's relay, when the node leaves the SuperLink's online list or answers under a new node id after a restart: 20.7 and 26.1 s in E6a). Retried rounds do not change the result: a retry re-trains from the same global model with the same seed-derived data order.
 
 ## 9. Learning efficiency
 
@@ -235,18 +235,18 @@ Federated training through the hub learns exactly what a framework-free FedAvg s
 
 **Per framework:**
 
-- **NVFlare:** the lowest overhead (1.6–2.7 s per site and round) and the best bandwidth use (0.94 at 20 Mbit/s); the best choice for large models. Costs: a one-time hospital restart to adopt job-shipped code, a 2.5 s latency floor, and one client failure ends the round for every NVFlare site ([guide](frameworks/nvflare.md) §6).
-- **Flower:** no hospital steps at all for code updates and near-ideal bytes on the wire; about 5.5 s fixed cost per round, which matters only for small models.
-- **vantage6:** fine for small models (12.8 s per round at 8 MiB, 6.3 s at 1 MiB) and where hospitals already run vantage6 nodes. Above about 64 MiB its default SQLite server is the bottleneck (468 s per round at 128 MiB, no delivery at 256 MiB); a PostgreSQL server database is the candidate fix but was not tested ([guide](frameworks/vantage6.md) §6).
+- **NVFlare:** the lowest overhead (1.6–2.7 s per site and round) and the best bandwidth use (0.94 at 20 Mbit/s); the best choice for large models. Costs: a one-time hospital restart to adopt job-shipped code, a 2.5 s latency floor, and a crash of one site's training process ends the round for every NVFlare site, because one relay job serves them all (a killed client fails alone) ([guide](frameworks/nvflare.md) §6).
+- **Flower:** no hospital steps at all for code updates and near-ideal bytes on the wire (1.002–1.005); the costs are about 5.5 s of fixed time per round, which matters only for small models, a SuperLink database that keeps about 4× the payload until it is purged, and a relay run that ends with the SuperLink (the adapter starts a new one; the round in flight is retried) ([guide](frameworks/flower.md) §6).
+- **vantage6:** fine for small models (6.3 s per round at 1 MiB, 12.8 s at 8 MiB) and where hospitals already run vantage6 nodes. Each MiB costs 1.49 s, 24–70× more than with Flower and NVFlare (60 s per round at 32 MiB, 115 s at 64 MiB), and above 64 MiB the default SQLite server grows superlinearly (468 s per round at 128 MiB, no delivery at 256 MiB). Candidate fixes, both untested: a PostgreSQL server database, `share_algorithm_logs: false` on the nodes ([guide](frameworks/vantage6.md) §6).
 - **Mixed federations** run at the pace of the slowest framework (§7). Put large models on NVFlare or Flower sites, or accept vantage6's pace.
 
-**It is not worth it** for a single-framework federation that needs nothing beyond that framework's own FedAvg; for round times below about 2 s; or where updates must stay hidden from the server: the hub sees every update in plaintext, and there is no secure aggregation or differential privacy ([architecture](architecture.md#trust-and-security-model), [limitations](limitations-and-future-work.md)).
+**It is not worth it** for a single-framework federation that needs nothing beyond that framework's own FedAvg; for round times below the frameworks' own floors (about 2.5 s with NVFlare, 5.5 s with Flower, 6.3 s with vantage6 at 1 MiB), which the native FedAvg of each framework has as well; or where updates must stay hidden from the server: the hub sees every update in plaintext, and there is no secure aggregation or differential privacy ([architecture](architecture.md#trust-and-security-model), [limitations](limitations-and-future-work.md)).
 
 ## 11. Method and caveats
 
 - **Hardware.** Four VMs with 4 vCPUs (AMD EPYC-Rome, AVX2), 31 GiB RAM and 19 GB disk each, CPU-only, in one data centre (about 0.7 ms round-trip time). One VM runs the hub and all three framework servers; each framework's two hospitals share one VM, so co-located sites compete for CPU, memory and the link.
 - **Network.** Wide-area links exist only as `netem` emulation of rate and delay (E4b), without loss, jitter or competing traffic.
-- **Timing.** The orchestrator polls the adapters every 0.25 s (stage 2; 1 s in stage 1), and the frameworks poll on their own schedules (vantage6 1 s, Flower relay 1 s, NVFlare streaming), so sub-second differences are not resolved. Medians exclude round 1 (start-up).
+- **Timing.** The orchestrator polls the adapters every 0.25 s (stage 2; 1 s in stage 1), and the frameworks poll on their own schedules (vantage6 every 1 s, for models ≥ 16 MiB every P/16 s, e.g. 8 s at 128 MiB; Flower relay 1 s; NVFlare clients wait 2 s between task requests, the NVFlare relay checks for replies every 0.1 s), so sub-second differences are not resolved. Medians exclude round 1 (start-up).
 - **Seeds.** Every real run used seed 2026; the extra seeds of the learning experiments ran in the simulation, which is valid because each real run is hash-identical to its simulation.
 - **Memory.** Sampled once per second; peak values can miss shorter spikes. Long-lived processes keep memory from earlier runs, so the central tables list only the processes of each run's scope ([central-e4a-memory.md](results/evidence/stage2/central-e4a-memory.md)).
 - **Versions.** All numbers hold for the tested versions in [`deploy/versions.env`](../deploy/versions.env); framework upgrades change them.

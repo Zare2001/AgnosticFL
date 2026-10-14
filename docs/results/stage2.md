@@ -202,7 +202,7 @@ NVFlare and Flower move each update once and reach 94 % and 89 % of the bandwidt
 
 ![E3 round-time breakdown](figures/e3_round_time_breakdown.png)
 
-Training dominates as the model grows; vantage6 sets the round time for every model, and its overhead grows during a run while tasks stay in its server database (`cnn-medium`: 8.7 s at round 3, 12.4 s at round 21). The hub is never the bottleneck. With `resnet18-gn`, one training process needed 1.0–1.1 GiB (vantage6's container 2.1 GiB) and the orchestrator 1.7–2.1 GiB ([tables.md](evidence/stage2/tables.md)). One stall, in round 10 of the ResNet FedAvg run, came from a hospital-side clean-up job that deleted a fresh result; the round failed at its deadline, the retry succeeded, and the job was removed.
+Training dominates as the model grows; vantage6 sets the round time for every model, and its overhead grows during a run while tasks stay in its server database (`cnn-medium`: 8.7 s at round 3, 12.4 s at round 21). The hub is never the bottleneck. With `resnet18-gn`, one training process needed 1.0–1.1 GiB (vantage6: 2.1 GiB for its two training containers together) and the orchestrator 1.7–2.1 GiB ([tables.md](evidence/stage2/tables.md)). One stall, in round 10 of the ResNet FedAvg run, came from a hospital-side clean-up job that deleted a fresh result; the round failed at its deadline, the retry succeeded, and the job was removed.
 
 ### E5: number of sites
 
