@@ -67,3 +67,11 @@ Newest entry at the bottom. Format: `## <UTC> — <what>` then facts (commands, 
 - Test without any NVFlare deployment: run_local.py = hub core + plain RelayAdapter + the relay job in NVFlare 2.9.0's simulator (clients nvf-h1/nvf-h2, benchmark data) + 3 orchestrator rounds + hub.sim --compare. Fresh GitHub clone at 8bb0e64 + fresh venv (versions.env pins): adapter.py --check PASS; relay_job.py export ships custom/client.py (== example) + custom/flhub_core; run_local.py finished, median round 2.39 s, test acc 0.625, simulator exit 0, INV-1 hashes_equal=True; final global sha256:0c1553fb… identical across two runs; round-1 losses 0.6005/0.6182 = stage-1 conformance evidence. check_links 758/0.
 - Testbed untouched: status.sh HEALTHY, nvf-h1 pid 485009, nvf-h2 pid 938623 (R0). Temporary dirs and processes removed except /tmp/nvf-fresh (clone + venv, kept for the main check after the merge).
 - Next: central's review and PR; after the owner's merge: confirm main from a fresh clone; recreate ~/.flhub/stage3/DONE after "S3 examples-done".
+
+## 2026-10-14T19:10Z — S3 examples merged: confirm main af31058 (#1198)
+
+- Central's overview (examples/README.md), doc links and CHANGELOG [0.2.1] (cc6c28a): NVFlare statements correct (#1191); my examples re-run at cc6c28a: --check PASS, run_local hashes_equal=True, check_links 884/0.
+- PR #4 (head cc6c28a, CI green) merged by the owner at 19:05:24Z: main = af31058, tag v0.2.1, release (Latest) (#1196).
+- Fresh clone of main af31058 + fresh pinned venv: check_links 884 links / 58 files, 0 problems, 23/23 figures; selfcheck sha256:ac074a0b…; pytest 91 passed / 15 skipped; test_nvflare_adapter.py 12 passed; examples/nvflare README §4: adapter.py --check PASS, export ok (custom/client.py == example), run_local.py finished, 3 rounds, median 2.39 s, simulator exit 0, INV-1 hashes_equal=True, final global sha256:0c1553fb… (identical in all three runs). GitHub rendering of the example README ok (6 headings, 2 code blocks, 3 tables).
+- Testbed: status.sh HEALTHY, nvf-h1 pid 485009, nvf-h2 pid 938623 (R0, unchanged). /tmp clones, venvs and run dirs removed; no processes of mine left.
+- Next: recreate ~/.flhub/stage3/DONE after central's "S3 examples-done".
