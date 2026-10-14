@@ -1,0 +1,37 @@
+{
+ "utc": "2026-10-14T08:59:49Z",
+ "entity": "hpml_surf-surf",
+ "stage2_project": "AgnosticFL-stage2",
+ "stage2_runs": 122,
+ "stage2_by_group": {
+  "E1": 24,
+  "E2": 45,
+  "E3": 4,
+  "E4": 28,
+  "E5": 2,
+  "E6": 7,
+  "E7": 12
+ },
+ "stage2_by_mode": {
+  "native": 6,
+  "real": 69,
+  "reference": 3,
+  "sim": 44
+ },
+ "runs_md_rows": 122,
+ "duplicates": [],
+ "in_runs_md_not_in_wandb": [],
+ "in_wandb_not_in_runs_md": [],
+ "problems": [],
+ "stage1_project": "AgnosticFL",
+ "stage1_runs": 6,
+ "stage1_names": [
+  "centralized-baseline",
+  "flower-only",
+  "mixed-6sites",
+  "nvflare-only",
+  "sim-fedavg-reference",
+  "vantage6-only"
+ ],
+ "ok": true
+}
