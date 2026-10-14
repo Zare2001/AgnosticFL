@@ -117,3 +117,13 @@ Server-side candidates if E4a hits a limit on central: comm_config.json `streami
 - S4 for NVFlare: E4a ext 512 MB ok (15.5 s/round, VM 5.0 GB peak); E7 analysis (native vs hub: cnn -0.23 s, payload +0.10 s; drift = float32 aggregation amplified by SGD; accuracy follows the same oscillation, best 78.1 vs 78.4 %); E4b netem applied/cleared on request for wan1g/wan100/wan20 (fan-out 4.3/17.0/80.3 s, efficiency 0.94 at 20 Mbit/s). S4-done #959 (122 final runs), final-call #961.
 - docs/report/stage2/nvflare.md final (rollout cost, limits/knobs incl. task_request_interval floor, E4a/E4b/E5/E6/E7 results, problems/fixes, recommendations); ledger rows for experiment operations and the end-state cleanup.
 - End state: nvf-h2 restarted once (left the unlimited straggler scope), sysmon + run follower stopped, island files and venvs removed, extras stopped, tc default, no flhub-netem timers, both base sites HEALTHY in relay job 47c9e2b2 (flhub_core 0.2.0+fe357a1dbec1), 14 GB free.
+
+### 2026-10-14T09:20Z — S5 — S2 all-done: DoD verified from the nvflare VM, DONE
+- all-done #985 (central; REPORT_STAGE2.md §12). My report-ready #980 (last push d7fd188, end state ALL PASS).
+- DoD 1: milestones on the bus: S0-ready, S1-core, S2-flower/-nvflare/-vantage6, S2-mixed, S3-frozen 96c44c9 (+ re-freeze 975a949), S4-done; 122 final runs (#959).
+- DoD 3/8 (nvflare): conformance v2 vs central 13/13 (#165); endstate.sh ALL PASS: tc fq_codel default, 0 flhub-netem timers, nothing armed/throttled, no experiment processes, extras nvf-h7/nvf-h8 stopped (documented), 14 GB free, nvf-h1/nvf-h2 HEALTHY in relay job 47c9e2b2 with flhub_core 0.2.0+fe357a1dbec1.
+- DoD 4: ledger nvflare rows complete (7); `git diff --stat stage1-final..HEAD -- clients/` in the ledger: clients/nvflare 0 lines.
+- DoD 5: docs/report/stage2/evidence/wandb_audit.json: AgnosticFL-stage2 122 runs = runs.md rows, AgnosticFL 6 runs, ok.
+- DoD 6: REPORT_STAGE2.md, 16 figures, per-agent sections (central, nvflare, vantage6, flower), ledger, README/REPORT links (1 each) on main; bus transcript follows from central.
+- DoD 7: scratch venv at 0bdc1e7: pytest 103 passed, 13 skipped; conformance --adapter mock 12 passed, 1 skipped; 281 commits since stage1-final all Zare2001 (author+committer), 0 attribution lines. Scratch venv removed.
+- ~/.flhub/stage2/DONE created after this push.
