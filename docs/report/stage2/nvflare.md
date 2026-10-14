@@ -1,6 +1,7 @@
 # Stage 2 — NVFlare agent (145.38.189.142)
 
-Status: draft during S2–S4; experiment results are filled in from the final runs (`runs.md`) in S5.
+Status: final (S5, 2026-10-14). Numbers come from the final runs in `runs.md` (central's run data) and the logs and
+evidence files cited in each section.
 
 ## 1. Scope
 
@@ -74,7 +75,7 @@ E4a on the real system (final runs, `runs.md`, INV-1 full sim 0.000 for every ru
   (frozen), and the E7 native runs have the same floor.
 - In the mixed scope NVFlare's fan-out stayed at 1.8–3.8 s (1–64 MB); those rounds were set by vantage6.
 
-E4b on the real system: (S4 results).
+E4b (bandwidth): see §5; NVFlare reached 0.94 of the wire limit at 20 Mbit/s.
 
 ## 5. Experiments supported
 
@@ -147,6 +148,9 @@ E4b on the real system: (S4 results).
 | native job rejected | `ComponentNotAuthorized` | server app without custom code is held to the kit's class allow-list | ship the workflow as BYOC server code | 271bf12 | 10 min |
 | FedAvg dropped `train_config` after round 1 | (would train defaults from round 2) | `FLModelUtils.update_model` replaces the meta | re-attach in `send_model()` | 271bf12 | — |
 | sites offline > 5 min after two server restarts | keeper looped on a failing abort | job store kept the old relay job RUNNING; abort answered "not running" | treat as stale (delete or ignore) and resubmit; end a silent relay's job at once | 007bf3a | 20 min |
+| round-time breakdown not attributable | overhead_s lumped hub, relay and NVFlare time | the relay recorded no timings | relay adds `nvflare_relay_{prep,reply,store}_s` to each site's metrics | 3212150 | — |
+| run follower counted lines of the wrong run | 51 "trained" rounds in 50-round runs; short runs' first lines missed | RUN start seen up to 15 s late; scan read up to processing time | offsets from the previous poll; lines filtered by their timestamp against RUN start/end | e4981de, 3d56401 | — |
+| s2-e7-nvflare-native-cnn did not start (first attempt) | `native: … exists`, rc 1 | central's runner created the output dir before `native/run.sh`, which refuses an existing dir | central runner fix d18485a; re-run after the E7 campaign | d18485a (central) | re-run only |
 
 ## 7. Recommendations
 
@@ -154,3 +158,6 @@ E4b on the real system: (S4 results).
 - Use one task per site (`Controller.send`) for per-site results and cancels; it also avoids the broadcast deep copy of large models.
 - Plan for job-level failure: one site's job-process crash ends the job for every site; keepers must resubmit, and must handle job-store entries that outlive a server restart.
 - NVFlare's built-in FedAvg aggregates in float32 in arrival order: not bit-equal to a float64 reference unless the weights are exactly representable; the difference grows through later local training.
+- For latency-sensitive use, lower the server's `task_request_interval` (job config; default 2 s): it sets NVFlare's ~2.5 s per-round floor for small models (E4a), for the hub path and the native path alike.
+- One relay job for all NVFlare sites couples their availability: readmitting one restarted client restarts the job, which the keeper does only between rounds, so under `min_sites` with back-to-back rounds a restarted site waits for a hub pause (E6a: 4 rounds). One relay job per site would isolate sites at the cost of one server job process each.
+- After an abrupt server stop, NVFlare 2.9.0 keeps the jobs that were running as RUNNING in its job store (`update_abnormal_finished_jobs()` is never called); tools that count active jobs must tolerate such records.
