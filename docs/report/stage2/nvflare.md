@@ -113,6 +113,10 @@ E4b on the real system: (S4 results).
     casts once. Local SGD then amplifies that 1-ulp perturbation (6.3e-04 after one more round); the payload echo has no
     training, so its difference stays at float32 rounding level. vantage6 and Flower native runs are hash-equal to the hub
     because their two sites hold equal n (weights exactly 0.5).
+  - Accuracy (hub evaluator on both, central #230/#231): this config (lr 0.1, 2 sites) oscillates strongly in both runs
+    with the same shape (dips at rounds 3, 5, 9, 13, 19; rounds 1–2 equal to 4 decimals). Round 20: native 47.9 % vs hub
+    67.2 % test accuracy is one of those swings; best round native 78.1 % (r18) vs hub 78.4 % (r18), mean of the last
+    5 rounds 63.5 % vs 66.8 %.
   - Extra processes on the hub path (central sysmon, RSS peak): orchestrator 403 MB (cnn; its CPU is mostly the per-round
     test evaluation) / 570 MB (payload), NVFlare adapter 163 MB, hub core 44 MB; the relay's server job 136 MB (cnn) /
     585 MB (payload-45).
