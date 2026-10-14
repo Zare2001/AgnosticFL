@@ -1,0 +1,15 @@
+central end state 2026-10-14T09:10:51Z at 0bdc1e7
+OK    tc ens3: qdisc fq_codel 0: root refcnt 2 limit 10240p flows 1024 quantum 8964 target 5ms interval 100ms memory_limit 32Mb ecn drop_batch 64 
+OK    revert timers: 0 flhub-netem-revert timers
+OK    experiment processes: none
+OK    run markers: no ACTIVE_RUN / HOLD_POST / PAUSE
+OK    post-processing queue: 0 jobs
+OK    disk: 7.1G 12G 19G (avail/used/size)
+OK    hub core: :8800 /health
+OK    nvflare status: status : HEALTHY;
+OK    vantage6 status: adapter OK :8812 vantage6 4.15.2 v6-h3=online v6-h4=online v6-h9=offline v6-h10=offline;
+OK    flower status:  discover: flower flwr 1.39.0: flw-h5=online, flw-h6=online, flw-h11=offline, flw-h12=offline;flower central: HEALTHY;
+OK    adapter :8811 sites: nvf-h1=online nvf-h2=online nvf-h7=offline nvf-h8=offline
+OK    adapter :8812 sites: v6-h3=online v6-h4=online v6-h9=offline v6-h10=offline
+OK    adapter :8813 sites: flw-h5=online flw-h6=online flw-h11=offline flw-h12=offline
+result: PASS

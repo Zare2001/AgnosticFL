@@ -2,11 +2,24 @@
 
 Stage 2 tests the stage-1 system (`REPORT.md`, tag `stage1-final`) under realistic and demanding conditions: non-IID and uneven data, six server aggregators, larger models, payloads up to 512 MB, more sites, dropouts, stragglers, partial participation, hub crashes and framework-server restarts. It also measures where the time goes. The same four autonomous agents ran it (central, nvflare, vantage6, flower), one per VM, coordinating over the agent bus and one GitHub repository.
 
-> Status: draft during S4. Sections marked *(pending)* are filled from the final runs in `docs/report/stage2/runs.md` and the generated tables (`docs/report/stage2/tables.md`, `scripts/stage2/report_tables.py`).
+> All numbers come from the final runs in `docs/report/stage2/runs.md` (W&B project `AgnosticFL-stage2`) and the generated tables in `docs/report/stage2/` (`tables.md`, `e6.md`, `e4_bytes.md`, `cost_model.md`, made by `scripts/stage2/*.py`). The framework agents' sections are `docs/report/stage2/{central,nvflare,vantage6,flower}.md`.
 
 ## 1. Executive summary
 
-*(pending: RQ1–RQ5 answers, headline claim, campaign time, number of final runs, three main limits)*
+**Headline claim: confirmed.** Changing the aggregation algorithm (six of them), the data distribution (eight partitions), the model (52 k to 11 M parameters) and the participation policy were hub-side changes. The hospitals kept running the same standard client glue in NVFlare, vantage6 and Flower (0 changed lines in hospital code), and every real run produced the same weights as the framework-free simulation, bit for bit.
+
+- **RQ1, correctness.** All **69 final real runs** equal `hub.sim` with difference **0.0 in every round**: global weights and float64 server-optimizer state (62 by full simulation, 4 with the recorded participants, 2 by replay, 1 by bit-exact resume). Two configurations re-run hours later reproduced all 50 rounds exactly (INV-4).
+- **RQ2, hospital cost.** The only hospital-side change was one `flhub_core` 0.1 → 0.2 rollout through each framework's own channel: NVFlare job custom code (3 one-time steps, 50 s downtime per site), a new vantage6 algorithm image tag plus one labelled database per data variant (14.7 s downtime), and the Flower FAB (0 steps, 0 downtime). Every later change (aggregators, FedProx μ, partitions, models, participation, resume) needed nothing at the hospitals.
+- **RQ3, learning.** Site-level label skew costs FedAvg 6–9 pp of test accuracy and 25–30 pp on the worst site; quantity skew costs nothing; skew that follows framework boundaries costs about 1 pp. Server momentum (FedAvgM) and FedYogi recover 2–4 pp under label skew. FedAdam diverged in one of three seeds and FedAdagrad was weakest. The wider `cnn-medium` reaches 81.5 %, the target, on `dir0.3`. Server learning rates tuned for one setting diverged with a larger model and with 50 % participation.
+- **RQ4, performance.** Per site and round, transport, framework and adapter together cost 1.6–2.7 s with NVFlare, 5.6–10.9 s with Flower and 7.2–42 s with vantage6 (E3), and the hub's own aggregation stays below 0.15 s up to 11 M parameters. NVFlare and Flower carried 512 MB updates (15.5 and 45.8 s per round) with 1.002–1.06× bytes on wire and 89–94 % of the link at 20 Mbit/s. vantage6 moves 5–9× the payload, its server is CPU-bound and superlinear, and it dominates every mixed round. Twelve sites instead of six cost 14 % more round time. Against each framework's own FedAvg the hub path is between 20 % faster and 10 % (0.7 s) slower per round, with bit-identical weights for vantage6 and Flower and a 3e-8 float32 difference for NVFlare. A simple per-framework cost model (fixed cost plus cost per MiB, fitted on the payload sweep, plus the slowest site's training and the link transfer) predicts the E3 and E4b round times within ±10 % for NVFlare and Flower, and within ±13 % for vantage6 at 6 MiB and more.
+- **RQ5, robustness.** Every injected fault recovered without manual action: client kills (detected in 2–34 s depending on the framework), stragglers (dropped at the deadline through partial collect and per-site cancel), a SIGKILL of the hub and all adapters (resumed bit-exactly, including the FedAvgM state), and restarts of all three framework servers between and during rounds.
+
+**Campaign:** 2026-10-13 13:47 UTC to 2026-10-14 about 09:00 UTC for S0–S4 (about 19 h; S4 alone 17 h). **122 final runs** were finalized and uploaded (69 real, 44 simulated extra seeds, 3 references, 6 native baselines), plus INV-4 re-runs and diagnostics that were not uploaded.
+
+**Most important limits found:**
+1. **vantage6 4.15.2 cannot deliver 256 MB results** with its default SQLite server: the server rewrites near-GB run rows while the node's websocket times out, and the node then drops the result and trains again (§6.1). Its by-design five copies of every update per site and round also make it the bottleneck under limited bandwidth (§6.2).
+2. **NVFlare re-admits a restarted client only by restarting the relay job.** With `min_sites` the hub keeps the round going without the client, so it stays out until the hub pauses (§7).
+3. **The testbed itself:** the 19 GB central disk stopped the payload sweep above 512 MB for two-site scopes and above 128 MB for six sites. CPU-only training limited `resnet18-gn` to 20 rounds, too few to converge (42.7 % with FedAvg, 50.7 % with FedAvgM).
 
 ## 2. Setup
 
@@ -73,14 +86,16 @@ S3 tuning (sim, validation split, dir0.3, 30 rounds; `docs/report/stage2/tuning.
 
 **Every final real run equals `hub.sim` for the same config, seed and participants.** `metrics.jsonl` and the round records hold the sha256 of the global weights (`global_ref`) and of the aggregator state (`agg_state_ref`) after every round; `scripts/stage2/finalize_run.py` refuses to upload a real run unless its INV-1 check passed. Methods (PLAN.md §2):
 
-| method | runs | how |
-|---|---|---|
-| full-sim | E1, E2, E3 CNN, E4a, E5, E6e | `hub.sim --compare <real run>`: the whole run again in-process (same `flhub_core.train`, same aggregator), participants taken from the real run, global hash compared per round |
-| participants-sim | E6a, E6b, E6c | the same, for runs with dropped or sampled sites (`--participants-from`) |
-| replay | E3 `resnet18-gn` | `hub.sim --replay <run> --rounds 1,2,3,last`: recompute those rounds from the real run's own previous weights and aggregator state |
-| resume-equal | E6d | final weights and aggregator state hash-equal to the uninterrupted `s2-e2-dir0.3-fedavgm` |
+| method | real runs | which | how |
+|---|---|---|---|
+| full-sim | 62 | E1 (7), E2 (15), E3 CNN (2), E4a (24), E4b (4), E5 (2), E6a strict, E6e, E7 hub (6) | `hub.sim --compare <real run>`: the whole run again in-process (same `flhub_core.train`, same aggregator), participants taken from the real run, global hash compared per round |
+| participants-sim | 4 | E6a `min_sites`, E6b, E6c (2) | the same, for runs with dropped or sampled sites (`--participants-from`) |
+| replay | 2 | E3 `resnet18-gn` | `hub.sim --replay <run> --rounds 1,2,3,last`: recompute those rounds from the real run's own previous weights and aggregator state |
+| resume-equal | 1 | E6d | final weights and aggregator state hash-equal to the uninterrupted `s2-e2-dir0.3-fedavgm` |
 
-*(pending: counts, the per-run table from `scripts/stage2/report_tables.py`, any exception, INV-4 re-runs)*
+**69 of 69 final real runs passed, all with difference 0.0** (`docs/report/stage2/runs.md`, `tables.md` §RQ1). No run needed the tolerance and there was no exception. The 44 extra-seed runs are `hub.sim` runs, and their gate is the real seed-2026 run of the same config (`sim-counterpart`). The 3 reference runs (centralized, local-only) have no federated counterpart. The 6 native E7 runs are compared with the hub instead (§6.5).
+
+**INV-4 (reproducibility).** One E1 and one E2 configuration were run a second time on the real system from the frozen code, 3–5 hours later and after dozens of other runs on the same deployment (`scripts/stage2/inv4_check.py`). In `s2-e1-dir0.3-fedavg` and `s2-e2-dir0.3-fedavgm` all 50 rounds are identical in global weights and aggregator state (`docs/report/stage2/evidence/inv4-*.json`). E6 shows the same from another side: strict runs with 2 and 3 retried rounds (E6a, E6e) and a resumed run after SIGKILL (E6d) end with the same weights as their undisturbed counterparts.
 
 The result is stronger than the 1e-5 tolerance of INV-1: in every round of every compared run the hashes were equal, i.e. the real cross-framework system produced byte-identical weights to the framework-free simulation, including the float64 server-optimizer states.
 
