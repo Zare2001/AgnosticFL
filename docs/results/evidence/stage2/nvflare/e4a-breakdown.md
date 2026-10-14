@@ -1,6 +1,6 @@
 # NVFlare E4a breakdown (final runs, medians over rounds 2-3)
 
-Source: central's run dirs (metrics.jsonl) of the final runs in runs.md; script ~/flhub-analysis/tools/e4a_breakdown.py (nvflare VM). Per site: t_result = relay prep (hub-core read + FLModel) + NVFlare reply (task sent -> reply at the server) + store (hub-core write) + rest (adapter queue/polls, envelope); 'nvflare_transfer' = reply - train_time - data_load (NVFlare transport both ways + client framework).
+Source: the run directories (metrics.jsonl) of the final runs in runs.md, on the central machine; script `deploy/nvflare-vm/analysis/e4a_breakdown.py` (committed with this table). Per site: t_result = relay prep (hub-core read + FLModel) + NVFlare reply (task sent -> reply at the server) + store (hub-core write) + rest (adapter queue/polls, envelope); 'nvflare_transfer' = reply - train_time - data_load (NVFlare transport both ways + client framework).
 
 ## Scope nvflare (nvf-h1, nvf-h2)
 

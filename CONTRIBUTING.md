@@ -10,7 +10,7 @@ Follow [getting started](docs/getting-started.md) for the virtual environment, t
 uv pip install --python .venv/bin/python pandas
 ```
 
-The framework adapters need their framework only where they run: `nvflare==2.9.0` for the NVFlare adapter tests, `flwr==1.39.0` for the Flower relay tests, `vantage6==4.15.2` for the vantage6 adapter. Use separate environments with the versions of [`deploy/versions.env`](deploy/versions.env), as the testbed does.
+The framework adapters need their framework only where they run: `nvflare==2.9.0` for the NVFlare adapter tests, `flwr==1.39.0` for the Flower relay tests, `vantage6==4.15.2` to run the vantage6 adapter (its unit tests use a fake client and run without it). Use separate environments with the versions of [`deploy/versions.env`](deploy/versions.env), as the testbed does.
 
 ## Tests
 
