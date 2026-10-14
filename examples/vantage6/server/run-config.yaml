@@ -1,0 +1,16 @@
+# Orchestrator run configuration for a federation of vantage6 hospitals (example; the testbed used the
+# same form in deploy/central/vantage6/island-3r.yaml). This is how the orchestrator finds the vantage6
+# adapter: by its URL and the sites it serves. Nothing registers with the hub core; the adapter uses the
+# hub core (hub_url) only to read each round's model and to store each site's update.
+#   python -m hub.orchestrator run --config examples/vantage6/server/run-config.yaml --runs-dir <dir>
+#   python -m hub.sim --config examples/vantage6/server/run-config.yaml --runs-dir <dir> --compare <real run dir>
+name: vantage6-example
+rounds: 3
+seed: 2026
+train_config: {local_epochs: 1, batch_size: 64, lr: 0.05, momentum: 0.0, seed: 2026}
+hub_url: http://127.0.0.1:8800
+adapters:
+  - {name: vantage6, url: "http://127.0.0.1:8812", sites: [v6-h3, v6-h4]}
+deadline_s: 600
+online_wait_s: 120
+tags: [example]
