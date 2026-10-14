@@ -1798,3 +1798,363 @@ Stage-2 part of the agent bus (`tools/bus export`), from STAGE2-START #98 to #98
   > ...
   > r20: 2026-10-13T22:21:58.709Z .. 2026-10-13T22:22:10.380Z
 - **#647** `2026-10-13T22:22:11+00:00` **vantage6 → central** [info] file #163: sysmon-vantage6-s2-e6e-server-restart.json
+  > 
+  > fetch with: tools/bus get 163 -o <path>
+- **#648** `2026-10-13T22:22:12+00:00` **vantage6 → central** [info] S4 vantage6 s2-e6e-server-restart: RAM/disk on the vantage6 VM
+  > VM mem peak 2421 MB of 32097 MB; process RSS peaks: v6-algorithm 882 MB (2.7 %), v6-h3-node 359 MB (1.1 %), dockerd 267 MB (0.8 %); disk free now 6.2 GB; rounds trained {'v6-h3': 18, 'v6-h4': 18}; HEALTHY
+- **#649** `2026-10-13T22:22:12+00:00` **vantage6 → central** [info] S4 vantage6 s2-e6e-server-restart: flagged node log lines or health
+  > sysmon summary rc=0; HEALTHY; rounds trained {'v6-h3': 18, 'v6-h4': 18}
+  > node log lines flagged during 2026-10-13T22:14:06Z..2026-10-13T22:22:10Z: {'v6-h3': 11, 'v6-h4': 11}
+  > v6-h3: 2026-10-13 22:18:24 - socket         - INFO     - Disconnected from the server
+  > v6-h3: 2026-10-13 22:18:25 - socket         - INFO     - Disconnected from the server
+  > v6-h3: 2026-10-13 22:18:34 - socket         - INFO     - Disconnected from the server
+  > v6-h3: 2026-10-13 22:19:05 - socket         - INFO     - Disconnected from the server
+  > v6-h4: 2026-10-13 22:18:24 - socket         - INFO     - Disconnected from the server
+  > v6-h4: 2026-10-13 22:18:25 - socket         - INFO     - Disconnected from the server
+  > v6-h4: 2026-10-13 22:18:34 - socket         - INFO     - Disconnected from the server
+  > v6-h4: 2026-10-13 22:19:05 - socket         - INFO     - Disconnected from the server
+- **#650** `2026-10-13T22:22:12+00:00` **flower → central** [info] file #164: sysmon-flower-s2-e6e-server-restart.json
+  > 
+  > fetch with: tools/bus get 164 -o <path>
+- **#651** `2026-10-13T22:22:21+00:00` **nvflare → central** [info] file #165: s2-e6e-server-restart-nvflare-sysmon.json
+  > 
+  > fetch with: tools/bus get 165 -o <path>
+- **#652** `2026-10-13T22:22:21+00:00` **nvflare → central** [info] S4 nvflare s2-e6e-server-restart: flagged NVFlare client log lines or health
+  > sysmon summary rc=0; status: HEALTHY; rounds trained {'nvf-h1': 21, 'nvf-h2': 21}
+  > NVFlare client log lines flagged during 2026-10-13T22:14:06Z..2026-10-13T22:22:10Z: {'nvf-h1': 64, 'nvf-h2': 60}
+  > nvf-h1: 2026-10-14 00:14:54,545 - CoreCell - WARNING - [ME=nvf-h1 O=? D=server F=? T=? CH=task TP=heart_beat SCH=? STP=? SEQ=?] no connection to server
+  > nvf-h1: 2026-10-14 00:14:54,546 - CoreCell - ERROR - [ME=nvf-h1 O=nvf-h1 D=server F=nvf-h1 T=server CH=task TP=heart_beat SCH=? STP=? SEQ=?] cannot send to 'server': target_unrea
+  > nvf-h1: 2026-10-14 00:16:34,008 - CoreCell - WARNING - [ME=nvf-h1 O=nvf-h1.:8052b92 D=server F=nvf-h1.:8052b92 T=nvf-h1 CH=sm__STREAM TP=sm__DATA SCH=aux_communication STP=Object
+  > nvf-h1: 2026-10-14 00:16:34,008 - CoreCell - ERROR - [ME=nvf-h1 O=nvf-h1.:8052b92 D=server F=nvf-h1.:8052b92 T=nvf-h1 CH=sm__STREAM TP=sm__DATA SCH=aux_communication STP=ObjectSt
+  > nvf-h2: 2026-10-14 00:14:53,023 - CoreCell - WARNING - [ME=nvf-h2 O=? D=server F=? T=? CH=task TP=heart_beat SCH=? STP=? SEQ=?] no connection to server
+  > nvf-h2: 2026-10-14 00:14:53,024 - CoreCell - ERROR - [ME=nvf-h2 O=nvf-h2 D=server F=nvf-h2 T=server CH=task TP=heart_beat SCH=? STP=? SEQ=?] cannot send to 'server': target_unrea
+  > nvf-h2: 2026-10-14 00:16:34,059 - CoreCell - WARNING - [ME=nvf-h2 O=nvf-h2.:8052b92 D=server F=nvf-h2.:8052b92 T=nvf-h2 CH=sm__STREAM TP=sm__DATA SCH=aux_communication STP=Object
+  > nvf-h2: 2026-10-14 00:16:34,060 - CoreCell - ERROR - [ME=nvf-h2 O=nvf-h2.:8052b92 D=server F=nvf-h2.:8052b92 T=nvf-h2 CH=sm__STREAM TP=sm__DATA SCH=aux_communication STP=ObjectSt
+  > nvf-h1: 2026-10-14 00:16:31,251 - byte_streamer - WARNING - Late stream error: stream_id=1791929753936214 channel=server_command topic=get_task sender=nvf-h1.83d02fb9-0ff3-4043-a
+  > nvf-h1: 2026-10-14 00:16:31,754 - byte_streamer - WARNING - Late stream error: stream_id=1791929753936215 channel=server_command topic=get_task sender=nvf-h1.83d02fb9-0ff3-4043-a
+  > nvf-h1: 2026-10-14 00:16:32,258 - byte_streamer - WARNING - Late stream error: stream_id=1791929753936216 channel=server_command topic=get_task sender=nvf-h1.83d02fb9-0ff3-4043-a
+  > nvf-h1: 2026-10-14 00:16:32,762 - byte_streamer - WARNING - Late stream error: stream_id=1791929753936217 channel=server_command topic=get_task sender=nvf-h1.83d02fb9-0ff3-4043-a
+- **#653** `2026-10-13T22:22:36+00:00` **flower → central** [info] S4 flower s2-e6e-server-restart (hospital side): SuperNodes reconnected by themselves, node ids unchanged
+  > SuperLink restarts 22:19:49Z (after r15) and 22:20:52Z (mid r18): neither SuperNode process restarted (pids unchanged: flw-h5 457389, flw-h6 474920), node ids unchanged (1904685626967891070, 16440330416478537649; persistent --database keeps node rows), flw-h6 logged 3 'Connection attempt failed, retrying' lines, flw-h5 none (no request fell into the downtime); no ERROR/Traceback; flower-vm HEALTHY; no manual action. Detection/recovery times on the server side are in your run dir (relay lost -> round failed -> new relay run).
+- **#654** `2026-10-13T22:22:40+00:00` **central → all** [info] RUN start inv4-s2-e1-dir0.3-fedavg 2026-10-13T22:22:40Z
+  > INV-4 re-run of s2-e1-dir0.3-fedavg from frozen SHA (not uploaded)
+- **#655** `2026-10-13T22:22:45+00:00` **nvflare → central** [info] S4 nvflare E6d/E6e outcome (nvflare side): healed without manual action
+  > s2-e6d-resume: nvf-h1/nvf-h2 trained 51 rounds each (50 + the round in flight at the kill, redone after --resume); no flagged NVFlare client lines; relay job unchanged (ba97e23f) - the relay re-attached to the restarted adapter; HEALTHY.
+  > s2-e6e-server-restart (nvflare restarts 22:14:44Z after r3, 22:16:24Z mid r6): clients lost the server (status NOT HEALTHY at 22:14:52Z), reconnected by themselves (HEALTHY 22:15:07Z); the keeper ran new relay jobs 83d02fb9 (by 22:15:53Z, ~70 s after restart 1) and 54f2f52f (by 22:17:54Z, ~90 s after restart 2); rounds trained 21/21 (one retried); the 64/60 flagged lines are the expected 'no connection to server'/stream errors during the restarts; HEALTHY at the end. No manual action. Detailed numbers in my report section.
+- **#656** `2026-10-13T22:26:08+00:00` **central → all** [milestone] S2 S4-E6 robustness done: 7 runs finalized, no manual action, INV-1 0.0
+  > a-strict: kills r5 nvf-h1 / r10 v6-h3 / r15 flw-h5 -> one failed attempt each (detected 33.1 / 2.1 / 20.7 s), retry ok (recovered 74.0 / 15.2 / 31.3 s). a-minsites: r5 and r15 finish 5/6 (34.0 / 26.1 s); nvf-h1 out r6-r9 (NVFlare readmits only via a relay-job restart when the hub idles); r10 two missing -> retry.
+  > b-straggler (10 % CPU, deadline 20 s): nvf-h2 always in time (train 8.0 s vs 0.7), v6-h4 and flw-h6 dropped in all 7 rounds of their windows.
+  > c (fraction 0.5): fedavg 66.1 % final (72.0 mean last 5) vs 77.0 full participation; fedavgm (A*, eta 1.0) diverges from r24 to 9.8 %, reproduced exactly by sim with the recorded participants (algorithm, not system).
+  > d: SIGKILL hub + 3 adapters 3 s into r21; adapters back in 1.1/2.2/7.0 s, resumed, r21 done 20.1 s after the kill; final weights AND fedavgm state hash-equal to s2-e2-dir0.3-fedavgm.
+  > e: server restarts after r3/mid r6 nvflare (back 12-13 s, relay job resubmitted), after r9/mid r12 vantage6 (15 s), after r15/mid r18 flower (SuperLink 2 s, relay run relaunched 36-40 s); 2 retried rounds (r7, r18); final weights hash-equal to s2-e6a-strict.
+  > Table: docs/report/stage2/e6.md (push follows). INV-4 re-runs in progress, then E3.
+- **#657** `2026-10-13T22:26:24+00:00` **nvflare → all** [push] 56d903f docs: nvflare report section: E6 results
+  > paths: docs/report/stage2/nvflare.md; pull: optional
+- **#658** `2026-10-13T22:26:49+00:00` **central → all** [push] 0de99b8 report: E6 robustness section, table and timelines (+runs.md)
+  > paths: REPORT_STAGE2.md, docs/report/stage2/{e6.md,figures,runs.md}, scripts/stage2/{e6_table,plots}.py; pull: optional; note: E6 written up (section 7); framework agents: please check the E6 rows for your framework
+- **#659** `2026-10-13T22:30:26+00:00` **central → all** [push] 516489e report: E6c fedavgm step-size diagnostic (sim, eta 0.3)
+  > paths: configs/dev/diag-e6c-fedavgm-eta0.3.yaml, REPORT_STAGE2.md; pull: optional; note: not a final run; fedavgm eta 0.3 at fraction 0.5 is stable (73.9 %), eta 1.0 diverged
+- **#660** `2026-10-13T22:32:36+00:00` **central → all** [info] RUN end inv4-s2-e1-dir0.3-fedavg 2026-10-13T22:32:36Z
+  > INV-4 re-run
+- **#661** `2026-10-13T22:32:37+00:00` **central → all** [info] RUN start inv4-s2-e2-dir0.3-fedavgm 2026-10-13T22:32:37Z
+  > INV-4 re-run of s2-e2-dir0.3-fedavgm from frozen SHA (not uploaded)
+- **#662** `2026-10-13T22:32:40+00:00` **nvflare → central** [info] file #166: inv4-s2-e1-dir0.3-fedavg-nvflare-sysmon.json
+  > 
+  > fetch with: tools/bus get 166 -o <path>
+- **#663** `2026-10-13T22:32:47+00:00` **flower → central** [info] file #167: sysmon-flower-inv4-s2-e1-dir0.3-fedavg.json
+  > 
+  > fetch with: tools/bus get 167 -o <path>
+- **#664** `2026-10-13T22:32:47+00:00` **vantage6 → central** [info] file #168: sysmon-vantage6-inv4-s2-e1-dir0.3-fedavg.json
+  > 
+  > fetch with: tools/bus get 168 -o <path>
+- **#665** `2026-10-13T22:32:48+00:00` **vantage6 → central** [info] S4 vantage6 inv4-s2-e1-dir0.3-fedavg: RAM/disk on the vantage6 VM
+  > VM mem peak 2471 MB of 32097 MB; process RSS peaks: v6-algorithm 883 MB (2.8 %), v6-h3-node 359 MB (1.1 %), dockerd 262 MB (0.8 %); disk free now 6.2 GB; rounds trained {'v6-h3': 50, 'v6-h4': 50}; HEALTHY
+- **#666** `2026-10-13T22:42:30+00:00` **central → all** [info] RUN end inv4-s2-e2-dir0.3-fedavgm 2026-10-13T22:42:30Z
+  > INV-4 re-run
+- **#667** `2026-10-13T22:42:36+00:00` **flower → central** [info] file #169: sysmon-flower-inv4-s2-e2-dir0.3-fedavgm.json
+  > 
+  > fetch with: tools/bus get 169 -o <path>
+- **#668** `2026-10-13T22:42:38+00:00` **vantage6 → central** [info] file #170: sysmon-vantage6-inv4-s2-e2-dir0.3-fedavgm.json
+  > 
+  > fetch with: tools/bus get 170 -o <path>
+- **#669** `2026-10-13T22:42:39+00:00` **vantage6 → central** [info] S4 vantage6 inv4-s2-e2-dir0.3-fedavgm: RAM/disk on the vantage6 VM
+  > VM mem peak 2444 MB of 32097 MB; process RSS peaks: v6-algorithm 883 MB (2.8 %), dockerd 371 MB (1.2 %), v6-h3-node 359 MB (1.1 %); disk free now 6.2 GB; rounds trained {'v6-h3': 50, 'v6-h4': 50}; HEALTHY
+- **#670** `2026-10-13T22:42:45+00:00` **nvflare → central** [info] file #171: inv4-s2-e2-dir0.3-fedavgm-nvflare-sysmon.json
+  > 
+  > fetch with: tools/bus get 171 -o <path>
+- **#671** `2026-10-13T22:43:14+00:00` **central → all** [push] 4931eca report: INV-4 evidence (E1 and E2 re-runs identical)
+  > paths: docs/report/stage2/evidence/inv4-*.json, worklog; pull: optional; note: s2-e1-dir0.3-fedavg and s2-e2-dir0.3-fedavgm re-run on the real system from the frozen code: all 50 rounds identical (global weights and aggregator state). E3 started 22:42Z: cnn-medium fedavg, cnn-medium fedavgm, resnet18-gn fedavg, resnet18-gn fedavgm (v6 purge before each, each run finalized before the next; no sims during runs). Expect several hours.
+- **#672** `2026-10-13T22:46:06+00:00` **central → all** [info] RUN start s2-e3-cnn-medium-fedavg 2026-10-13T22:46:06Z
+  > config configs/stage2/e3/s2-e3-cnn-medium-fedavg.yaml; sites nvf-h1 nvf-h2 v6-h3 v6-h4 flw-h5 flw-h6; model cnn-medium; agg fedavg; rounds 50; netem none
+- **#673** `2026-10-13T22:50:47+00:00` **central → all** [push] efc5809 report: read-only W&B audit for the stage-2 DoD
+  > paths: scripts/stage2/wandb_audit.py; pull: optional; note: 22:50Z audit: AgnosticFL-stage2 97 runs = 97 runs.md rows, all finished/final/grouped, no duplicates; AgnosticFL still 6
+- **#674** `2026-10-13T23:02:16+00:00` **central → vantage6** [info] E3 cnn-medium: vantage6 overhead grows over the run (8.7 s r3 -> 12.4 s r21)
+  > s2-e3-cnn-medium-fedavg (6.7 MB model, tasks kept in the server DB, below your 16 MB delete threshold; DB purged + vacuumed right before the run): per-site overhead v6-h3/v6-h4 = 8.7/9.2 s at r3, 11.3/10.9 at r9, 12.0/12.8 at r18, 12.2/12.4 at r21; vantage6 fan-out 23.1 -> 26.7 s while nvflare (14.5) and flower (~20) stay flat. Looks like the server slows down as the run table grows. For your E3 analysis; per-round data in the run's metrics.jsonl after finalize (I will send the run dir summary).
+- **#675** `2026-10-13T23:03:00+00:00` **vantage6 → central** [reply] re #674: overhead growth = sqlite row layout (input first) + kept cnn-medium tasks; keep E3 as is
+  > Cause (vantage6 4.15.2 source): the run table's first column is input (server/model/run.py: input Text, then task_id, organization_id, result, ..., status). In sqlite a row's later columns sit behind its large input's overflow-page chain, so every query that filters runs by task_id/node/status (the node's run.list(state=open, node_id) per task, the run listings around each status change) walks every stored row's input. cnn-medium input = 1.78 x 6.7 MB ~ 12 MB per run, 2 runs per round kept (below the 16 MB delete threshold) -> each listing costs ~(2r x 12 MB) at round r -> overhead grows ~linearly over the run (your 8.7 s r3 -> 12.4 s r21). cnn-small rows are 0.37 MB (no visible growth in E1/E2); resnet18-gn tasks are deleted every round (constant).
+  > Knob (adapter config, no code change, no numerics change): V6_PURGE_MIN_MB=0 in ~/flhub-runtime/vantage6/adapter.env + restart_adapter.sh -> every round's tasks are deleted -> constant table. I suggest NOT switching mid-E3: keep both cnn-medium runs alike (purge --vacuum before each run as planned) and report the growth as a vantage6 finding; I put it in my section. If you prefer the knob for later experiments (E5/E7 use cnn-small: negligible), tell me.
+- **#676** `2026-10-13T23:07:40+00:00` **nvflare → all** [push] 0b66a65 deploy: nvflare E7 native-vs-hub comparison script
+  > paths: deploy/nvflare-vm/analysis/e7_compare.py; pull: optional; note: compares native round/duration_s with hub round/duration_s + round/agg_s (like for like), medians/IQR over rounds >= 2, plus native_vs_hub.json diffs.
+- **#677** `2026-10-13T23:22:15+00:00` **central → all** [info] RUN end s2-e3-cnn-medium-fedavg 2026-10-13T23:22:15Z
+  > status finished rc=0 rounds=50 median_round_s=28.772288840998954 run_dir=/home/zpalanciya/flhub-runtime/runs/stage2/s2-e3-cnn-medium-fedavg-20261013T224608Z
+  > r1: 2026-10-13T22:46:23.267Z .. 2026-10-13T22:47:01.948Z
+  > ...
+  > r50: 2026-10-13T23:21:28.160Z .. 2026-10-13T23:22:14.827Z
+- **#678** `2026-10-13T23:22:17+00:00` **nvflare → central** [info] file #172: s2-e3-cnn-medium-fedavg-nvflare-sysmon.json
+  > 
+  > fetch with: tools/bus get 172 -o <path>
+- **#679** `2026-10-13T23:22:23+00:00` **flower → central** [info] file #173: sysmon-flower-s2-e3-cnn-medium-fedavg.json
+  > 
+  > fetch with: tools/bus get 173 -o <path>
+- **#680** `2026-10-13T23:22:23+00:00` **flower → central** [info] S4 flower VM s2-e3-cnn-medium-fedavg: mem peak 2.4 GB (8 %)
+  > window 2026-10-13T22:46:06Z..2026-10-13T23:22:15Z; VM mem peak 2.4 GB = 8 % of 31 GB (70 % rule ok); cpu peak 63.7 %; RSS peak MB per site (supernode+superexec+clientapp) {flw-h5: 945, flw-h6: 985}; ens3 rx 676.2 MB tx 687.4 MB
+- **#681** `2026-10-13T23:22:26+00:00` **vantage6 → central** [info] file #174: sysmon-vantage6-s2-e3-cnn-medium-fedavg.json
+  > 
+  > fetch with: tools/bus get 174 -o <path>
+- **#682** `2026-10-13T23:22:27+00:00` **vantage6 → central** [info] S4 vantage6 s2-e3-cnn-medium-fedavg: RAM/disk on the vantage6 VM
+  > VM mem peak 2762 MB of 32097 MB; process RSS peaks: v6-algorithm 1051 MB (3.3 %), v6-h3-node 441 MB (1.4 %), dockerd 318 MB (1.0 %); disk free now 6.1 GB; rounds trained {'v6-h3': 50, 'v6-h4': 50}; HEALTHY
+- **#683** `2026-10-13T23:24:44+00:00` **central → all** [info] central netem self-test now: wan1g to the 3 VMs for ~1 min (revert timer 16 min), no run active
+  > Purpose: verify deploy/central/netem.sh (sudo tc, systemd revert timer, prio + netem + u32 on framework source ports 8002/7601/5050/9092) before E4b. Only central egress to 145.38.189.142, 145.38.186.63, 145.38.187.20 on those ports; SSH/7700 untouched. Cleared right after; I will post 'central netem self-test cleared'. Only the INV-1 sim of s2-e3-cnn-medium-fedavg is running (local, no network).
+- **#684** `2026-10-13T23:25:18+00:00` **central → all** [info] central netem self-test cleared (tc default fq_codel, no revert timer)
+  > apply 23:24:47Z -> clear 23:25:3xZ. Packets through the netem leaves in 20 s: nvflare VM band 150 pkt, vantage6 VM 6 pkt, flower VM 72 pkt (heartbeats/polls on the framework ports), so the u32 filters match. tc qdisc show dev ens3 = fq_codel default; 0 flhub-netem-revert timers. E4b is ready on central's side.
+- **#685** `2026-10-13T23:26:18+00:00` **flower → central** [info] S4 flower: central netem self-test seen from the flower VM: :9092 +5 ms, :7700 unchanged, cleared
+  > TCP connect medians from 145.38.187.20 to 145.38.205.58: 23:24:57Z (during your wan1g test) port 9092 5.88 ms, port 7700 0.78 ms; 23:26:13Z (after clear) 9092 0.79 ms, 7700 0.77 ms. So your filter hits only the Flower port's replies and the bus is untouched.
+- **#686** `2026-10-13T23:37:04+00:00` **flower → all** [push] 03b2ff9 deploy: flower VM end-state check for the DoD evidence
+  > paths: deploy/flower-vm/endstate.sh; pull: optional; note: checks tc default, no netem revert timers, no straggler scopes, nothing armed, no experiment/island processes, E5 extras stopped, base SuperNodes HEALTHY, >= 3 GB free; output goes into 'S2 report-ready flower'.
+- **#687** `2026-10-13T23:41:40+00:00` **nvflare → all** [push] 908fea8 deploy: nvflare VM end-state check for the DoD evidence
+  > paths: deploy/nvflare-vm/endstate.sh; pull: optional; note: tc rules, revert timers, armed injections, CPU-throttled scopes, inject watchers, extras stopped, status HEALTHY, disk >= 3 GB; ALL PASS now.
+- **#688** `2026-10-14T00:08:02+00:00` **central → all** [info] RUN start s2-e3-cnn-medium-fedavgm 2026-10-14T00:08:02Z
+  > config configs/stage2/e3/s2-e3-cnn-medium-fedavgm.yaml; sites nvf-h1 nvf-h2 v6-h3 v6-h4 flw-h5 flw-h6; model cnn-medium; agg fedavgm; rounds 50; netem none
+- **#689** `2026-10-14T00:08:41+00:00` **central → vantage6** [info] purge.sh listing stalls with E3 cnn-medium tasks; central deletes by id first
+  > 00:53-00:05Z: purge.sh --vacuum before s2-e3-cnn-medium-fedavgm sat 12 min in GET /task (100 tasks, run rows 2 x 12 MB): the single uwsgi worker built the response at 1.5-2.3 GB RSS, the client logged 'Connection error... Retrying' and re-requested, and the nodes left their websocket rooms at 23:56Z (no run active, no impact on results). I paused the campaign (PAUSE), killed the purge, restarted the server (restart_server.sh), deleted the 100 tasks by id (ids read-only from sqlite, DELETE /task/<id> as root, 74 s; scripts/stage2/v6_delete_tasks.py), then purge.sh --vacuum (0 tasks, 2.3 GB -> 220 KB). The next E3 purge gets the same treatment. No change to deploy/central (frozen paths). For your section: the task list endpoint serializes run input/result.
+- **#690** `2026-10-14T00:08:47+00:00` **central → vantage6** [info] correction to #689: the stall was 23:53-00:05Z
+  > Not 00:53. Purge login 23:53:16Z, nodes disconnected 23:56:02Z, server restarted 00:05:44Z, vacuum done 00:07:38Z.
+- **#691** `2026-10-14T00:08:59+00:00` **vantage6 → central** [reply] re #689: thanks; same root cause (Task.status loads full runs); noted in my §4
+  > GET /task computes each task's status (hybrid property) by loading its runs with input+result, so the listing scales with the stored payload: 100 cnn-medium tasks ~ 2.4 GB loaded. Deleting by id with ids read from sqlite is the right workaround (purge.sh is frozen; for the report I note the cost and your fix). With the adapter's >= 16 MB per-round delete, resnet18-gn leaves at most 2 tasks, so the purge before/after the resnet runs is cheap.
+- **#692** `2026-10-14T00:18:56+00:00` **central → all** [info] E3: s2-e3-cnn-medium-fedavgm diverges at r9 (A* eta 1.0 tuned on cnn-small)
+  > cnn-medium + fedavgm (eta 1.0, beta 0.9, frozen S3 values): acc 0.50 at r7, 0.06 at r9, then ~0.10 (chance) with test loss ~2.7 through r15. Same pattern as s2-e6c-fedavgm (partial participation). The run continues as configured (timing breakdown stays valid); INV-1 sim will tell whether the system reproduces it exactly. Finding for RQ3: the S3 server step does not transfer to the larger model. resnet18-gn-fedavgm (same params) follows later as planned.
+- **#693** `2026-10-14T00:43:36+00:00` **central → all** [info] RUN end s2-e3-cnn-medium-fedavgm 2026-10-14T00:43:36Z
+  > status finished rc=0 rounds=50 median_round_s=27.981949521003116 run_dir=/home/zpalanciya/flhub-runtime/runs/stage2/s2-e3-cnn-medium-fedavgm-20261014T000804Z
+  > r1: 2026-10-14T00:08:19.499Z .. 2026-10-14T00:08:57.961Z
+  > ...
+  > r50: 2026-10-14T00:42:48.678Z .. 2026-10-14T00:43:36.101Z
+- **#694** `2026-10-14T00:43:37+00:00` **nvflare → central** [info] file #175: s2-e3-cnn-medium-fedavgm-nvflare-sysmon.json
+  > 
+  > fetch with: tools/bus get 175 -o <path>
+- **#695** `2026-10-14T00:43:42+00:00` **flower → central** [info] file #176: sysmon-flower-s2-e3-cnn-medium-fedavgm.json
+  > 
+  > fetch with: tools/bus get 176 -o <path>
+- **#696** `2026-10-14T00:43:43+00:00` **flower → central** [info] S4 flower VM s2-e3-cnn-medium-fedavgm: mem peak 2.4 GB (8 %)
+  > window 2026-10-14T00:08:02Z..2026-10-14T00:43:36Z; VM mem peak 2.4 GB = 8 % of 31 GB (70 % rule ok); cpu peak 67.3 %; RSS peak MB per site (supernode+superexec+clientapp) {flw-h5: 931, flw-h6: 957}; ens3 rx 675.9 MB tx 572.7 MB
+- **#697** `2026-10-14T00:43:47+00:00` **vantage6 → central** [info] file #177: sysmon-vantage6-s2-e3-cnn-medium-fedavgm.json
+  > 
+  > fetch with: tools/bus get 177 -o <path>
+- **#698** `2026-10-14T00:43:48+00:00` **vantage6 → central** [info] S4 vantage6 s2-e3-cnn-medium-fedavgm: RAM/disk on the vantage6 VM
+  > VM mem peak 2750 MB of 32097 MB; process RSS peaks: v6-algorithm 1051 MB (3.3 %), v6-h3-node 467 MB (1.5 %), v6-h4-node 300 MB (0.9 %); disk free now 6.1 GB; rounds trained {'v6-h3': 50, 'v6-h4': 50}; HEALTHY
+- **#699** `2026-10-14T01:14:25+00:00` **central → all** [info] RUN start s2-e3-resnet18-gn-fedavg 2026-10-14T01:14:24Z
+  > config configs/stage2/e3/s2-e3-resnet18-gn-fedavg.yaml; sites nvf-h1 nvf-h2 v6-h3 v6-h4 flw-h5 flw-h6; model resnet18-gn; agg fedavg; rounds 20; netem none
+- **#700** `2026-10-14T01:16:24+00:00` **central → all** [push] 808bbac report: runs.md row for s2-e3-cnn-medium-fedavgm (+postproc)
+  > paths: scripts/stage2/postproc.py, docs/report/stage2/runs.md, worklog; pull: optional; note: cnn-medium fedavgm divergence reproduced bit-exactly by sim (INV-1 0.0); INV-1 sim checkpoints are dropped after finalize (disk); resnet18-gn-fedavg started 01:16Z
+- **#701** `2026-10-14T01:24:09+00:00` **central → all** [push] 0dcbaee report: delete v6 tasks by id before purges in E7 and E4a
+  > paths: scripts/stage2/{e4a_sweep.py,campaign_e7.sh}; pull: optional; note: vantage6 purges in E7/E4a now run scripts/stage2/v6_delete_tasks.py first (no GET /task listing)
+- **#702** `2026-10-14T01:35:45+00:00` **central → all** [push] 739b3d3 report: central end-state check for the DoD evidence
+  > paths: scripts/stage2/endstate_central.sh (+ d0d3e34 report section 10 draft, E3 figure); pull: optional; note: checks tc default, no revert timers, no experiment processes, queue empty, disk >= 3 GB, hub core, 6 base sites online and E5 extras offline in all adapters
+- **#703** `2026-10-14T01:44:38+00:00` **central → vantage6** [request] Cost model: why is v6 fan-out ~3 s higher for cnn-small than for the 1 MB echo?
+  > Fitting fan-out = a + b*P on E4a (1-64 MiB: a 2.1 s, b 1.77 s/MiB, R2 0.997) predicts nvflare and flower learning runs within -8..+2 % (adding max train_time_s), and vantage6 cnn-medium/resnet within -5/+13 %, but vantage6 cnn-small (0.2 MiB) is measured 9.1 s vs predicted 4.3 s (s2-e1-dir0.3-fedavg; data_load_s = 0.0 at v6 sites, train 1.9 s). My guess: per task the node/wrapper reads the variant's CSV database into a DataFrame before flhub_core.train starts its timer, while the echo runs read a smaller default database. Can you confirm or give the right cause (and the per-task cost) for the report? No action needed on the system.
+- **#704** `2026-10-14T01:45:08+00:00` **central → all** [push] fb80a68 report: E2 worst-site figure (+cost model 715d732)
+  > paths: scripts/stage2/{plots,cost_model}.py, REPORT_STAGE2.md, figures; pull: optional; note: cost model fan-out = a + b*P (+ max train) fitted on E4a: nvflare a 2.0 s b 0.026 s/MiB, flower 5.7 s / 0.054, vantage6 (1-64 MiB) 2.1 s / 1.77; E3 predictions within -5..+13 %
+- **#705** `2026-10-14T01:45:57+00:00` **vantage6 → central** [reply] re #703: v6 cnn-small 9.1 s = fixed per-task cost ~6.3 s (fit intercept too low) + training 1.9 + CSV 0.3 + exit 0.6 s
+  > Measured on v6-h3 (node log phases, mean over the 50 rounds of s2-e1-dir0.3-fedavg vs E4a vantage6-1mb):
+  > - node 'Starting task' -> training start: 3.3 s (cnn-small) vs 3.0 s (1 MB echo): image check (pull of the tag), container create/start, python + torch import ~1.2 s, wrapper; incl. the variant CSV read by the vantage6 wrapper (@data -> pandas): 0.29 s for organamnist-dir0.3 (5760 x 785, 16 MB) vs 0.05 s for the default stage-1 file (785 rows), measured in the image. This is before flhub_core.train starts, hence data_load_s = 0.0 at v6 sites (the DataFrame is already loaded).
+  > - training: 1.9 s vs 0.0 s.
+  > - 'Writing output' -> 'Sending result': 2.3 s vs 1.7 s (container exit after a real torch run, log collection, cleanup, node 1 s result polling).
+  > => node side 7.4 s vs 4.7 s per task; the +2.7 s match your fan-out difference (9.1 vs 6.3 s for vantage6-1mb). The rest is the fit: vantage6's fixed per-task cost is ~6.3 s measured at 1 MB (node 4.7 s + task create, socket event, node run fetch, result PATCH, adapter poll <= 1 s), while the linear fit over 1-64 MiB puts a = 2.1 s (the 32/64 MiB points dominate; the fit is 3.9 s at 1 MiB vs 6.3 s measured). So: fixed ~6.3 s + training + ~0.3 s CSV + ~0.6 s exit, not a CSV-dominated cost.
+- **#706** `2026-10-14T02:07:32+00:00` **nvflare → all** [push] abb806a docs: nvflare report section: diff stat since stage1-final
+  > paths: docs/report/stage2/nvflare.md; pull: optional; note: clients/nvflare 0 lines since stage1-final.
+- **#707** `2026-10-14T02:14:10+00:00` **central → vantage6** [request] URGENT s2-e3-resnet18-gn-fedavg r10: v6-h3 run 1 'active' since 01:59:08Z, no result
+  > Round 10 started 01:59:03Z. Server DB: run 1 (task 1 'flhub-r10', org 2 = v6-h3) status active, started_at 01:59:08, finished_at NULL; run 2 (v6-h4) completed 02:03:10. Other frameworks finished r10 long ago. Normal v6 round ~4.5 min. Adapter keeps polling task 1 (active). deadline_s is 1800, so the hub fails the round at ~02:29Z and retries once (round_retries 1). Please check v6-h3 now: is the algorithm container still running/stuck, dead (OOM?), or did the node lose the run (task id 1 reused every round after the per-round delete)? Report what you find; do NOT kill anything unless it is clearly dead/stuck and you tell me first.
+- **#708** `2026-10-14T02:14:54+00:00` **vantage6 → central** [reply] re #707 URGENT: cause = my task-folder GC deleted v6-h3's output (run-id reuse race); GC stopped; propose node restart to re-run r10
+  > Cause: v6-h3 node log 02:03:00 'Writing output', 02:03:03 'Speaking thread had an exception: FileNotFoundError /mnt/data/task-000000001/output'. deploy/vantage6-vm/taskdir_gc.sh (cron at the minute boundary) removed the folder in the ~1 s between the training container's exit and the node reading the output: the adapter deletes resnet tasks every round, sqlite reuses run id 1, so the node reuses task-000000001/ and overwrites its files -> the folder's own mtime stayed old. The result was never sent; run 1 stays 'active' until your deadline (1800 s -> ~02:29Z).
+  > Done: GC cron entry removed (02:15Z); a fixed GC (age = newest file in the folder) follows, not active before you agree.
+  > Fastest recovery (vantage6-native, no hub action): restart the v6-h3 node now (docker stop + start.sh, ~15 s); on reconnect the server's sync makes the node re-run the open run 1 (input still in the DB), as in the island restart test and E6e -> round 10 completes ~4.5 min later with the same deterministic training, no retry, no INV-1 effect. Alternative: wait for the deadline at ~02:29Z and let round_retries retry r10. Reply 'go restart' and I do it at once; I will not touch the node otherwise.
+- **#709** `2026-10-14T02:16:41+00:00` **central → vantage6** [reply] re #708: no node restart; let the deadline + retry recover r10
+  > Thanks for the fast diagnosis. I prefer the system's own path for a final run: no hospital action now; at ~02:29Z the hub fails attempt 1 (deadline) and retries r10 (all sites), result unchanged (deterministic), and the record shows the failed attempt. GC: keep it off for the rest of E3 (resnet runs reuse task ids 1/2 every round, so task folders do not pile up). Install the fixed GC only after E3 ends (I will post 'E3 done'), with a ledger row for the removal and one for the fix, and tell me how much disk the v6 VM has then. For the report please write up the race (GC + id reuse after the adapter's per-round delete) in your section.
+- **#710** `2026-10-14T02:34:33+00:00` **vantage6 → central** [info] S4 vantage6: r10 retry of s2-e3-resnet18-gn-fedavg done on v6-h3 (result sent 02:33:14Z); GC stays off until 'E3 done'
+  > v6-h3: retry task arrived 02:29:12Z, training 02:29:22-02:33:11Z, result sent 02:33:14Z. GC fix committed (eb24d43: a folder's age = its newest file; dry-run mode), not installed; ledger row for the removal added (007f9a2), report section has the race.
+- **#711** `2026-10-14T02:45:43+00:00` **central → all** [push] 56d3d71 report: ledger clients/ diff stat with justification
+  > paths: docs/report/stage2/ledger.md, worklog; pull: optional; note: git diff --stat stage1-final..HEAD -- clients/ = flower server_app.py (central-only relay ServerApp) + pyproject.toml; flower agent: please check the wording. Chain after E3 is armed: E5 (EXTRAS UP/DOWN requests will come), drain, E7.
+- **#712** `2026-10-14T03:24:06+00:00` **central → all** [info] RUN end s2-e3-resnet18-gn-fedavg 2026-10-14T03:24:06Z
+  > status finished rc=0 rounds=20 median_round_s=267.97452895400056 run_dir=/home/zpalanciya/flhub-runtime/runs/stage2/s2-e3-resnet18-gn-fedavg-20261014T011426Z
+  > r1: 2026-10-14T01:16:15.252Z .. 2026-10-14T01:20:42.188Z
+  > ...
+  > r20: 2026-10-14T03:17:49.783Z .. 2026-10-14T03:24:05.985Z
+- **#713** `2026-10-14T03:24:11+00:00` **vantage6 → central** [info] file #178: sysmon-vantage6-s2-e3-resnet18-gn-fedavg.json
+  > 
+  > fetch with: tools/bus get 178 -o <path>
+- **#714** `2026-10-14T03:24:12+00:00` **vantage6 → central** [info] S4 vantage6 s2-e3-resnet18-gn-fedavg: RAM/disk on the vantage6 VM
+  > VM mem peak 4122 MB of 32097 MB; process RSS peaks: v6-algorithm 2127 MB (6.6 %), v6-h4-node 740 MB (2.3 %), v6-h3-node 716 MB (2.2 %); disk free now 5.6 GB; rounds trained {'v6-h3': 20, 'v6-h4': 20}; HEALTHY
+- **#715** `2026-10-14T03:24:12+00:00` **vantage6 → central** [info] S4 vantage6 s2-e3-resnet18-gn-fedavg: flagged node log lines or health
+  > sysmon summary rc=0; HEALTHY; rounds trained {'v6-h3': 20, 'v6-h4': 20}
+  > node log lines flagged during 2026-10-14T01:14:24Z..2026-10-14T03:24:06Z: {'v6-h3': 66, 'v6-h4': 82}
+  > v6-h3: 2026-10-14 01:22:37 - node           - ERROR    - ('Connection broken: IncompleteRead(2755475 bytes read, 76712041 more expected)', IncompleteRead(2755475 bytes
+  > v6-h3: Traceback (most recent call last):
+  > v6-h3: raise IncompleteRead(self._fp_bytes_read, self.length_remaining)
+  > v6-h3: urllib3.exceptions.IncompleteRead: IncompleteRead(2755475 bytes read, 76712041 more expected)
+  > v6-h4: 2026-10-14 01:18:04 - node           - ERROR    - ('Connection broken: IncompleteRead(2802643 bytes read, 76664873 more expected)', IncompleteRead(2802643 bytes
+  > v6-h4: Traceback (most recent call last):
+  > v6-h4: raise IncompleteRead(self._fp_bytes_read, self.length_remaining)
+  > v6-h4: urllib3.exceptions.IncompleteRead: IncompleteRead(2802643 bytes read, 76664873 more expected)
+- **#716** `2026-10-14T03:24:16+00:00` **nvflare → central** [info] file #179: s2-e3-resnet18-gn-fedavg-nvflare-sysmon.json
+  > 
+  > fetch with: tools/bus get 179 -o <path>
+- **#717** `2026-10-14T03:24:20+00:00` **flower → central** [info] file #180: sysmon-flower-s2-e3-resnet18-gn-fedavg.json
+  > 
+  > fetch with: tools/bus get 180 -o <path>
+- **#718** `2026-10-14T03:24:20+00:00` **flower → central** [info] S4 flower VM s2-e3-resnet18-gn-fedavg: mem peak 3.3 GB (11 %)
+  > window 2026-10-14T01:14:24Z..2026-10-14T03:24:06Z; VM mem peak 3.3 GB = 11 % of 31 GB (70 % rule ok); cpu peak 91.7 %; RSS peak MB per site (supernode+superexec+clientapp) {flw-h5: 1469, flw-h6: 1508}; ens3 rx 1982.2 MB tx 1941.3 MB
+- **#719** `2026-10-14T03:54:25+00:00` **central → all** [info] RUN start s2-e3-resnet18-gn-fedavgm 2026-10-14T03:54:25Z
+  > config configs/stage2/e3/s2-e3-resnet18-gn-fedavgm.yaml; sites nvf-h1 nvf-h2 v6-h3 v6-h4 flw-h5 flw-h6; model resnet18-gn; agg fedavgm; rounds 20; netem none
+- **#720** `2026-10-14T04:03:02+00:00` **central → all** [push] c323f17 report: E3 accuracy and timing sections, cost model
+  > paths: REPORT_STAGE2.md, scripts/stage2/report_tables.py; pull: optional; note: framework agents: please check the E3 per-framework numbers (section 6.3) and the vantage6 stall paragraph
+- **#721** `2026-10-14T04:43:26+00:00` **central → all** [info] Heads-up: E5 starts ~06:05Z (after the resnet18-gn-fedavgm replay)
+  > Order: s2-e5-6sites (iid, 20 rounds, ~4 min) -> central sends 'E5 EXTRAS UP' requests: please start your two extra sites and reply 'E5 EXTRAS ONLINE' when they show online -> s2-e5-12sites (iid12, 20 rounds) -> 'E5 EXTRAS DOWN': stop them (and their watchdog entries), reply 'E5 EXTRAS STOPPED'. Then E7 per framework (native, then hub; cnn then payload), no action needed from you unless your native script asks. vantage6: install your fixed task-folder GC when you see 'E3 done' (before E5) or skip it.
+- **#722** `2026-10-14T05:34:02+00:00` **central → all** [info] RUN end s2-e3-resnet18-gn-fedavgm 2026-10-14T05:34:01Z
+  > status finished rc=0 rounds=20 median_round_s=268.0595727189939 run_dir=/home/zpalanciya/flhub-runtime/runs/stage2/s2-e3-resnet18-gn-fedavgm-20261014T035426Z
+  > r1: 2026-10-14T03:56:14.767Z .. 2026-10-14T04:00:43.145Z
+  > ...
+  > r20: 2026-10-14T05:27:41.374Z .. 2026-10-14T05:34:00.928Z
+- **#723** `2026-10-14T05:34:07+00:00` **vantage6 → central** [info] file #181: sysmon-vantage6-s2-e3-resnet18-gn-fedavgm.json
+  > 
+  > fetch with: tools/bus get 181 -o <path>
+- **#724** `2026-10-14T05:34:08+00:00` **vantage6 → central** [info] S4 vantage6 s2-e3-resnet18-gn-fedavgm: RAM/disk on the vantage6 VM
+  > VM mem peak 4258 MB of 32097 MB; process RSS peaks: v6-algorithm 2117 MB (6.6 %), v6-h3-node 841 MB (2.6 %), v6-h4-node 763 MB (2.4 %); disk free now 5.7 GB; rounds trained {'v6-h3': 20, 'v6-h4': 20}; HEALTHY
+- **#725** `2026-10-14T05:34:08+00:00` **vantage6 → central** [info] S4 vantage6 s2-e3-resnet18-gn-fedavgm: flagged node log lines or health
+  > sysmon summary rc=0; HEALTHY; rounds trained {'v6-h3': 20, 'v6-h4': 20}
+  > node log lines flagged during 2026-10-14T03:54:25Z..2026-10-14T05:34:01Z: {'v6-h3': 113, 'v6-h4': 33}
+  > v6-h3: 2026-10-14 03:58:03 - node           - ERROR    - ('Connection broken: IncompleteRead(2708307 bytes read, 76759209 more expected)', IncompleteRead(2708307 bytes
+  > v6-h3: Traceback (most recent call last):
+  > v6-h3: raise IncompleteRead(self._fp_bytes_read, self.length_remaining)
+  > v6-h3: urllib3.exceptions.IncompleteRead: IncompleteRead(2708307 bytes read, 76759209 more expected)
+  > v6-h4: 2026-10-14 04:31:42 - node           - ERROR    - ('Connection broken: IncompleteRead(2849811 bytes read, 76617705 more expected)', IncompleteRead(2849811 bytes
+  > v6-h4: Traceback (most recent call last):
+  > v6-h4: raise IncompleteRead(self._fp_bytes_read, self.length_remaining)
+  > v6-h4: urllib3.exceptions.IncompleteRead: IncompleteRead(2849811 bytes read, 76617705 more expected)
+- **#726** `2026-10-14T05:34:12+00:00` **nvflare → central** [info] file #182: s2-e3-resnet18-gn-fedavgm-nvflare-sysmon.json
+  > 
+  > fetch with: tools/bus get 182 -o <path>
+- **#727** `2026-10-14T05:34:15+00:00` **flower → central** [info] file #183: sysmon-flower-s2-e3-resnet18-gn-fedavgm.json
+  > 
+  > fetch with: tools/bus get 183 -o <path>
+- **#728** `2026-10-14T05:34:15+00:00` **flower → central** [info] S4 flower VM s2-e3-resnet18-gn-fedavgm: mem peak 3.4 GB (11 %)
+  > window 2026-10-14T03:54:25Z..2026-10-14T05:34:01Z; VM mem peak 3.4 GB = 11 % of 31 GB (70 % rule ok); cpu peak 84.7 %; RSS peak MB per site (supernode+superexec+clientapp) {flw-h5: 1532, flw-h6: 1513}; ens3 rx 1796.6 MB tx 1835.7 MB
+- **#729** `2026-10-14T06:04:13+00:00` **central → all** [info] E3 done 2026-10-14T06:04:13Z: starting E5
+  > campaign_e3 finished (4 runs; INV-1 per run before the next). vantage6: you may install the fixed task-folder GC now (ledger rows). Next: s2-e5-6sites, then 'E5 EXTRAS UP' requests, s2-e5-12sites, 'E5 EXTRAS DOWN'; then E7.
+- **#730** `2026-10-14T06:04:14+00:00` **central → all** [info] RUN start s2-e5-6sites 2026-10-14T06:04:14Z
+  > config configs/stage2/e5/s2-e5-6sites.yaml; sites nvf-h1 nvf-h2 v6-h3 v6-h4 flw-h5 flw-h6; model cnn-small; agg fedavg; rounds 20; netem none
+- **#731** `2026-10-14T06:04:33+00:00` **central → all** [milestone] S2 S4-E3 model scale done: 4 runs finalized, INV-1 0.0 (full sim CNNs, replay resnet)
+  > dir0.3, seed 2026 (final test acc %, worst site): cnn-medium fedavg 81.5 (63.3), target reached r36; cnn-medium fedavgm 11.1 (diverged r9, sim-reproduced); resnet18-gn fedavg 42.7 (15.3) after 20 rounds; resnet18-gn fedavgm 50.7 (27.8). cnn-small reference: 77.0 / 78.3.
+  > Median per round, train/overhead s per site: nvflare 11.7/1.9 (cnn-medium), 214/2.7 (resnet); vantage6 13.5/14.1, 225/42.0; flower 13.9/6.3, 223/10.9. Round 28.8 s (cnn-medium), 268 s (resnet); hub agg <= 0.13 s, eval 14.6 / 106 s.
+  > One stall: resnet fedavg r10, v6-h3 output deleted by the hospital-side task GC (id reuse race), recovered by deadline + retry. Durations: cnn-medium 36 min, resnet 2.1 h / 1.6 h.
+  > E5 started 06:04Z (6sites now; EXTRAS UP requests follow).
+- **#732** `2026-10-14T06:04:35+00:00` **vantage6 → central** [info] S4 vantage6: fixed task-folder GC installed 06:04Z (eb24d43; ledger row); VM disk 6.0 GB free; ready for E5 extras
+  > Dry run first: it selected only finished E3 folders (v6-h3 task-2, v6-h4 task-1, > 5 min, no running container). Cron entry restored as install.sh writes it. E5: 'extra.sh start' brings up v6-h9/v6-h10 (configs + keys installed, database organamnist_iid12, image a43cef3f75c0 already local) and adds their watchdog entry; 'extra.sh stop' stops them and removes the entry.
+- **#733** `2026-10-14T06:07:54+00:00` **central → all** [info] RUN end s2-e5-6sites 2026-10-14T06:07:54Z
+  > status finished rc=0 rounds=20 median_round_s=9.102268747010385 run_dir=/home/zpalanciya/flhub-runtime/runs/stage2/s2-e5-6sites-20261014T060416Z
+  > r1: 2026-10-14T06:04:18.196Z .. 2026-10-14T06:04:28.266Z
+  > ...
+  > r20: 2026-10-14T06:07:43.106Z .. 2026-10-14T06:07:54.254Z
+- **#734** `2026-10-14T06:07:55+00:00` **central → nvflare** [request] E5 EXTRAS UP
+  > Please start your two E5 extra sites now and reply 'E5 EXTRAS ONLINE' once they show online in your status.
+- **#735** `2026-10-14T06:07:55+00:00` **central → vantage6** [request] E5 EXTRAS UP
+  > Please start your two E5 extra sites now and reply 'E5 EXTRAS ONLINE' once they show online in your status.
+- **#736** `2026-10-14T06:07:55+00:00` **central → flower** [request] E5 EXTRAS UP
+  > Please start your two E5 extra sites now and reply 'E5 EXTRAS ONLINE' once they show online in your status.
+- **#737** `2026-10-14T06:07:57+00:00` **nvflare → central** [info] file #184: s2-e5-6sites-nvflare-sysmon.json
+  > 
+  > fetch with: tools/bus get 184 -o <path>
+- **#738** `2026-10-14T06:07:59+00:00` **flower → central** [info] file #185: sysmon-flower-s2-e5-6sites.json
+  > 
+  > fetch with: tools/bus get 185 -o <path>
+- **#739** `2026-10-14T06:07:59+00:00` **flower → central** [info] S4 flower VM s2-e5-6sites: mem peak 2.2 GB (7 %)
+  > window 2026-10-14T06:04:14Z..2026-10-14T06:07:54Z; VM mem peak 2.2 GB = 7 % of 31 GB (70 % rule ok); cpu peak 59.4 %; RSS peak MB per site (supernode+superexec+clientapp) {flw-h5: 826, flw-h6: 768}; ens3 rx 9.5 MB tx 16.1 MB
+- **#740** `2026-10-14T06:08:08+00:00` **vantage6 → central** [info] file #186: sysmon-vantage6-s2-e5-6sites.json
+  > 
+  > fetch with: tools/bus get 186 -o <path>
+- **#741** `2026-10-14T06:08:09+00:00` **vantage6 → central** [info] S4 vantage6 s2-e5-6sites: RAM/disk on the vantage6 VM
+  > VM mem peak 2728 MB of 32097 MB; process RSS peaks: v6-algorithm 882 MB (2.7 %), v6-h3-node 538 MB (1.7 %), v6-h4-node 447 MB (1.4 %); disk free now 6.1 GB; rounds trained {'v6-h3': 20, 'v6-h4': 20, 'v6-h9': 0, 'v6-h10': 0}; HEALTHY
+- **#742** `2026-10-14T06:08:11+00:00` **vantage6 → central** [reply] E5 EXTRAS ONLINE (vantage6: v6-h9, v6-h10)
+  > extra.sh start at 06:08:11Z: v6-h9 and v6-h10 started and connected to http://145.38.205.58:7601 in 7.4 s (standard vantage6 4.15.2 nodes, database organamnist_iid12, image a43cef3f75c0 already local, share_config false); watchdog cron entry added. Base nodes v6-h3/v6-h4 unchanged.
+- **#743** `2026-10-14T06:08:17+00:00` **flower → central** [reply] E5 EXTRAS ONLINE (flower: flw-h11, flw-h12)
+  > deploy/flower-vm/extra.sh start at 06:08:01Z: flw-h11 (node id 16156373353830183144, local port 9096) and flw-h12 (4829869334115821877, port 9097) connected to 145.38.205.58:9092 and answered the relay's site-info query by 06:08:13Z (mapped; your discover should list them online). Data organamnist-iid12-<site>.csv provisioned; own watchdog cron entry installed; base flw-h5/flw-h6 unchanged, HEALTHY.
+- **#744** `2026-10-14T06:08:57+00:00` **nvflare → central** [reply] E5 EXTRAS ONLINE
+  > nvflare: nvf-h7 and nvf-h8 started 06:08Z (extra.sh start: standard kits, same scripts/venv, data organamnist-iid12), registered, and all four NVFlare sites (nvf-h1, nvf-h2, nvf-h7, nvf-h8) run relay job de332656 with flhub_core 0.2.0+fe357a1dbec1 (the keeper restarted the relay job to include them, 42 s after the start). VM status HEALTHY for base and extras.
+- **#745** `2026-10-14T06:09:07+00:00` **central → all** [info] RUN start s2-e5-12sites 2026-10-14T06:09:07Z
+  > config configs/stage2/e5/s2-e5-12sites.yaml; sites nvf-h1 nvf-h2 v6-h3 v6-h4 flw-h5 flw-h6 nvf-h7 nvf-h8 v6-h9 v6-h10 flw-h11 flw-h12; model cnn-small; agg fedavg; rounds 20; netem none
+- **#746** `2026-10-14T06:13:15+00:00` **central → all** [info] RUN end s2-e5-12sites 2026-10-14T06:13:14Z
+  > status finished rc=0 rounds=20 median_round_s=10.371339014993282 run_dir=/home/zpalanciya/flhub-runtime/runs/stage2/s2-e5-12sites-20261014T060908Z
+  > r1: 2026-10-14T06:09:10.666Z .. 2026-10-14T06:09:23.051Z
+  > ...
+  > r20: 2026-10-14T06:13:01.926Z .. 2026-10-14T06:13:14.507Z
+- **#747** `2026-10-14T06:13:15+00:00` **central → nvflare** [request] E5 EXTRAS DOWN
+  > E5 done: please stop your two extra sites (and their watchdog entries) and reply 'E5 EXTRAS STOPPED'.
+- **#748** `2026-10-14T06:13:15+00:00` **central → vantage6** [request] E5 EXTRAS DOWN
+  > E5 done: please stop your two extra sites (and their watchdog entries) and reply 'E5 EXTRAS STOPPED'.
+- **#749** `2026-10-14T06:13:15+00:00` **central → flower** [request] E5 EXTRAS DOWN
+  > E5 done: please stop your two extra sites (and their watchdog entries) and reply 'E5 EXTRAS STOPPED'.
+- **#750** `2026-10-14T06:13:17+00:00` **flower → central** [info] file #187: sysmon-flower-s2-e5-12sites.json
+  > 
+  > fetch with: tools/bus get 187 -o <path>
+- **#751** `2026-10-14T06:13:17+00:00` **flower → central** [info] S4 flower VM s2-e5-12sites: mem peak 3.0 GB (10 %)
+  > window 2026-10-14T06:09:07Z..2026-10-14T06:13:14Z; VM mem peak 3.0 GB = 10 % of 31 GB (70 % rule ok); cpu peak 100.0 %; RSS peak MB per site (supernode+superexec+clientapp) {flw-h5: 757, flw-h6: 760, flw-h11: 690, flw-h12: 689}; ens3 rx 18.9 MB tx 20.6 MB
+- **#752** `2026-10-14T06:13:26+00:00` **vantage6 → central** [reply] E5 EXTRAS STOPPED (vantage6: v6-h9, v6-h10)
+  > extra.sh stop at 06:13:25Z: v6-h9/v6-h10 containers stopped, watchdog cron entry removed (0 entries), extra-nodes flag cleared. They trained 20 rounds each in s2-e5-12sites (node logs). Base nodes v6-h3/v6-h4 HEALTHY.
+- **#753** `2026-10-14T06:13:27+00:00` **vantage6 → central** [info] file #188: sysmon-vantage6-s2-e5-12sites.json
+  > 
+  > fetch with: tools/bus get 188 -o <path>
+- **#754** `2026-10-14T06:13:28+00:00` **vantage6 → central** [info] S4 vantage6 s2-e5-12sites: RAM/disk on the vantage6 VM
+  > VM mem peak 3331 MB of 32097 MB; process RSS peaks: v6-algorithm 1658 MB (5.2 %), v6-h3-node 482 MB (1.5 %), dockerd 422 MB (1.3 %); disk free now 6.1 GB; rounds trained {'v6-h3': 20, 'v6-h4': 20}; HEALTHY
+- **#755** `2026-10-14T06:13:29+00:00` **nvflare → central** [info] file #189: s2-e5-12sites-nvflare-sysmon.json
+  > 
+  > fetch with: tools/bus get 189 -o <path>
+- **#756** `2026-10-14T06:13:30+00:00` **flower → central** [reply] E5 EXTRAS STOPPED (flower: flw-h11, flw-h12)
+  > deploy/flower-vm/extra.sh stop at 06:13:22Z: flw-h11 and flw-h12 SuperNodes and supervisors stopped (graceful, they deregister), their watchdog cron entry removed (crontab: only the base flw-h5/flw-h6 line). Both had trained the 20 rounds of s2-e5-12sites (40 ROUND lines in the flw-h11 log). Base flw-h5/flw-h6 HEALTHY.
+- **#757** `2026-10-14T06:15:07+00:00` **nvflare → central** [reply] E5 EXTRAS STOPPED
+  > nvflare: nvf-h7 and nvf-h8 stopped 06:13Z (extra.sh stop: kit shutdown, .enabled markers removed; the single cron watchdog line now covers only nvf-h1/nvf-h2). Base sites nvf-h1/nvf-h2 HEALTHY. Extras: DOWN (documented for the DoD). E5 on the nvflare side: extras joined relay job de332656 42 s after start, trained n=2880 (organamnist-iid12) every round of s2-e5-12sites.
+- **#758** `2026-10-14T06:15:17+00:00` **central → all** [info] S4 E5 step done rc=0 2026-10-14T06:15:17Z
+- **#759** `2026-10-14T06:18:18+00:00` **central → all** [info] RUN start s2-e7-nvflare-native-cnn 2026-10-14T06:18:18Z
+  > native nvflare: /home/zpalanciya/AgnosticFL/deploy/central/nvflare/native/run.sh configs/stage2/e7/s2-e7-nvflare-hub-cnn.yaml /home/zpalanciya/flhub-runtime/runs/stage2/s2-e7-nvflare-native-cnn-20261014T061818Z
+- **#760** `2026-10-14T06:18:19+00:00` **central → all** [info] RUN end s2-e7-nvflare-native-cnn 2026-10-14T06:18:18Z
+  > native nvflare rc=1 out=/home/zpalanciya/flhub-runtime/runs/stage2/s2-e7-nvflare-native-cnn-20261014T061818Z
+- **#761** `2026-10-14T06:18:20+00:00` **flower → central** [info] file #190: sysmon-flower-s2-e7-nvflare-native-cnn.json
+  > 
+  > fetch with: tools/bus get 190 -o <path>
+- **#762** `2026-10-14T06:18:20+00:00` **central → all** [info] RUN start s2-e7-nvflare-hub-cnn 2026-10-14T06:18:20Z
+  > config configs/stage2/e7/s2-e7-nvflare-hub-cnn.yaml; sites nvf-h1 nvf-h2; model cnn-small; agg fedavg; rounds 20; netem none
+- **#763** `2026-10-14T06:18:31+00:00` **vantage6 → central** [info] file #191: sysmon-vantage6-s2-e7-nvflare-native-cnn.json
+  > 
+  > fetch with: tools/bus get 191 -o <path>
+- **#764** `2026-10-14T06:18:32+00:00` **nvflare → central** [info] file #192: s2-e7-nvflare-native-cnn-nvflare-sysmon.json
+  > 
+  > fetch with: tools/bus get 192 -o <path>
+- **#765** `2026-10-14T06:19:41+00:00` **central → nvflare** [info] E7: s2-e7-nvflare-native-cnn did not start (central bug), will be re-run after the E7 campaign
+  > run_final.py native created the output dir before calling deploy/central/nvflare/native/run.sh, which refuses an existing dir ('native: ... exists', rc 1, 0 s). Fixed in d18485a (the script creates the dir; vantage6/flower scripts accept either). The campaign goes on (nvflare hub-cnn now, then nvflare native/hub payload, vantage6, flower); I re-run s2-e7-nvflare-native-cnn right after the campaign. No action needed from you.
+- **#766** `2026-10-14T06:20:09+00:00` **central → all** [info] RUN end s2-e7-nvflare-hub-cnn 2026-10-14T06:20:09Z
+  > status finished rc=0 rounds=20 median_round_s=3.2739389519992983 run_dir=/home/zpalanciya/flhub-runtime/runs/stage2/s2-e7-nvflare-hub-cnn-20261014T061822Z
+  > r1: 2026-10-14T06:18:24.041Z .. 2026-10-14T06:18:28.858Z
+  > ...
+  > r20: 2026-10-14T06:20:03.768Z .. 2026-10-14T06:20:08.810Z
+- **#767** `2026-10-14T06:20:10+00:00` **central → all** [info] RUN start s2-e7-nvflare-native-payload 2026-10-14T06:20:10Z
+  > native nvflare: /home/zpalanciya/AgnosticFL/deploy/central/nvflare/native/run.sh configs/stage2/e7/s2-e7-nvflare-hub-payload.yaml /home/zpalanciya/flhub-runtime/runs/stage2/s2-e7-nvflare-native-payload-20261014T062010Z
+- **#768** `2026-10-14T06:20:18+00:00` **nvflare → central** [info] file #193: s2-e7-nvflare-hub-cnn-nvflare-sysmon.json
+  > 
+  > fetch with: tools/bus get 193 -o <path>
+- **#769** `2026-10-14T06:20:39+00:00` **central → all** [info] RUN end s2-e7-nvflare-native-payload 2026-10-14T06:20:39Z
+  > native nvflare rc=0 out=/home/zpalanciya/flhub-runtime/runs/stage2/s2-e7-nvflare-native-payload-20261014T062010Z
+- **#770** `2026-10-14T06:20:41+00:00` **central → all** [info] RUN start s2-e7-nvflare-hub-payload 2026-10-14T06:20:41Z
+  > config configs/stage2/e7/s2-e7-nvflare-hub-payload.yaml; sites nvf-h1 nvf-h2; model payload-45; agg fedavg; rounds 5; netem none
+- **#771** `2026-10-14T06:20:48+00:00` **nvflare → central** [info] file #194: s2-e7-nvflare-native-payload-nvflare-sysmon.json
+  > 
+  > fetch with: tools/bus get 194 -o <path>
+- **#772** `2026-10-14T06:20:49+00:00` **nvflare → central** [info] S4 nvflare s2-e7-nvflare-native-payload: flagged NVFlare client log lines or health
+  > sysmon summary rc=0; status: HEALTHY; rounds trained {'nvf-h1': 5, 'nvf-h2': 5}
+  > NVFlare client log lines flagged during 2026-10-14T06:20:10Z..2026-10-14T06:20:39Z: {'nvf-h1': 5, 'nvf-h2': 5}
