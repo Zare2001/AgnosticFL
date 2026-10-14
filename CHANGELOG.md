@@ -6,7 +6,12 @@ All notable changes to this project. The format follows [Keep a Changelog](https
 
 ### Fixed
 
-- `examples/new-framework/check.sh` no longer leaves two adapter processes running after it ends. The restart command it writes for the conformance suite's restart test recorded the pid of a subshell instead of the restarted adapter's, so the script's cleanup missed the restarted direct and relay adapters.
+The example scripts now stop everything they started and remove their temporary files on every exit, also when they are interrupted (Ctrl-C, `timeout`, `kill`, a closed terminal).
+
+- `examples/new-framework/check.sh`: the restart command it writes for the conformance suite's restart test recorded the pid of a subshell instead of the restarted adapter's, so every run left the two restarted adapters running. Its cleanup now also stops a test or a restart in progress, and Ctrl-C ends the whole script instead of only the running step.
+- `examples/nvflare/server/run_local.py`: after a failure, Ctrl-C, SIGTERM or SIGHUP, the processes of NVFlare's simulator no longer outlive the script; it ends the relay job, then stops the remaining process tree.
+- `examples/flower/run_local.py` stops the processes it started and removes its working directory also when it is ended with SIGTERM or SIGHUP (for example by `timeout` or a closed terminal); before, they kept running.
+- `examples/vantage6/client/run_local.py` removes its temporary directory (dataset, site CSV, run token) also when it is ended with SIGTERM or SIGHUP; before, the directory stayed behind.
 
 ## [0.2.1] - 2026-10-14
 
