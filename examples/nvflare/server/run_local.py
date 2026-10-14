@@ -120,7 +120,7 @@ def main() -> int:
     py, procs, adapter, adapter_server, sim = sys.executable, [], None, None, None
     try:
         procs.append(subprocess.Popen([py, "-m", "hub.core", "--port", hub_url.rsplit(":", 1)[1],
-                                       "--root", str(work / "hubcore")], cwd=REPO,
+                                       "--root", str(work / "hubcore")], cwd=REPO, start_new_session=True,
                                       stdout=open(work / "hubcore.log", "w"), stderr=subprocess.STDOUT))
         wait_healthy(hub_url)
         adapter = SimulatorRelayAdapter(SITES, HubClient(hub_url))
@@ -130,7 +130,8 @@ def main() -> int:
 
         sim = subprocess.Popen([py, str(HERE / "relay_job.py"), "simulate", "--workspace", str(work / "simulator"),
                                 "--adapter-url", adapter_url, "--hub-url", hub_url, "--clients", *SITES],
-                               cwd=REPO, stdout=open(work / "simulator.log", "w"), stderr=subprocess.STDOUT)
+                               cwd=REPO, start_new_session=True,  # own session: Ctrl-C reaches only this script,
+                               stdout=open(work / "simulator.log", "w"), stderr=subprocess.STDOUT)  # whose finally stops all
         procs.append(sim)
         print("NVFlare simulator started (log: simulator.log)", flush=True)
 
