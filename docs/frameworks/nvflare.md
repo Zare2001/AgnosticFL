@@ -76,7 +76,7 @@ job.to_clients(staging)                        # flhub_core/*.py -> custom/flhub
   - submits the relay job when none is active, once every base site is connected or 30 s after the first one connected;
   - adopts a relay job that is already running (for example after an adapter restart);
   - restarts the job gracefully (relay shutdown, then a new job) when a connected site has been outside it for 15 s and no round is in flight, because NVFlare does not let a restarted client rejoin a running job;
-  - aborts a job whose relay has been silent for 30 s, or that did not end 60 s after a shutdown request;
+  - after such a shutdown request, aborts the old job as soon as its relay has been silent for 30 s, or after 60 s at the latest;
   - treats job-store entries that survived an abrupt server stop as stale (deletes or ignores them, then submits a new job).
 - **Site watcher** (every 5 s during a round): fails a site that has been offline for 30 s; the other sites go on. An unknown probe result never fails a site.
 - **Extra sites.** Sites in `--sites` but not in `--base-sites` are served but never delay the job start and never block a round. The 12-site run used this for two extra NVFlare hospitals.
@@ -254,6 +254,7 @@ All numbers are from the reference testbed (4 vCPU AMD EPYC-Rome VMs in one data
 | Bytes on the wire ÷ payload (E4a) | 1.005–1.064 | [e4_bytes.md](../results/evidence/stage2/e4_bytes.md) |
 | Bandwidth efficiency at 20 Mbit/s (E4b) | 0.94 of the lower bound | [cost_model.md](../results/evidence/stage2/cost_model.md) |
 | Largest payload carried | 512 MiB per site and direction (15.5 s per round); 1024 MiB on a single-host test | §5.5 |
+| Memory at 512 MiB | hospital VM 5.0 GiB (two clients), one client job 2.1 GiB; relay job on the central host 3.8 GiB | §5.5 |
 | Overhead per site and round (E3) | 1.6 s (`cnn-small`), 1.9 s (`cnn-medium`), 2.7 s (`resnet18-gn`) | [tables.md](../results/evidence/stage2/tables.md) |
 | 6 → 12 sites (E5) | NVFlare fan-out 3.0 s → 2.8 s | [tables.md](../results/evidence/stage2/tables.md) |
 | Hospital crash (E6a): detected / recovered | 33.1 s / 74.0 s, no manual action | [e6.md](../results/evidence/stage2/e6.md) |
@@ -294,7 +295,7 @@ Source: [e7-native-vs-hub.md](../results/evidence/stage2/nvflare/e7-native-vs-hu
 
 **Where the time goes (E4a, echo models).** Medians over rounds 2–3, NVFlare scope (two hospitals). *Transfer* is NVFlare transport both ways plus the client framework; *hub* is the relay reading the model from the hub core plus storing the replies.
 
-| Payload (MiB) | Round (s) | NVFlare transfer (s) | Hub prep + store (s) | NVFlare VM memory peak (GB) | Client job RSS peak (GB) |
+| Payload (MiB) | Round (s) | NVFlare transfer (s) | Hub prep + store (s) | NVFlare VM memory peak (GiB) | Client job RSS peak (GiB) |
 |---|---|---|---|---|---|
 | 1 | 2.52 | 2.36 | 0.01 | 1.68 | 0.43 |
 | 8 | 2.67 | 2.39 | 0.04 | 1.74 | 0.47 |
@@ -330,9 +331,9 @@ Source: [cost_model.md](../results/evidence/stage2/cost_model.md); figure [e4b_m
 
 ### 5.5 Memory and payload size
 
-- **Hospital VM** (memory in use at peak, two clients and the operating system): 1.68 GB at 1 MiB up to 5.01 GB at 512 MiB; one client's job process 0.43 GB up to 2.11 GB (table in §5.3).
-- **Central host:** the relay's server job process peaked at 3.8 GB at 512 MiB; at 45 MiB (E7 C2) it took 585 MB, the adapter 163 MB and the hub core 44 MB. Sources: [stage-2 report §6.1](https://github.com/Zare2001/AgnosticFL/blob/stage2-final/REPORT_STAGE2.md), [stage-2 NVFlare section](https://github.com/Zare2001/AgnosticFL/blob/stage2-final/docs/report/stage2/nvflare.md) §5.
-- **Largest payload:** 512 MiB per site and direction on the testbed (15.5 s per round, every round hash-equal to the simulation). On a single-host test with NVFlare's default settings: 128 MiB 5–6 s, 256 MiB 9–10 s, 512 MiB 16–17 s and 1024 MiB 32.8 s per round (17.6 GB of host memory in use at 1024 MiB). No NVFlare limit was reached; the stops were the testbed's disk.
+- **Hospital VM** (memory in use at peak, two clients and the operating system): 1.68 GiB at 1 MiB up to 5.01 GiB at 512 MiB, 16 % of the VM's 31.3 GiB; one client's job process 0.43 GiB up to 2.11 GiB; the NVFlare client process itself 89–96 MiB (table in §5.3).
+- **Central host:** the relay's server job process peaked at 3.8 GiB at 512 MiB; at 45 MiB (E7 C2) it took 585 MiB, the adapter 163 MiB and the hub core 44 MiB. Sources: [stage-2 report §6.1](https://github.com/Zare2001/AgnosticFL/blob/stage2-final/REPORT_STAGE2.md), [stage-2 NVFlare section](https://github.com/Zare2001/AgnosticFL/blob/stage2-final/docs/report/stage2/nvflare.md) §5.
+- **Largest payload:** 512 MiB per site and direction on the testbed (15.5 s per round, every round hash-equal to the simulation). On a single-host test with NVFlare's default settings: 128 MiB 5–6 s, 256 MiB 9–10 s, 512 MiB 16–17 s and 1024 MiB 32.8 s per round. No NVFlare limit was reached; the stops were the testbed's disk.
 
 ### 5.6 Scaling and robustness
 
