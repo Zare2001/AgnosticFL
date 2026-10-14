@@ -1,57 +1,50 @@
 # AgnosticFL — agent instructions (all VMs)
 
-## Current stage: 2 — full system and performance test
+## Current stage: 3 — library restructure and documentation
 
-Stage 1 (build + IID FedAvg proof) is finished: see `REPORT.md` and git tag `stage1-final`. The stage-1 version of this file is archived at `docs/agents/stage1/CLAUDE.stage1.md`. Notes the agents added there still apply unless stage-2 documents contradict them.
+Stage 2 is finished: see `REPORT_STAGE2.md` and tag `stage2-final`. The stage-2 version of this file is archived at `docs/agents/stage2/CLAUDE.stage2.md`.
 
-You are one of four autonomous agents, one per VM:
+Stage 3 runs **no experiments** and changes **no system code**. It turns `main` into a clean, documented library repository; all agent material stays on branch `archive/agentic-build`.
 
-| Role | VM | Owns in stage 2 |
+| Role | VM | Owns in stage 3 |
 |---|---|---|
-| `central` (lead) | 145.38.205.58 | hub (aggregators, flhub_core 0.2, orchestrator, sim), configs, campaign schedule (RUNLOCK), W&B `AgnosticFL-stage2`, `REPORT_STAGE2.md` |
-| `nvflare` | 145.38.189.142 | NVFlare adapter + hospitals, NVFlare rollout, payload limits, fault injection, E7 native baseline |
-| `vantage6` | 145.38.186.63 | vantage6 adapter + hospitals, vantage6 rollout, payload limits, fault injection, E7 native baseline |
-| `flower` | 145.38.187.20 | Flower adapter + hospitals, Flower rollout, payload limits, fault injection, E7 native baseline |
+| `central` (lead) | 145.38.205.58 | restructure of `main`, README, all shared docs, results (incl. new stage-1 plots), cost-and-efficiency, GitHub files, merge and release |
+| `nvflare` | 145.38.189.142 | `docs/frameworks/nvflare.md`, `adapters/nvflare/README.md`, `clients/nvflare/README.md`, review of every NVFlare statement |
+| `vantage6` | 145.38.186.63 | `docs/frameworks/vantage6.md`, `adapters/vantage6/README.md`, `clients/vantage6/README.md`, review of every vantage6 statement |
+| `flower` | 145.38.187.20 | `docs/frameworks/flower.md`, `adapters/flower/README.md`, `clients/flower/README.md`, review of every Flower statement, quick-start verification |
 
-Your role is in `~/.flhub/role`. Your stage-2 role file is `docs/agents/stage2/roles/<ROLE>.md` (uppercase). Read it now. The documents imported below are the plan, the experiment matrix, the protocol and the collaboration rules.
+Your role is in `~/.flhub/role`. Your stage-3 role file is `docs/agents/stage3/roles/<ROLE>.md` (uppercase). Read it now.
 
-@docs/agents/stage2/PLAN.md
-@docs/agents/stage2/EXPERIMENTS.md
-@docs/agents/PROTOCOL.md
+@docs/agents/stage3/PLAN.md
 @docs/agents/COLLABORATION.md
 
-`docs/agents/PROJECT_PLAN.md` (stage 1) still defines topology, architecture, ownership and technical decisions (§2–§5, §11). Read those sections when you need them; its phases and Definition of Done are finished.
+`COLLABORATION.md` still defines the bus, announcements and git style. Where it says "main", stage 3 uses the branch from PLAN.md §2 instead.
+
+## Two checkouts — know where you are
+
+| Directory | Branch | What you commit there |
+|---|---|---|
+| `~/AgnosticFL` | `archive/agentic-build` | Only agent bookkeeping: your worklog `docs/agents/worklogs/stage3-<role>.md`, stage-3 notes, the bus transcript. This is also where `tools/bus` lives and where the running services come from. |
+| `~/AgnosticFL-main` | `restructure/library` | The library and its documentation (the future `main`). Never agent material. |
+
+Before every commit: `git -C <dir> branch --show-current` and check that it is the right branch for the files you commit.
 
 ## Non-negotiable rules
 
-1. **Never stop working until stage 2 is DONE** (`docs/agents/stage2/PLAN.md` §9). When blocked, say so on the bus, then do useful parallel work from your role file or `tools/bus wait --timeout 600`. Do not invent busywork.
-2. **Git as Zare2001 only.**
-   - No Co-Authored-By, no "Generated with", no session links, no emoji.
-   - Messages: `<scope>: <what>`, ≤ 72 characters.
-   - Commits ≤ 400 changed lines; pushes ≤ 8 commits.
-   - Hooks enforce this. Never use `--no-verify`.
-3. **After every push, announce it** on the bus (COLLABORATION.md §4). Pull when someone announces `pull: yes` for files you use.
-4. **Secrets never leave `~/.flhub/secrets.env`.** Credentials travel only via `tools/bus put --secret`.
-5. **W&B:**
-   - Final stage-2 runs only, project `AgnosticFL-stage2`.
-   - Central runs every final run. `scripts/stage2/finalize_run.py` uploads it only after its gate passes (PLAN.md §6).
-   - Never log to or delete from project `AgnosticFL` (stage 1).
-6. **Hospitals stay standard.** Hospital-side code is the framework's normal client pattern. Every hospital-side change (code, config, data, ops) gets a row in `docs/report/stage2/ledger.md`.
-7. **Safety:** network shaping and fault injection only under PLAN.md §8: framework ports only, revert timer first, announce on the bus, never touch SSH/7700/firewall/reboot.
-8. **One final run at a time, all on central.** Framework agents ask for a RUNLOCK before disturbing the system, and arm E6 injections only on request (ARM → ARMED; PLAN.md §6).
-9. **Use subagents:** `scout` (lookups), `runner` (commands/tests/logs), `gitops` (commit/push/announce) and `scribe` (worklogs/docs) run on Haiku. Do design, numerics, debugging and integration yourself.
-10. **Keep your worklog** `docs/agents/worklogs/stage2-<role>.md` current after every milestone. It is how you recover after a restart or context compaction.
-11. **Verify, don't assume:** check framework APIs and limits in the installed version's source (`scout`).
-12. **Disk:** keep ≥ 3 GB free (PLAN.md §7).
-13. **You run in auto mode.** A safety classifier reviews every action; hard deny rules come from `~/.flhub/stage2/claude-settings.json`. If an action is blocked:
-    - Never try to reach the same effect another way: no rewording, no scripts, no other tools.
-    - Never edit the settings file or the runner to loosen it.
-    - Send `tools/bus send --to human --type blocker` with the exact command, the block reason, and why the plan needs it. Put it in your status `--blockers` too.
-    - Continue with other work. The owner decides: they run the step themselves or adjust the settings.
+1. **Never stop working until stage 3 is DONE** (PLAN.md §9). When blocked, say so on the bus, then do useful parallel work or `tools/bus wait --timeout 600`.
+2. **Git as Zare2001 only.** No Co-Authored-By, no "Generated with", no session links, no emoji. Messages `<scope>: <what>`, ≤ 72 characters. Commits ≤ 400 changed lines, pushes ≤ 8 commits, except the two owner-approved cases in PLAN.md §2 rule 6. Hooks enforce this. Never use `--no-verify`.
+3. **After every push, announce it** on the bus with the branch name. Pull when someone announces `pull: yes`.
+4. **No code changes** beyond PLAN.md §3. If a document would need a code change to be true, change the document, or list the gap in `limitations-and-future-work.md`.
+5. **The testbed is read-only** (PLAN.md §2 rule 3): no stop/start/restart/install/purge, no runs, no `tc`/netem, no injections, no W&B writes.
+6. **Never push to `main` before R4, never force-push, never delete a branch or tag.**
+7. **Secrets never leave `~/.flhub/secrets.env`.** Never print them; never put them in a document.
+8. **Facts only.** Every number in a document comes from evidence in the repo (stage reports, `runs.md`, evidence files, ledger) or from a command you ran; cite the source file. If a number is missing, write `TODO(verify)` and resolve it before R3.
+9. **Use subagents:** `scout` (lookups), `runner` (commands/tests), `gitops` (commit/push/announce) and `scribe` (worklog). Write the documentation yourself.
+10. **Keep your worklog** `docs/agents/worklogs/stage3-<role>.md` (in `~/AgnosticFL`) current after every milestone.
+11. **You run in auto mode.** Hard deny rules come from `~/.flhub/stage3/claude-settings.json`. If an action is blocked: never reach the same effect another way, never edit the settings or the runner, send `tools/bus send --to human --type blocker` with the exact command and why the plan needs it, and continue with other work.
 
 ## On (re)start, always
 
-1. `cat ~/.flhub/role` → read your stage-2 role file.
-2. `git pull --rebase`, read your stage-2 worklog tail, `tools/bus inbox`, `tools/bus status`.
-3. If you hold a RUNLOCK or an active netem rule from before the restart, resolve it first: finish or abort the run, clear the rule, tell the bus.
-4. Continue with the next unfinished task. Update `tools/bus status-set --phase S<n>` when your phase changes.
+1. `cat ~/.flhub/role` → read your stage-3 role file.
+2. `git -C ~/AgnosticFL pull --rebase` and `git -C ~/AgnosticFL-main pull --rebase`; read your stage-3 worklog tail; `tools/bus inbox`; `tools/bus status`.
+3. Continue with the next unfinished task. Update `tools/bus status-set --phase R<n>` when your phase changes.
