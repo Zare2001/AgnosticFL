@@ -108,6 +108,38 @@ def learning_table(title: str, names: list[tuple[str, str]], target: float | Non
     return out + [""]
 
 
+def sysmon_vm(fname: str) -> str | None:
+    if fname == "central.json":
+        return "central"
+    for fw in FWS:
+        if fname.startswith(f"sysmon-{fw}-") or fname.endswith(f"-{fw}-sysmon.json"):
+            return fw
+    return None
+
+
+def sysmon_table(title: str, names: list[str]) -> list[str]:
+    """Per run and VM: system CPU mean/peak (% of all vCPUs), memory peak, and the process with the largest RSS."""
+    out = [f"### {title}", "", "| run | VM | CPU mean % | CPU peak % | memory peak MB | largest process (peak RSS MB) |",
+           "|---|---|---|---|---|---|"]
+    for name in names:
+        run = load(name)
+        if not run or not (run["path"] / "sysmon").exists():
+            out.append(f"| {name} | - | - | - | - | - |")
+            continue
+        for f in sorted((run["path"] / "sysmon").glob("*.json"), key=lambda q: (sysmon_vm(q.name) != "central", q.name)):
+            vm = sysmon_vm(f.name)
+            if vm is None:
+                continue
+            d = json.loads(f.read_text())
+            sysd, procs = d.get("system") or {}, d.get("procs") or {}
+            top = max(procs.items(), key=lambda kv: kv[1].get("rss_mb_peak") or 0, default=None)
+            top_s = "-" if top is None else "%s (%.0f)" % (top[0], top[1].get("rss_mb_peak") or 0)
+            out.append(f"| {name} | {vm} | {fmt(sysd.get('cpu_mean'), 1)} | {fmt(sysd.get('cpu_peak'), 1)} | "
+                       f"{fmt(sysd.get('mem_used_mb_peak'), 0)} | {top_s} |")
+    out.append("")
+    return out
+
+
 def main(argv: list[str] | None = None) -> int:
     global RUNS
     ap = argparse.ArgumentParser()
@@ -152,6 +184,9 @@ def main(argv: list[str] | None = None) -> int:
                          f"{fmt(med([r['round/agg_s'] for r in rows]), 3)} | {fmt(med([r['round/eval_s'] for r in rows if (r.get('round/eval_s') or 0) > 0.01]), 2)} | "
                          f"{fmt(med([r['round/duration_s'] for r in rows]), 2)} | {fmt(last(run, 'global/test_acc'), pct=True)} |")
     lines.append("")
+    lines += sysmon_table("E3 — resources per VM during the run (sysmon)", [
+        "s2-e1-dir0.3-fedavg", "s2-e3-cnn-medium-fedavg", "s2-e3-cnn-medium-fedavgm", "s2-e3-resnet18-gn-fedavg",
+        "s2-e3-resnet18-gn-fedavgm"])
     # E4a
     lines += ["### E4a — payload sweep (median of rounds 2-3)", "",
               "| scope | MiB | status | round s | per-framework fan-out s | INV-1 |", "|---|---|---|---|---|---|"]
