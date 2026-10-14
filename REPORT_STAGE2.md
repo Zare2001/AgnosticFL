@@ -237,7 +237,26 @@ Median over rounds ≥ 2 (seconds; train and overhead are the mean of the framew
 
 The model explains NVFlare and Flower within 8 % across a 200× range of model sizes: a fixed cost per round plus a small per-MiB cost plus the slowest site's training. vantage6's per-MiB cost is 30–70× higher, and its growth beyond 64 MiB is superlinear (E4a). Its small-model error has two parts (vantage6 #705): the straight line underestimates vantage6's fixed cost per task, which is 6.3 s measured at 1 MiB (container start, task and result round trips), and real training adds about 0.8 s per task that the echo runs do not have (reading the site's CSV database into a DataFrame, a slower container exit after a torch run).
 
-*(pending: E5, E7)*
+### 6.4 E5 — number of sites
+
+`iid` over the 6 base sites against `iid12` over 12 sites (4 per framework; the 6 extra sites hold half as much data each, so the total per round is the same), FedAvg, 20 rounds, real system; INV-1 full simulation, hash-equal. The extra sites were started for this experiment only, with the framework agents' standard scripts: online 16 s (vantage6), 22 s (Flower) and 62 s (NVFlare) after the request, and stopped again right after the run.
+
+| | 6 sites | 12 sites |
+|---|---|---|
+| round time (median, s) | 9.1 | 10.4 (+14 %) |
+| fan-out NVFlare / vantage6 / Flower (s) | 3.0 / 9.1 / 7.6 | 2.8 / 10.4 / 8.3 |
+| training per site, NVFlare / vantage6 / Flower (s) | 0.73 / 1.84 / 1.61 | 0.36 / 1.48 / 1.29 |
+| overhead per site, NVFlare / vantage6 / Flower (s) | 1.9 / 6.7 / 5.6 | 1.7 / 8.2 / 6.4 |
+| hub aggregation (ms) | 0.6 | 1.0 |
+| central CPU mean / peak (%), memory peak (GB) | 12 / 41, 3.3 | 17 / 38, 2.7 |
+| framework VM CPU mean, NVFlare / vantage6 / Flower (%) | 4.5 / 26.7 / 25.2 | 4.8 / 42.0 / 39.8 |
+| test accuracy after 20 rounds | 81.7 % | 74.9 % |
+
+- **Doubling the sites costs the hub almost nothing**, and the round time grows by 14 %. NVFlare's fan-out does not grow at all: four clients poll the server in parallel, and each trains on half the data. vantage6 and Flower grow by 1.3 and 0.7 s, because four training processes (vantage6: four containers) now share the VM's 4 vCPUs, and each extra site adds its own per-task setup.
+- **Accuracy drops with more, smaller sites** at the same number of rounds (81.7 → 74.9 %): each site makes half as many local steps per round, so the averaged update is smaller.
+- Registered but offline sites did not block any other run: the extra sites stayed registered and offline in every run before and after E5, as in conformance v2 (§3).
+
+*(pending: E7)*
 
 ## 7. RQ5 — Robustness (E6)
 
