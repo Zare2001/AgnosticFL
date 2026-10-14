@@ -1078,3 +1078,363 @@ Stage-2 part of the agent bus (`tools/bus export`), from STAGE2-START #98 to #98
   > 
   > fetch with: tools/bus get 80 -o <path>
 - **#407** `2026-10-13T17:21:12+00:00` **nvflare → central** [info] file #81: s2-e1-iid-fedavg-nvflare-sysmon.json
+  > 
+  > fetch with: tools/bus get 81 -o <path>
+- **#408** `2026-10-13T17:23:49+00:00` **central → vantage6** [info] S4 E4a finding for your section: vantage6 VM received 5.4x (64 MB) and 9.1x (128 MB) the payload
+  > From the follower sysmon summaries (interface deltas over the run window; scripts/stage2/e4_bytes.py): s2-e4a-vantage6-64mb rx 3378 MiB / tx 748 MiB for 768 MiB of payload (2 sites x 2 dirs x 3 rounds x 64) -> ratio 5.37; 128 MB rx 12351 / tx 1589 MiB for 1536 -> 9.08; mixed 8-64 MB ratio ~5.2-5.5. Upload (tx) ~1.0x of base64+JSON, download (rx) grows with round length -> looks like the nodes fetching the run with its input repeatedly while a round is open (GET /run includes input), which would also explain the server CPU saturation (uwsgi 100 %) and the superlinear round time. NVFlare 1.005-1.06, Flower 1.002-1.005. Can you confirm from the node/server logs (number of run fetches per round)?
+- **#409** `2026-10-13T17:24:45+00:00` **vantage6 → central** [reply] re #408: vantage6 download = 4 input copies per run by design + retries under load
+  > Explained from the 4.15.2 node/server source: per site and round the node receives the run's input (base64(json), 1.78x payload) four times: (1) run.list(state=open, include_task) to start the run; (2) the response to PATCH run/<id> {status: active, started_at} - the server returns run_schema.dump(run), which includes the input (server/resource/run.py:716); (3) GET run/<id> before sending the result (node/__init__.py:598, marked FIXME in vantage6: only to read the task id); (4) the response to the result PATCH (again the full run with input). = 7.1x payload rx per site and round, ~1.95x tx (result 1.78x). Measured 64 MB: rx 563 MiB per site-round = 8.8x; the extra ~1.7x are retried requests after 'RemoteDisconnected' (uWSGI drops connections while the single worker is blocked rewriting run rows per log line; 2 retries on v6-h3 at 64 MB). At 128 MB the worker blocks longer -> more retries -> 16x per site-round (ratio 9.1). The node does not poll GET /run while a round is open (log: no reconnects/syncs in the 64 MB window). So: vantage6 protocol overhead ~3.6x by design (4 x 1.78 down + 1.78 up over 2x nominal), plus load-dependent retries. I put this in docs/report/stage2/vantage6.md §4.
+- **#410** `2026-10-13T17:28:35+00:00` **human → central** [reply] re #214: stage-1 v6-train image removed
+  > I removed the local copy localhost:5050/flhub/v6-train:bd800cee7922 myself after checking the tag is in the :5050 registry. Free on / now: 7.0G. Please extend the E4a sweep at the end of S4 as you proposed.
+- **#411** `2026-10-13T17:30:13+00:00` **central → all** [info] RUN end s2-e1-dir1.0-fedavg 2026-10-13T17:30:13Z
+  > status finished rc=0 rounds=50 median_round_s=8.86994287700145 run_dir=/home/zpalanciya/flhub-runtime/runs/stage2/s2-e1-dir1.0-fedavg-20261013T172104Z
+  > r1: 2026-10-13T17:21:06.260Z .. 2026-10-13T17:21:16.966Z
+  > ...
+  > r50: 2026-10-13T17:30:02.327Z .. 2026-10-13T17:30:13.516Z
+- **#412** `2026-10-13T17:30:16+00:00` **flower → central** [info] file #82: sysmon-flower-s2-e1-dir1.0-fedavg.json
+  > 
+  > fetch with: tools/bus get 82 -o <path>
+- **#413** `2026-10-13T17:30:17+00:00` **nvflare → central** [info] file #83: s2-e1-dir1.0-fedavg-nvflare-sysmon.json
+  > 
+  > fetch with: tools/bus get 83 -o <path>
+- **#414** `2026-10-13T17:30:18+00:00` **central → all** [info] RUN start s2-e1-dir0.3-fedavg 2026-10-13T17:30:18Z
+  > config configs/stage2/e1/s2-e1-dir0.3-fedavg.yaml; sites nvf-h1 nvf-h2 v6-h3 v6-h4 flw-h5 flw-h6; model cnn-small; agg fedavg; rounds 50; netem none
+- **#415** `2026-10-13T17:30:19+00:00` **vantage6 → central** [info] file #84: sysmon-vantage6-s2-e1-dir1.0-fedavg.json
+  > 
+  > fetch with: tools/bus get 84 -o <path>
+- **#416** `2026-10-13T17:30:20+00:00` **vantage6 → central** [info] S4 vantage6 s2-e1-dir1.0-fedavg: RAM/disk on the vantage6 VM
+  > VM mem peak 2427 MB of 32097 MB; process RSS peaks: v6-algorithm 883 MB (2.8 %), v6-h3-node 352 MB (1.1 %), dockerd 245 MB (0.8 %); disk free now 6.3 GB; rounds trained {'v6-h3': 50, 'v6-h4': 50}; HEALTHY
+- **#417** `2026-10-13T17:33:56+00:00` **central → human** [reply] re #410: thanks; E4a extension (nvflare/flower 512, vantage6 256, mixed 128) scheduled at the end of S4
+  > Free on central now 7.0 GB. Before the extension I will vacuum the vantage6 DB, GC hub blobs and trim sim dirs so the disk rule (3 GB + 4 x payload x sites) and the measured projections are met; sizes that still do not fit stay documented as testbed disk limits.
+- **#418** `2026-10-13T17:33:56+00:00` **central → vantage6** [reply] re #409: thanks - 4 input copies per site-round by design, retries under load; used in the report
+  > Clear explanation; I will cite your §4 for the E4a overhead ratios (vantage6 ~3.6x by design + load-dependent retries; nvflare 1.005-1.06; flower 1.002-1.005).
+- **#419** `2026-10-13T17:39:40+00:00` **central → all** [info] RUN end s2-e1-dir0.3-fedavg 2026-10-13T17:39:40Z
+  > status finished rc=0 rounds=50 median_round_s=9.13015281600019 run_dir=/home/zpalanciya/flhub-runtime/runs/stage2/s2-e1-dir0.3-fedavg-20261013T173020Z
+  > r1: 2026-10-13T17:30:22.056Z .. 2026-10-13T17:30:32.886Z
+  > ...
+  > r50: 2026-10-13T17:39:29.226Z .. 2026-10-13T17:39:40.325Z
+- **#420** `2026-10-13T17:39:45+00:00` **central → all** [info] RUN start s2-e1-dir0.1-fedavg 2026-10-13T17:39:45Z
+  > config configs/stage2/e1/s2-e1-dir0.1-fedavg.yaml; sites nvf-h1 nvf-h2 v6-h3 v6-h4 flw-h5 flw-h6; model cnn-small; agg fedavg; rounds 50; netem none
+- **#421** `2026-10-13T17:39:51+00:00` **flower → central** [info] file #85: sysmon-flower-s2-e1-dir0.3-fedavg.json
+  > 
+  > fetch with: tools/bus get 85 -o <path>
+- **#422** `2026-10-13T17:39:51+00:00` **nvflare → central** [info] file #86: s2-e1-dir0.3-fedavg-nvflare-sysmon.json
+  > 
+  > fetch with: tools/bus get 86 -o <path>
+- **#423** `2026-10-13T17:39:54+00:00` **vantage6 → central** [info] file #87: sysmon-vantage6-s2-e1-dir0.3-fedavg.json
+  > 
+  > fetch with: tools/bus get 87 -o <path>
+- **#424** `2026-10-13T17:39:55+00:00` **vantage6 → central** [info] S4 vantage6 s2-e1-dir0.3-fedavg: RAM/disk on the vantage6 VM
+  > VM mem peak 2432 MB of 32097 MB; process RSS peaks: v6-algorithm 886 MB (2.8 %), v6-h3-node 352 MB (1.1 %), dockerd 255 MB (0.8 %); disk free now 6.3 GB; rounds trained {'v6-h3': 50, 'v6-h4': 50}; HEALTHY
+- **#425** `2026-10-13T17:49:24+00:00` **central → all** [info] RUN end s2-e1-dir0.1-fedavg 2026-10-13T17:49:24Z
+  > status finished rc=0 rounds=50 median_round_s=9.390744348998851 run_dir=/home/zpalanciya/flhub-runtime/runs/stage2/s2-e1-dir0.1-fedavg-20261013T173946Z
+  > r1: 2026-10-13T17:39:48.870Z .. 2026-10-13T17:40:00.213Z
+  > ...
+  > r50: 2026-10-13T17:49:12.696Z .. 2026-10-13T17:49:24.059Z
+- **#426** `2026-10-13T17:49:25+00:00` **flower → central** [info] file #88: sysmon-flower-s2-e1-dir0.1-fedavg.json
+  > 
+  > fetch with: tools/bus get 88 -o <path>
+- **#427** `2026-10-13T17:49:25+00:00` **nvflare → central** [info] file #89: s2-e1-dir0.1-fedavg-nvflare-sysmon.json
+  > 
+  > fetch with: tools/bus get 89 -o <path>
+- **#428** `2026-10-13T17:49:29+00:00` **central → all** [info] RUN start s2-e1-qty-fedavg 2026-10-13T17:49:29Z
+  > config configs/stage2/e1/s2-e1-qty-fedavg.yaml; sites nvf-h1 nvf-h2 v6-h3 v6-h4 flw-h5 flw-h6; model cnn-small; agg fedavg; rounds 50; netem none
+- **#429** `2026-10-13T17:49:29+00:00` **vantage6 → central** [info] file #90: sysmon-vantage6-s2-e1-dir0.1-fedavg.json
+  > 
+  > fetch with: tools/bus get 90 -o <path>
+- **#430** `2026-10-13T17:49:29+00:00` **vantage6 → central** [info] S4 vantage6 s2-e1-dir0.1-fedavg: RAM/disk on the vantage6 VM
+  > VM mem peak 2423 MB of 32097 MB; process RSS peaks: v6-algorithm 886 MB (2.8 %), v6-h3-node 352 MB (1.1 %), dockerd 254 MB (0.8 %); disk free now 6.3 GB; rounds trained {'v6-h3': 50, 'v6-h4': 50}; HEALTHY
+- **#431** `2026-10-13T17:53:14+00:00` **central → all** [info] S4 heads-up: E6 after E2 (~20:45Z); ARM format and schedule
+  > E6 runs one at a time after E2. Before each injected run central sends one request per agent: subject 'ARM <run> <site> <action...>' (scripts/stage2/arm.py). Please arm, then reply with a subject containing 'ARMED <run>' (exactly the run name); I start the run only after all ARMED. After the run: confirm outcome + recovery + HEALTHY, then disarm.
+  > Order and injections (from #136, your replies #145 #162 #169 #295):
+  > 1 s2-e6a-strict: nvflare 'nvf-h1 kill at round 5 +0.5s'; vantage6 'v6-h3 kill at round 10 +0.3s'; flower 'flw-h5 kill-node at round 15 +4s'
+  > 2 s2-e6a-minsites: same three
+  > 3 s2-e6b-straggler (deadline 20 s, min_sites 5): nvflare 'nvf-h2 straggler 10% rounds 1-6'; vantage6 'v6-h4 straggler 10% rounds 7-13'; flower 'flw-h6 straggler 10% rounds 14-20' (flower: straggler.sh prepare before ARMED)
+  > 4/5 s2-e6c-fedavg, s2-e6c-fedavgm: no injection
+  > 6 s2-e6d-resume: central only (SIGKILL hub + adapters after round 20, resume)
+  > 7 s2-e6e-server-restart: central only (restart_server.sh: nvflare after r3 and mid r6, vantage6 after r9 and mid r12, flower after r15 and mid r18).
+- **#432** `2026-10-13T17:59:34+00:00` **central → all** [info] RUN end s2-e1-qty-fedavg 2026-10-13T17:59:33Z
+  > status finished rc=0 rounds=50 median_round_s=9.877692537000257 run_dir=/home/zpalanciya/flhub-runtime/runs/stage2/s2-e1-qty-fedavg-20261013T174930Z
+  > r1: 2026-10-13T17:49:32.548Z .. 2026-10-13T17:49:44.959Z
+  > ...
+  > r50: 2026-10-13T17:59:21.630Z .. 2026-10-13T17:59:33.620Z
+- **#433** `2026-10-13T17:59:34+00:00` **vantage6 → central** [info] file #91: sysmon-vantage6-s2-e1-qty-fedavg.json
+  > 
+  > fetch with: tools/bus get 91 -o <path>
+- **#434** `2026-10-13T17:59:35+00:00` **vantage6 → central** [info] S4 vantage6 s2-e1-qty-fedavg: RAM/disk on the vantage6 VM
+  > VM mem peak 2386 MB of 32097 MB; process RSS peaks: v6-algorithm 858 MB (2.7 %), v6-h3-node 352 MB (1.1 %), dockerd 246 MB (0.8 %); disk free now 6.3 GB; rounds trained {'v6-h3': 50, 'v6-h4': 50}; HEALTHY
+- **#435** `2026-10-13T17:59:38+00:00` **central → all** [info] RUN start s2-e1-fwcorr-fedavg 2026-10-13T17:59:38Z
+  > config configs/stage2/e1/s2-e1-fwcorr-fedavg.yaml; sites nvf-h1 nvf-h2 v6-h3 v6-h4 flw-h5 flw-h6; model cnn-small; agg fedavg; rounds 50; netem none
+- **#436** `2026-10-13T17:59:45+00:00` **flower → central** [info] file #92: sysmon-flower-s2-e1-qty-fedavg.json
+  > 
+  > fetch with: tools/bus get 92 -o <path>
+- **#437** `2026-10-13T17:59:45+00:00` **nvflare → central** [info] file #93: s2-e1-qty-fedavg-nvflare-sysmon.json
+  > 
+  > fetch with: tools/bus get 93 -o <path>
+- **#438** `2026-10-13T18:10:45+00:00` **central → all** [info] RUN end s2-e1-fwcorr-fedavg 2026-10-13T18:10:45Z
+  > status finished rc=0 rounds=50 median_round_s=10.38985373000105 run_dir=/home/zpalanciya/flhub-runtime/runs/stage2/s2-e1-fwcorr-fedavg-20261013T175940Z
+  > r1: 2026-10-13T17:59:42.099Z .. 2026-10-13T17:59:54.960Z
+  > ...
+  > r50: 2026-10-13T18:10:30.995Z .. 2026-10-13T18:10:44.658Z
+- **#439** `2026-10-13T18:10:49+00:00` **central → all** [info] RUN start s2-e1-mix-fedavg 2026-10-13T18:10:49Z
+  > config configs/stage2/e1/s2-e1-mix-fedavg.yaml; sites nvf-h1 nvf-h2 v6-h3 v6-h4 flw-h5 flw-h6; model cnn-small; agg fedavg; rounds 50; netem none
+- **#440** `2026-10-13T18:10:50+00:00` **flower → central** [info] file #94: sysmon-flower-s2-e1-fwcorr-fedavg.json
+  > 
+  > fetch with: tools/bus get 94 -o <path>
+- **#441** `2026-10-13T18:10:50+00:00` **nvflare → central** [info] file #95: s2-e1-fwcorr-fedavg-nvflare-sysmon.json
+  > 
+  > fetch with: tools/bus get 95 -o <path>
+- **#442** `2026-10-13T18:10:55+00:00` **vantage6 → central** [info] file #96: sysmon-vantage6-s2-e1-fwcorr-fedavg.json
+  > 
+  > fetch with: tools/bus get 96 -o <path>
+- **#443** `2026-10-13T18:10:56+00:00` **vantage6 → central** [info] S4 vantage6 s2-e1-fwcorr-fedavg: RAM/disk on the vantage6 VM
+  > VM mem peak 2513 MB of 32097 MB; process RSS peaks: v6-algorithm 946 MB (2.9 %), v6-h3-node 352 MB (1.1 %), dockerd 256 MB (0.8 %); disk free now 6.3 GB; rounds trained {'v6-h3': 50, 'v6-h4': 50}; HEALTHY
+- **#444** `2026-10-13T18:21:24+00:00` **central → all** [info] RUN end s2-e1-mix-fedavg 2026-10-13T18:21:24Z
+  > status finished rc=0 rounds=50 median_round_s=10.626564242000313 run_dir=/home/zpalanciya/flhub-runtime/runs/stage2/s2-e1-mix-fedavg-20261013T181051Z
+  > r1: 2026-10-13T18:10:52.932Z .. 2026-10-13T18:11:05.044Z
+  > ...
+  > r50: 2026-10-13T18:21:11.155Z .. 2026-10-13T18:21:24.111Z
+- **#445** `2026-10-13T18:21:24+00:00` **flower → central** [info] file #97: sysmon-flower-s2-e1-mix-fedavg.json
+  > 
+  > fetch with: tools/bus get 97 -o <path>
+- **#446** `2026-10-13T18:21:25+00:00` **nvflare → central** [info] file #98: s2-e1-mix-fedavg-nvflare-sysmon.json
+  > 
+  > fetch with: tools/bus get 98 -o <path>
+- **#447** `2026-10-13T18:21:30+00:00` **vantage6 → central** [info] file #99: sysmon-vantage6-s2-e1-mix-fedavg.json
+  > 
+  > fetch with: tools/bus get 99 -o <path>
+- **#448** `2026-10-13T18:21:31+00:00` **vantage6 → central** [info] S4 vantage6 s2-e1-mix-fedavg: RAM/disk on the vantage6 VM
+  > VM mem peak 2384 MB of 32097 MB; process RSS peaks: v6-algorithm 871 MB (2.7 %), v6-h3-node 352 MB (1.1 %), dockerd 259 MB (0.8 %); disk free now 6.3 GB; rounds trained {'v6-h3': 50, 'v6-h4': 50}; HEALTHY
+- **#449** `2026-10-13T18:27:24+00:00` **central → all** [info] RUN start s2-e2-iid-fedavgm 2026-10-13T18:27:24Z
+  > config configs/stage2/e2/s2-e2-iid-fedavgm.yaml; sites nvf-h1 nvf-h2 v6-h3 v6-h4 flw-h5 flw-h6; model cnn-small; agg fedavgm; rounds 50; netem none
+- **#450** `2026-10-13T18:27:43+00:00` **central → all** [milestone] S2 S4-E1 done: 7 real runs + 14 seed sims queued + 3 references; E2 started 18:26Z
+  > E1 real runs (seed 2026, 50 rounds, ~9.3 min each): iid 0.834, dir1.0 0.799, dir0.3 0.770, dir0.1 0.734, qty 0.838, fwcorr and mix finalizing; references: centralized 0.847 (target for rounds-to-target 0.805), local-only mean site acc iid 0.692, dir0.1 0.263. INV-1 full sim: hash-equal every round for every finalized real run so far (iid, dir1.0, dir0.3, dir0.1, qty). Label skew lowers final accuracy by 4-10 pp and worst-site (site-shaped) accuracy to 54-64 %; quantity skew alone costs nothing.
+  > vantage6 DB vacuum between E1 and E2: 714 tasks deleted, 1.2 GB -> 156 KB, central 8.0 GB free.
+  > E2 (15 real runs, ~2.3 h) running; seed sims and INV-1 sims continue in the queue (nice 19, 2 workers). Full table at S4-E2.
+- **#451** `2026-10-13T18:36:03+00:00` **central → all** [info] RUN end s2-e2-iid-fedavgm 2026-10-13T18:36:03Z
+  > status finished rc=0 rounds=50 median_round_s=8.61932565800089 run_dir=/home/zpalanciya/flhub-runtime/runs/stage2/s2-e2-iid-fedavgm-20261013T182725Z
+  > r1: 2026-10-13T18:27:27.547Z .. 2026-10-13T18:27:37.495Z
+  > ...
+  > r50: 2026-10-13T18:35:53.762Z .. 2026-10-13T18:36:03.465Z
+- **#452** `2026-10-13T18:36:07+00:00` **vantage6 → central** [info] file #100: sysmon-vantage6-s2-e2-iid-fedavgm.json
+  > 
+  > fetch with: tools/bus get 100 -o <path>
+- **#453** `2026-10-13T18:36:08+00:00` **central → all** [info] RUN start s2-e2-iid-fedadam 2026-10-13T18:36:08Z
+  > config configs/stage2/e2/s2-e2-iid-fedadam.yaml; sites nvf-h1 nvf-h2 v6-h3 v6-h4 flw-h5 flw-h6; model cnn-small; agg fedadam; rounds 50; netem none
+- **#454** `2026-10-13T18:36:08+00:00` **vantage6 → central** [info] S4 vantage6 s2-e2-iid-fedavgm: RAM/disk on the vantage6 VM
+  > VM mem peak 2454 MB of 32097 MB; process RSS peaks: v6-algorithm 883 MB (2.8 %), v6-h3-node 354 MB (1.1 %), dockerd 260 MB (0.8 %); disk free now 6.3 GB; rounds trained {'v6-h3': 50, 'v6-h4': 50}; HEALTHY
+- **#455** `2026-10-13T18:36:16+00:00` **flower → central** [info] file #101: sysmon-flower-s2-e2-iid-fedavgm.json
+  > 
+  > fetch with: tools/bus get 101 -o <path>
+- **#456** `2026-10-13T18:36:17+00:00` **nvflare → central** [info] file #102: s2-e2-iid-fedavgm-nvflare-sysmon.json
+  > 
+  > fetch with: tools/bus get 102 -o <path>
+- **#457** `2026-10-13T18:45:01+00:00` **nvflare → all** [push] 3d56401 deploy: nvflare follower counts only lines inside the run window
+  > paths: deploy/nvflare-vm/run_follow.py; pull: optional; note: log lines are filtered by their local timestamp against RUN start/end (UTC->local); the next run's first round no longer counts for the previous one.
+- **#458** `2026-10-13T18:45:19+00:00` **central → all** [info] RUN end s2-e2-iid-fedadam 2026-10-13T18:45:19Z
+  > status finished rc=0 rounds=50 median_round_s=8.869165227002668 run_dir=/home/zpalanciya/flhub-runtime/runs/stage2/s2-e2-iid-fedadam-20261013T183610Z
+  > r1: 2026-10-13T18:36:12.037Z .. 2026-10-13T18:36:22.551Z
+  > ...
+  > r50: 2026-10-13T18:45:08.060Z .. 2026-10-13T18:45:18.874Z
+- **#459** `2026-10-13T18:45:20+00:00` **flower → central** [info] file #103: sysmon-flower-s2-e2-iid-fedadam.json
+  > 
+  > fetch with: tools/bus get 103 -o <path>
+- **#460** `2026-10-13T18:45:23+00:00` **central → all** [info] RUN start s2-e2-iid-fedyogi 2026-10-13T18:45:23Z
+  > config configs/stage2/e2/s2-e2-iid-fedyogi.yaml; sites nvf-h1 nvf-h2 v6-h3 v6-h4 flw-h5 flw-h6; model cnn-small; agg fedyogi; rounds 50; netem none
+- **#461** `2026-10-13T18:45:26+00:00` **nvflare → central** [info] file #104: s2-e2-iid-fedadam-nvflare-sysmon.json
+  > 
+  > fetch with: tools/bus get 104 -o <path>
+- **#462** `2026-10-13T18:45:27+00:00` **vantage6 → central** [info] file #105: sysmon-vantage6-s2-e2-iid-fedadam.json
+  > 
+  > fetch with: tools/bus get 105 -o <path>
+- **#463** `2026-10-13T18:45:28+00:00` **vantage6 → central** [info] S4 vantage6 s2-e2-iid-fedadam: RAM/disk on the vantage6 VM
+  > VM mem peak 2494 MB of 32097 MB; process RSS peaks: v6-algorithm 883 MB (2.8 %), v6-h3-node 354 MB (1.1 %), dockerd 261 MB (0.8 %); disk free now 6.3 GB; rounds trained {'v6-h3': 50, 'v6-h4': 50}; HEALTHY
+- **#464** `2026-10-13T18:53:51+00:00` **central → all** [info] S2 S4-E1 complete: 24 runs (7 real + 14 sim + 3 ref), all gates passed
+  > Final test acc % (mean +- sd, seeds 2026 real / 2027 2028 sim), worst-site (site-shaped) %, rounds-to-target (0.95 x centralized 84.7 % = 80.5 %):
+  > iid 83.8+-0.4 / 84.2 / 16;  qty 84.3+-0.9 / 84.7 / 12;  fwcorr 82.9+-0.5 / 78.5 / 20;
+  > dir1.0 76.7+-4.7 / 63.8 / -;  dir0.3 78.0+-0.9 / 57.2 / -;  dir0.1 74.7+-2.0 / 60.5 / -;  mix 75.4+-2.4 / 63.6 / -.
+  > References: centralized 84.7; local-only mean site acc iid 69.2, dir0.1 26.3.
+  > Framework-correlated skew costs ~1 pp, site-level label skew 6-9 pp (and 25-30 pp on the worst site); quantity skew alone costs nothing (the big site even speeds up convergence).
+  > INV-1: all 7 real runs hash-equal to hub.sim in every round (full sim). Central disk 7.9 GB free.
+- **#465** `2026-10-13T18:54:45+00:00` **central → all** [info] RUN end s2-e2-iid-fedyogi 2026-10-13T18:54:45Z
+  > status finished rc=0 rounds=50 median_round_s=9.131933455999388 run_dir=/home/zpalanciya/flhub-runtime/runs/stage2/s2-e2-iid-fedyogi-20261013T184525Z
+  > r1: 2026-10-13T18:45:27.393Z .. 2026-10-13T18:45:38.206Z
+  > ...
+  > r50: 2026-10-13T18:54:33.702Z .. 2026-10-13T18:54:44.719Z
+- **#466** `2026-10-13T18:54:46+00:00` **nvflare → central** [info] file #106: s2-e2-iid-fedyogi-nvflare-sysmon.json
+  > 
+  > fetch with: tools/bus get 106 -o <path>
+- **#467** `2026-10-13T18:54:47+00:00` **vantage6 → central** [info] file #107: sysmon-vantage6-s2-e2-iid-fedyogi.json
+  > 
+  > fetch with: tools/bus get 107 -o <path>
+- **#468** `2026-10-13T18:54:48+00:00` **vantage6 → central** [info] S4 vantage6 s2-e2-iid-fedyogi: RAM/disk on the vantage6 VM
+  > VM mem peak 2471 MB of 32097 MB; process RSS peaks: v6-algorithm 883 MB (2.8 %), v6-h3-node 354 MB (1.1 %), dockerd 260 MB (0.8 %); disk free now 6.3 GB; rounds trained {'v6-h3': 50, 'v6-h4': 50}; HEALTHY
+- **#469** `2026-10-13T18:54:49+00:00` **central → all** [info] RUN start s2-e2-iid-fedadagrad 2026-10-13T18:54:49Z
+  > config configs/stage2/e2/s2-e2-iid-fedadagrad.yaml; sites nvf-h1 nvf-h2 v6-h3 v6-h4 flw-h5 flw-h6; model cnn-small; agg fedadagrad; rounds 50; netem none
+- **#470** `2026-10-13T18:54:54+00:00` **flower → central** [info] file #108: sysmon-flower-s2-e2-iid-fedyogi.json
+  > 
+  > fetch with: tools/bus get 108 -o <path>
+- **#471** `2026-10-13T19:01:04+00:00` **nvflare → all** [push] ec980d4 docs: nvflare report section: E4a results
+  > paths: docs/report/stage2/nvflare.md; pull: optional
+- **#472** `2026-10-13T19:04:36+00:00` **central → all** [info] RUN end s2-e2-iid-fedadagrad 2026-10-13T19:04:36Z
+  > status finished rc=0 rounds=50 median_round_s=9.389446409997618 run_dir=/home/zpalanciya/flhub-runtime/runs/stage2/s2-e2-iid-fedadagrad-20261013T185451Z
+  > r1: 2026-10-13T18:54:53.209Z .. 2026-10-13T18:55:04.605Z
+  > ...
+  > r50: 2026-10-13T19:04:24.262Z .. 2026-10-13T19:04:36.033Z
+- **#473** `2026-10-13T19:04:38+00:00` **vantage6 → central** [info] file #109: sysmon-vantage6-s2-e2-iid-fedadagrad.json
+  > 
+  > fetch with: tools/bus get 109 -o <path>
+- **#474** `2026-10-13T19:04:38+00:00` **vantage6 → central** [info] S4 vantage6 s2-e2-iid-fedadagrad: RAM/disk on the vantage6 VM
+  > VM mem peak 2480 MB of 32097 MB; process RSS peaks: v6-algorithm 884 MB (2.8 %), v6-h3-node 354 MB (1.1 %), dockerd 249 MB (0.8 %); disk free now 6.3 GB; rounds trained {'v6-h3': 50, 'v6-h4': 50}; HEALTHY
+- **#475** `2026-10-13T19:04:41+00:00` **central → all** [info] RUN start s2-e2-iid-fedprox 2026-10-13T19:04:41Z
+  > config configs/stage2/e2/s2-e2-iid-fedprox.yaml; sites nvf-h1 nvf-h2 v6-h3 v6-h4 flw-h5 flw-h6; model cnn-small; agg fedprox; rounds 50; netem none
+- **#476** `2026-10-13T19:04:44+00:00` **flower → central** [info] file #110: sysmon-flower-s2-e2-iid-fedadagrad.json
+  > 
+  > fetch with: tools/bus get 110 -o <path>
+- **#477** `2026-10-13T19:04:50+00:00` **nvflare → central** [info] file #111: s2-e2-iid-fedadagrad-nvflare-sysmon.json
+  > 
+  > fetch with: tools/bus get 111 -o <path>
+- **#478** `2026-10-13T19:08:54+00:00` **central → all** [info] S4 heads-up: E5 and E4b handshakes (later tonight / tomorrow morning)
+  > E5 (after E3): I first run s2-e5-6sites (base sites only). Then I send 'E5 EXTRAS UP' - please start your two extra sites (nvf-h7/h8, v6-h9/h10, flw-h11/h12) and reply 'E5 EXTRAS ONLINE' once they show online; I run s2-e5-12sites (iid12, 20 rounds); then 'E5 EXTRAS DOWN' - stop them, reply 'E5 EXTRAS STOPPED' (nvflare: the relay-job restart is expected).
+  > E4b (last, payload-45 mixed, 3 rounds; scripts/stage2/e4b_run.py): per profile wan1g, wan100, wan20 central applies its netem to all three VMs first, then sends you 'NETEM APPLY <profile> <minutes>': apply your netem.sh profile (egress to central, framework ports only, revert timer first) and reply with a subject containing 'NETEM APPLIED <profile>'; after the run 'NETEM CLEAR <profile>': clear, verify tc default, reply 'NETEM CLEARED'. Profile names/rates as EXPERIMENTS.md: wan1g 1 Gbit/s 5 ms, wan100 100 Mbit/s 20 ms, wan20 20 Mbit/s 40 ms.
+  > Current: E2 run 5/15 (iid done), ~20:45Z end; then E6 (ARM handshakes, #431).
+- **#479** `2026-10-13T19:14:00+00:00` **central → all** [info] RUN end s2-e2-iid-fedprox 2026-10-13T19:14:00Z
+  > status finished rc=0 rounds=50 median_round_s=9.87922314500247 run_dir=/home/zpalanciya/flhub-runtime/runs/stage2/s2-e2-iid-fedprox-20261013T190442Z
+  > r1: 2026-10-13T19:04:43.911Z .. 2026-10-13T19:04:54.742Z
+  > ...
+  > r50: 2026-10-13T19:13:48.476Z .. 2026-10-13T19:13:59.859Z
+- **#480** `2026-10-13T19:14:03+00:00` **flower → central** [info] file #112: sysmon-flower-s2-e2-iid-fedprox.json
+  > 
+  > fetch with: tools/bus get 112 -o <path>
+- **#481** `2026-10-13T19:14:04+00:00` **central → all** [info] RUN start s2-e2-dir0.3-fedavgm 2026-10-13T19:14:04Z
+  > config configs/stage2/e2/s2-e2-dir0.3-fedavgm.yaml; sites nvf-h1 nvf-h2 v6-h3 v6-h4 flw-h5 flw-h6; model cnn-small; agg fedavgm; rounds 50; netem none
+- **#482** `2026-10-13T19:14:09+00:00` **nvflare → central** [info] file #113: s2-e2-iid-fedprox-nvflare-sysmon.json
+  > 
+  > fetch with: tools/bus get 113 -o <path>
+- **#483** `2026-10-13T19:14:13+00:00` **vantage6 → central** [info] file #114: sysmon-vantage6-s2-e2-iid-fedprox.json
+  > 
+  > fetch with: tools/bus get 114 -o <path>
+- **#484** `2026-10-13T19:14:14+00:00` **vantage6 → central** [info] S4 vantage6 s2-e2-iid-fedprox: RAM/disk on the vantage6 VM
+  > VM mem peak 2482 MB of 32097 MB; process RSS peaks: v6-algorithm 884 MB (2.8 %), v6-h3-node 354 MB (1.1 %), dockerd 257 MB (0.8 %); disk free now 6.3 GB; rounds trained {'v6-h3': 50, 'v6-h4': 50}; HEALTHY
+- **#485** `2026-10-13T19:24:07+00:00` **central → all** [info] RUN end s2-e2-dir0.3-fedavgm 2026-10-13T19:24:07Z
+  > status finished rc=0 rounds=50 median_round_s=10.153854333999334 run_dir=/home/zpalanciya/flhub-runtime/runs/stage2/s2-e2-dir0.3-fedavgm-20261013T191406Z
+  > r1: 2026-10-13T19:14:08.366Z .. 2026-10-13T19:14:20.652Z
+  > ...
+  > r50: 2026-10-13T19:23:54.406Z .. 2026-10-13T19:24:06.660Z
+- **#486** `2026-10-13T19:24:07+00:00` **flower → central** [info] file #115: sysmon-flower-s2-e2-dir0.3-fedavgm.json
+  > 
+  > fetch with: tools/bus get 115 -o <path>
+- **#487** `2026-10-13T19:24:11+00:00` **central → all** [info] RUN start s2-e2-dir0.3-fedadam 2026-10-13T19:24:11Z
+  > config configs/stage2/e2/s2-e2-dir0.3-fedadam.yaml; sites nvf-h1 nvf-h2 v6-h3 v6-h4 flw-h5 flw-h6; model cnn-small; agg fedadam; rounds 50; netem none
+- **#488** `2026-10-13T19:24:14+00:00` **nvflare → central** [info] file #116: s2-e2-dir0.3-fedavgm-nvflare-sysmon.json
+  > 
+  > fetch with: tools/bus get 116 -o <path>
+- **#489** `2026-10-13T19:24:18+00:00` **vantage6 → central** [info] file #117: sysmon-vantage6-s2-e2-dir0.3-fedavgm.json
+  > 
+  > fetch with: tools/bus get 117 -o <path>
+- **#490** `2026-10-13T19:24:19+00:00` **vantage6 → central** [info] S4 vantage6 s2-e2-dir0.3-fedavgm: RAM/disk on the vantage6 VM
+  > VM mem peak 2512 MB of 32097 MB; process RSS peaks: v6-algorithm 884 MB (2.8 %), v6-h3-node 354 MB (1.1 %), dockerd 279 MB (0.9 %); disk free now 6.3 GB; rounds trained {'v6-h3': 50, 'v6-h4': 50}; HEALTHY
+- **#491** `2026-10-13T19:34:24+00:00` **central → all** [info] RUN end s2-e2-dir0.3-fedadam 2026-10-13T19:34:24Z
+  > status finished rc=0 rounds=50 median_round_s=10.633233257001848 run_dir=/home/zpalanciya/flhub-runtime/runs/stage2/s2-e2-dir0.3-fedadam-20261013T192413Z
+  > r1: 2026-10-13T19:24:15.097Z .. 2026-10-13T19:24:27.577Z
+  > ...
+  > r50: 2026-10-13T19:34:11.523Z .. 2026-10-13T19:34:23.734Z
+- **#492** `2026-10-13T19:34:27+00:00` **flower → central** [info] file #118: sysmon-flower-s2-e2-dir0.3-fedadam.json
+  > 
+  > fetch with: tools/bus get 118 -o <path>
+- **#493** `2026-10-13T19:34:28+00:00` **central → all** [info] RUN start s2-e2-dir0.3-fedyogi 2026-10-13T19:34:28Z
+  > config configs/stage2/e2/s2-e2-dir0.3-fedyogi.yaml; sites nvf-h1 nvf-h2 v6-h3 v6-h4 flw-h5 flw-h6; model cnn-small; agg fedyogi; rounds 50; netem none
+- **#494** `2026-10-13T19:34:34+00:00` **nvflare → central** [info] file #119: s2-e2-dir0.3-fedadam-nvflare-sysmon.json
+  > 
+  > fetch with: tools/bus get 119 -o <path>
+- **#495** `2026-10-13T19:34:39+00:00` **vantage6 → central** [info] file #120: sysmon-vantage6-s2-e2-dir0.3-fedadam.json
+  > 
+  > fetch with: tools/bus get 120 -o <path>
+- **#496** `2026-10-13T19:34:40+00:00` **vantage6 → central** [info] S4 vantage6 s2-e2-dir0.3-fedadam: RAM/disk on the vantage6 VM
+  > VM mem peak 2417 MB of 32097 MB; process RSS peaks: v6-algorithm 884 MB (2.8 %), v6-h3-node 354 MB (1.1 %), dockerd 262 MB (0.8 %); disk free now 6.3 GB; rounds trained {'v6-h3': 50, 'v6-h4': 50}; HEALTHY
+- **#497** `2026-10-13T19:45:09+00:00` **central → all** [info] RUN end s2-e2-dir0.3-fedyogi 2026-10-13T19:45:09Z
+  > status finished rc=0 rounds=50 median_round_s=10.891415359998064 run_dir=/home/zpalanciya/flhub-runtime/runs/stage2/s2-e2-dir0.3-fedyogi-20261013T193430Z
+  > r1: 2026-10-13T19:34:32.220Z .. 2026-10-13T19:34:45.080Z
+  > ...
+  > r50: 2026-10-13T19:44:56.056Z .. 2026-10-13T19:45:09.153Z
+- **#498** `2026-10-13T19:45:14+00:00` **central → all** [info] RUN start s2-e2-dir0.3-fedadagrad 2026-10-13T19:45:14Z
+  > config configs/stage2/e2/s2-e2-dir0.3-fedadagrad.yaml; sites nvf-h1 nvf-h2 v6-h3 v6-h4 flw-h5 flw-h6; model cnn-small; agg fedadagrad; rounds 50; netem none
+- **#499** `2026-10-13T19:45:15+00:00` **vantage6 → central** [info] file #121: sysmon-vantage6-s2-e2-dir0.3-fedyogi.json
+  > 
+  > fetch with: tools/bus get 121 -o <path>
+- **#500** `2026-10-13T19:45:15+00:00` **vantage6 → central** [info] S4 vantage6 s2-e2-dir0.3-fedyogi: RAM/disk on the vantage6 VM
+  > VM mem peak 2464 MB of 32097 MB; process RSS peaks: v6-algorithm 883 MB (2.8 %), v6-h3-node 354 MB (1.1 %), dockerd 265 MB (0.8 %); disk free now 6.3 GB; rounds trained {'v6-h3': 50, 'v6-h4': 50}; HEALTHY
+- **#501** `2026-10-13T19:45:17+00:00` **flower → central** [info] file #122: sysmon-flower-s2-e2-dir0.3-fedyogi.json
+  > 
+  > fetch with: tools/bus get 122 -o <path>
+- **#502** `2026-10-13T19:45:24+00:00` **nvflare → central** [info] file #123: s2-e2-dir0.3-fedyogi-nvflare-sysmon.json
+  > 
+  > fetch with: tools/bus get 123 -o <path>
+- **#503** `2026-10-13T19:56:07+00:00` **central → all** [info] RUN end s2-e2-dir0.3-fedadagrad 2026-10-13T19:56:07Z
+  > status finished rc=0 rounds=50 median_round_s=11.132729469005426 run_dir=/home/zpalanciya/flhub-runtime/runs/stage2/s2-e2-dir0.3-fedadagrad-20261013T194515Z
+  > r1: 2026-10-13T19:45:17.530Z .. 2026-10-13T19:45:29.699Z
+  > ...
+  > r50: 2026-10-13T19:55:54.870Z .. 2026-10-13T19:56:07.305Z
+- **#504** `2026-10-13T19:56:12+00:00` **central → all** [info] RUN start s2-e2-dir0.3-fedprox 2026-10-13T19:56:12Z
+  > config configs/stage2/e2/s2-e2-dir0.3-fedprox.yaml; sites nvf-h1 nvf-h2 v6-h3 v6-h4 flw-h5 flw-h6; model cnn-small; agg fedprox; rounds 50; netem none
+- **#505** `2026-10-13T19:56:14+00:00` **nvflare → central** [info] file #124: s2-e2-dir0.3-fedadagrad-nvflare-sysmon.json
+  > 
+  > fetch with: tools/bus get 124 -o <path>
+- **#506** `2026-10-13T19:56:21+00:00` **vantage6 → central** [info] file #125: sysmon-vantage6-s2-e2-dir0.3-fedadagrad.json
+  > 
+  > fetch with: tools/bus get 125 -o <path>
+- **#507** `2026-10-13T19:56:22+00:00` **vantage6 → central** [info] S4 vantage6 s2-e2-dir0.3-fedadagrad: RAM/disk on the vantage6 VM
+  > VM mem peak 2485 MB of 32097 MB; process RSS peaks: v6-algorithm 884 MB (2.8 %), v6-h3-node 354 MB (1.1 %), dockerd 260 MB (0.8 %); disk free now 6.2 GB; rounds trained {'v6-h3': 50, 'v6-h4': 50}; HEALTHY
+- **#508** `2026-10-13T19:56:22+00:00` **flower → central** [info] file #126: sysmon-flower-s2-e2-dir0.3-fedadagrad.json
+  > 
+  > fetch with: tools/bus get 126 -o <path>
+- **#509** `2026-10-13T20:07:23+00:00` **central → all** [info] RUN end s2-e2-dir0.3-fedprox 2026-10-13T20:07:23Z
+  > status finished rc=0 rounds=50 median_round_s=11.645823507999012 run_dir=/home/zpalanciya/flhub-runtime/runs/stage2/s2-e2-dir0.3-fedprox-20261013T195613Z
+  > r1: 2026-10-13T19:56:15.837Z .. 2026-10-13T19:56:29.719Z
+  > ...
+  > r50: 2026-10-13T20:07:09.137Z .. 2026-10-13T20:07:23.007Z
+- **#510** `2026-10-13T20:07:27+00:00` **vantage6 → central** [info] file #127: sysmon-vantage6-s2-e2-dir0.3-fedprox.json
+  > 
+  > fetch with: tools/bus get 127 -o <path>
+- **#511** `2026-10-13T20:07:27+00:00` **flower → central** [info] file #128: sysmon-flower-s2-e2-dir0.3-fedprox.json
+  > 
+  > fetch with: tools/bus get 128 -o <path>
+- **#512** `2026-10-13T20:07:28+00:00` **vantage6 → central** [info] S4 vantage6 s2-e2-dir0.3-fedprox: RAM/disk on the vantage6 VM
+  > VM mem peak 2451 MB of 32097 MB; process RSS peaks: v6-algorithm 884 MB (2.8 %), v6-h3-node 354 MB (1.1 %), dockerd 268 MB (0.8 %); disk free now 6.2 GB; rounds trained {'v6-h3': 50, 'v6-h4': 50}; HEALTHY
+- **#513** `2026-10-13T20:07:28+00:00` **central → all** [info] RUN start s2-e2-dir0.1-fedavgm 2026-10-13T20:07:28Z
+  > config configs/stage2/e2/s2-e2-dir0.1-fedavgm.yaml; sites nvf-h1 nvf-h2 v6-h3 v6-h4 flw-h5 flw-h6; model cnn-small; agg fedavgm; rounds 50; netem none
+- **#514** `2026-10-13T20:07:34+00:00` **nvflare → central** [info] file #129: s2-e2-dir0.3-fedprox-nvflare-sysmon.json
+  > 
+  > fetch with: tools/bus get 129 -o <path>
+- **#515** `2026-10-13T20:18:42+00:00` **central → all** [info] RUN end s2-e2-dir0.1-fedavgm 2026-10-13T20:18:42Z
+  > status finished rc=0 rounds=50 median_round_s=11.152868944998772 run_dir=/home/zpalanciya/flhub-runtime/runs/stage2/s2-e2-dir0.1-fedavgm-20261013T200729Z
+  > r1: 2026-10-13T20:07:31.536Z .. 2026-10-13T20:07:44.386Z
+  > ...
+  > r50: 2026-10-13T20:18:28.691Z .. 2026-10-13T20:18:41.980Z
+- **#516** `2026-10-13T20:18:47+00:00` **central → all** [info] RUN start s2-e2-dir0.1-fedadam 2026-10-13T20:18:46Z
+  > config configs/stage2/e2/s2-e2-dir0.1-fedadam.yaml; sites nvf-h1 nvf-h2 v6-h3 v6-h4 flw-h5 flw-h6; model cnn-small; agg fedadam; rounds 50; netem none
+- **#517** `2026-10-13T20:18:47+00:00` **flower → central** [info] file #130: sysmon-flower-s2-e2-dir0.1-fedavgm.json
+  > 
+  > fetch with: tools/bus get 130 -o <path>
+- **#518** `2026-10-13T20:18:48+00:00` **vantage6 → central** [info] file #131: sysmon-vantage6-s2-e2-dir0.1-fedavgm.json
+  > 
+  > fetch with: tools/bus get 131 -o <path>
+- **#519** `2026-10-13T20:18:49+00:00` **vantage6 → central** [info] S4 vantage6 s2-e2-dir0.1-fedavgm: RAM/disk on the vantage6 VM
+  > VM mem peak 2442 MB of 32097 MB; process RSS peaks: v6-algorithm 883 MB (2.8 %), v6-h3-node 354 MB (1.1 %), dockerd 268 MB (0.8 %); disk free now 6.2 GB; rounds trained {'v6-h3': 50, 'v6-h4': 50}; HEALTHY
+- **#520** `2026-10-13T20:18:54+00:00` **nvflare → central** [info] file #132: s2-e2-dir0.1-fedavgm-nvflare-sysmon.json
+  > 
+  > fetch with: tools/bus get 132 -o <path>
+- **#521** `2026-10-13T20:30:10+00:00` **central → all** [info] RUN end s2-e2-dir0.1-fedadam 2026-10-13T20:30:10Z
+  > status finished rc=0 rounds=50 median_round_s=11.40869472000486 run_dir=/home/zpalanciya/flhub-runtime/runs/stage2/s2-e2-dir0.1-fedadam-20261013T201848Z
+  > r1: 2026-10-13T20:18:50.402Z .. 2026-10-13T20:19:03.530Z
+  > ...
+  > r50: 2026-10-13T20:29:56.709Z .. 2026-10-13T20:30:10.054Z
+- **#522** `2026-10-13T20:30:14+00:00` **nvflare → central** [info] file #133: s2-e2-dir0.1-fedadam-nvflare-sysmon.json
+  > 
+  > fetch with: tools/bus get 133 -o <path>
+- **#523** `2026-10-13T20:30:15+00:00` **central → all** [info] RUN start s2-e2-dir0.1-fedyogi 2026-10-13T20:30:15Z
+  > config configs/stage2/e2/s2-e2-dir0.1-fedyogi.yaml; sites nvf-h1 nvf-h2 v6-h3 v6-h4 flw-h5 flw-h6; model cnn-small; agg fedyogi; rounds 50; netem none
+- **#524** `2026-10-13T20:30:22+00:00` **flower → central** [info] file #134: sysmon-flower-s2-e2-dir0.1-fedadam.json
+  > 
+  > fetch with: tools/bus get 134 -o <path>
+- **#525** `2026-10-13T20:30:24+00:00` **vantage6 → central** [info] file #135: sysmon-vantage6-s2-e2-dir0.1-fedadam.json
