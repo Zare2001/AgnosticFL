@@ -30,7 +30,7 @@ def main(argv: list[str] | None = None) -> int:
                          cwd=REPO, capture_output=True, text=True).stdout
     names = sorted((p.name[: -len("-latest")] for p in RUNS.glob("*-latest")), key=len, reverse=True)
     got = 0
-    for line in log.splitlines():
+    for line in reversed(log.splitlines()):  # newest first: a re-run's summary wins over the failed attempt's
         m = FILE_MSG.match(line)
         if not m or not m.group(4).endswith(".json"):
             continue
