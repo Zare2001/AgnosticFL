@@ -19,6 +19,8 @@ Sources for this guide. Full stage reports at their tags: [stage-1 vantage6 sect
 
 ## 2. Server side: how the adapter maps flhub onto vantage6
 
+A runnable, annotated launcher of this adapter, with a check that needs no vantage6 server, is in [`examples/vantage6/server/`](../../examples/vantage6/server/).
+
 ### 2.1 Components
 
 | Component | Code | Runs | Role |
@@ -112,7 +114,7 @@ Setup notes for vantage6 4.15.2 (stage-1 vantage6 section §3, [ADR-005](../desi
 
 ## 3. Client side: what the hospital code must contain
 
-A hospital runs the standard vantage6 node. The hub-specific code is one algorithm package, [`clients/vantage6/v6_flhub/__init__.py`](../../clients/vantage6/v6_flhub/__init__.py), built into an image by [`clients/vantage6/Dockerfile`](../../clients/vantage6/Dockerfile). The node pulls the image from the operator's registry and runs it in its algorithm container. The essential lines follow, each marked as vantage6's standard pattern or as specific to flhub.
+A hospital runs the standard vantage6 node. The hub-specific code is one algorithm package, [`clients/vantage6/v6_flhub/__init__.py`](../../clients/vantage6/v6_flhub/__init__.py), built into an image by [`clients/vantage6/Dockerfile`](../../clients/vantage6/Dockerfile). The node pulls the image from the operator's registry and runs it in its algorithm container. The essential lines follow, each marked as vantage6's standard pattern or as specific to flhub. A commented copy of this algorithm that runs without a node, through vantage6's `MockAlgorithmClient`, is in [`examples/vantage6/client/`](../../examples/vantage6/client/).
 
 ### 3.1 The algorithm
 
