@@ -666,3 +666,66 @@ Stage-3 part of the agent bus (`tools/bus export`), from STAGE3-START #996 to #1
   > 7 docs-ready: nvflare b1213b4 (#1119), flower b1213b4 (#1117), vantage6 6cbab50 (#1127). b1213b4..6cbab50 = a41b4a5 + 6cbab50, vantage6 statements only (vantage6 guide; vantage6 cells/sentences in cost page, stage2.md, limitations; bytes-on-wire figure). nvflare/flower: if you see anything of yours in that diff, say so now.
   > 8 88 commits stage2-final..6cbab50, all Zare2001|Zare2001, 0 attribution lines, no subject over 72 chars.
   > Next (owner #1091): I open the PR restructure/library -> main and send the URL to the owner; the owner merges; then tags v0.1.0/v0.2.0 and releases; then your 'confirm main <sha>' from a fresh clone of main.
+- **#1129** `2026-10-14T16:27:04+00:00` **nvflare → central** [reply] re #1128: b1213b4..6cbab50 ok for NVFlare; docs-ready stands at 6cbab50
+  > Checked b1213b4..6cbab50 (a41b4a5, 6cbab50): the NVFlare lines in the diff are unchanged in substance (V = 4 for NVFlare in the cost-model sentence; 'NVFlare and Flower ... 94 % and 89 %' in stage2.md; NVFlare column of the E4b table); cost_bytes_on_wire.png: NVFlare series unchanged (1.064 at 1 MiB, 8 MiB open marker, ~1.0 from 32 MiB on). Nothing of mine changed: docs-ready 6cbab50 (nvflare). Ready for R4: after the owner's merge I clone main fresh, run check_links + unit tests + NVFlare adapter tests, check the guide's rendering and send 'confirm main <sha>'.
+- **#1130** `2026-10-14T16:27:14+00:00` **flower → central** [reply] re #1128: b1213b4..6cbab50 holds nothing of Flower; docs-ready stands for 6cbab50
+  > Checked git diff b1213b4 6cbab50 (6 files): no Flower file touched; the 4 changed lines that mention Flower keep every Flower statement (V = 4 for NVFlare and Flower; 'NVFlare and Flower move each update once ... 89 %'; 'On slow links NVFlare and Flower come close to the wire limit ...'); the regenerated cost_bytes_on_wire.png keeps the Flower series (about 1.0 at 8-512 MiB, open 1 MiB marker 0.938). docs-ready (flower) therefore holds for 6cbab50. R4 check script ready: fresh clone of main, links, unit + Flower tests with the clone on PYTHONPATH, selfcheck, structure and content of my files, diff against restructure/library; 'confirm main <sha>' follows right after your 'S3 merged'.
+- **#1131** `2026-10-14T16:27:28+00:00` **flower → all** [push] bc71614 docs: flower stage-3 worklog: R3 quick start re-run, R3-verified
+  > branch: archive/agentic-build; paths: docs/agents/worklogs/stage3-flower.md; pull: optional; note: worklog only
+- **#1132** `2026-10-14T16:27:59+00:00` **central → human** [request] S3 R4: PR #3 restructure/library -> main ready for your review and merge
+  > https://github.com/Zare2001/AgnosticFL/pull/3 (head 6cbab50 = S3 R3-verified, #1128; base main 0f7965a; 55 commits since the merge base 1d008bf, 66 files; GitHub: MERGEABLE).
+  > Description: what moved where, what was archived, what was added (incl. the 12 script path strings), the PLAN 7 results, both no-code-change diff stats, the note on main's history, and one correction found in R3 (vantage6 node receives the input 5x, not 4x; documented under Known inconsistencies).
+  > CI: the new workflow is running on the PR now (job 'tests'); I report its result here.
+  > Please merge with a merge commit (as agreed in #1091). After your merge I create annotated tags v0.1.0 (250157a, stage1-final) and v0.2.0 (the merge commit) and the two GitHub releases from CHANGELOG.md; if that is blocked I send you the exact commands.
+- **#1133** `2026-10-14T16:27:59+00:00` **central → all** [info] S3 R4: PR #3 open for the owner (head 6cbab50); confirm main after the merge
+  > https://github.com/Zare2001/AgnosticFL/pull/3. The owner reviews and merges. After the merge I announce 'S3 merged <sha>' with the tags; then please: fresh clone of main under /tmp, check_links, unit tests (and your framework's tests), selfcheck, and reply 'confirm main <sha>'. No pushes to restructure/library from now on unless the owner asks for a change in the PR.
+- **#1134** `2026-10-14T16:28:20+00:00` **vantage6 → central** [reply] re #1133 PR #3 body: vantage6 sentence ok; one optional precision
+  > Checked the vantage6 statements in the PR #3 description: correct. Optional precision in the 'Findings' sentence: cost_model.md does not print 0.72; it prints V·P/rate = 336.0 s with V = 17.8. Suggest: '(0.72 with the V = 17.8 of the generated cost_model.md, which counts the downstream direction only)'. Waiting for 'S3 merged <sha>' to run the fresh-clone check of main.
+- **#1135** `2026-10-14T16:30:44+00:00` **central → human** [info] PR #3 CI passed (tests job, 2m29s): digest ac074a0b..., 80 passed/15 skipped, conformance 12/1
+  > GitHub Actions run 38598270326 on PR #3 (head 6cbab50): selfcheck on ubuntu-24.04 (AMD EPYC 7763, AVX2, torch 2.14.1+cpu) printed digest sha256:ac074a0b79a2d3c6782765480164c0465ac598359dfe91695e893e208f4e5034 = the testbed's; unit tests 80 passed, 15 skipped; mock conformance 12 passed, 1 skipped. PR is MERGEABLE; waiting for your merge (merge commit).
+- **#1136** `2026-10-14T16:31:30+00:00` **central → all** [push] d5d2e03 docs: central stage-3 worklog: R3 verified, PR #3 open
+  > branch: archive/agentic-build; paths: docs/agents/worklogs/stage3-central.md; pull: optional; note: worklog only
+- **#1137** `2026-10-14T16:31:52+00:00` **central → vantage6** [reply] re #1134: applied to the PR #3 description
+  > Now: '(0.72 with the V = 17.8 of the generated cost_model.md, which counts the downstream direction only)'. Edited with gh pr edit; no commit.
+- **#1138** `2026-10-14T18:09:32+00:00` **human → central** [info] PR #3 merged (merge commit); go ahead with R4 tags/releases
+  > Owner merged PR #3 into main with a merge commit. Create v0.1.0/v0.2.0 and the releases, then S3 merged.
+- **#1139** `2026-10-14T18:11:07+00:00` **human → central** [info] PR #3 now actually merged (merge commit)
+  > My previous message came before the merge; PR #3 is merged now. Go ahead with R4: tags v0.1.0/v0.2.0, releases, S3 merged.
+- **#1140** `2026-10-14T18:14:38+00:00` **central → all** [milestone] S3 merged 642d0b4 (main); tags v0.1.0, v0.2.0 and releases created
+  > Owner merged PR #3 at 18:10:34Z: main = 642d0b4 (parents 0f7965a, 6cbab50; tree 5a8816a = the R3-verified 6cbab50 tree).
+  > Tags (annotated, tagger Zare2001): v0.1.0 -> 250157a (= stage1-final commit), v0.2.0 -> 642d0b4. stage1-final/stage2-final unchanged. Releases: https://github.com/Zare2001/AgnosticFL/releases/tag/v0.1.0 and .../v0.2.0 (Latest), notes from CHANGELOG.md.
+  > CI on main (run 38612921902): success; this runner was an Intel Xeon 6973P-C with cpu_capability AVX512 and printed digest sha256:cd7f6185... (the PR run on AMD EPYC 7763 AVX2 printed ac074a0b...), as the docs say (same digest needs the same CPU code paths).
+  > Central fresh clone of main: pytest 80/15, mock conformance 12/1, NVFlare 12, Flower 11, selfcheck ac074a0b..., check_links 735/0 and 23/23 figures, greps as R3, no-code-change diff vs stage2-final 19 files.
+  > Please now (PLAN 8.3): fresh clone of main under /tmp, check_links, unit tests and your framework's tests, selfcheck; reply 'confirm main 642d0b4'. flower: please also run docs/getting-started.md verbatim on the fresh clone of main (DoD 3 on main). Then R5: your final worklog on archive/agentic-build, your testbed status script (read-only), DONE after my S3 all-done.
+- **#1141** `2026-10-14T18:14:38+00:00` **central → human** [info] R4 done: tags v0.1.0 (250157a) and v0.2.0 (642d0b4) pushed, both releases created
+  > Releases: https://github.com/Zare2001/AgnosticFL/releases/tag/v0.1.0 , https://github.com/Zare2001/AgnosticFL/releases/tag/v0.2.0 (Latest). First CI run on main: success (runner Intel Xeon AVX512: selfcheck digest cd7f6185..., differs from the AVX2 reference ac074a0b... as documented; the step only prints it). Framework agents are confirming main from fresh clones; then R5 (transcript, worklogs, status checks, S3 all-done).
+- **#1142** `2026-10-14T18:17:28+00:00` **vantage6 → central** [reply] confirm main 642d0b4 (vantage6)
+  > Fresh clone of main under /tmp/v6s3/r4 (git clone --branch main), HEAD 642d0b4 (parents 0f7965a, 6cbab50):
+  > - scripts/docs/check_links.py: 735 relative links in 53 Markdown files, 0 problems; 23 figures, 0 unreferenced.
+  > - unit tests with PYTHONPATH = the clone (fresh /tmp venv: torch 2.14.1+cpu, numpy 2.4.4, safetensors 0.8.0, pyyaml, pandas, pytest): 80 passed, 15 skipped, exit 0; tests/unit/test_vantage6_adapter.py 10 passed; modules imported from the clone (adapters/vantage6/service.py, flhub_core).
+  > - python -m flhub_core.selfcheck: digest sha256:ac074a0b79a2d3c6782765480164c0465ac598359dfe91695e893e208f4e5034 (AMD EPYC-Rome AVX2).
+  > - docs/frameworks/vantage6.md renders as intended (GitHub markdown API, gfm): 1 h1, 8 h2 (the template's sections), 19 h3, 7 code blocks, 20 tables, 6 images (all resolve), 3 blockquoted issue drafts, no raw table lines; adapters/ and clients/vantage6/README.md: links ok.
+  > - No agent material on main (CLAUDE.md, .claude, .githooks, docs/agents, docs/report, REPORT*.md absent); tree of main = restructure/library (git diff empty).
+  > - Tags: v0.1.0 -> 250157a (= stage1-final^{}), v0.2.0 -> 642d0b4; stage1-final 250157a and stage2-final b40390b unchanged; releases AgnosticFL 0.1.0 and 0.2.0 (Latest) exist.
+  > Next: R5 (final worklog on archive/agentic-build, testbed status read-only), DONE after S3 all-done.
+- **#1143** `2026-10-14T18:18:57+00:00` **vantage6 → all** [push] 43a8686 docs: vantage6 stage-3 worklog: R3-R5, confirm main 642d0b4
+  > branch: archive/agentic-build; paths: docs/agents/worklogs/stage3-vantage6.md; pull: optional; note: worklog only (final entry before S3 all-done)
+- **#1144** `2026-10-14T18:19:43+00:00` **flower → central** [reply] confirm main 642d0b4 (flower): links, tests, selfcheck, guide, quick start verbatim on main PASS
+  > PLAN 8.3 from the flower VM, fresh clones of main (default branch) under /tmp, code imported from the clone (PYTHONPATH):
+  > - head 642d0b4 (Merge pull request #3); tree identical to restructure/library 6cbab50 for my files; no agent material on main (no CLAUDE.md, .claude/, docs/agents/, .githooks/, tools/run_agent.sh, docs/report/).
+  > - tags: v0.1.0 -> 250157a (= stage1-final), v0.2.0 -> 642d0b4 (both annotated); stage1-final 250157a and stage2-final b40390b unchanged.
+  > - scripts/docs/check_links.py: 735 relative links in 53 Markdown files, 0 problems; 23 figures, 0 unreferenced.
+  > - unit tests (venv with flwr 1.39.0, torch 2.14.1+cpu, no pandas/nvflare): 90 passed, 15 skipped; tests/flower: 11 passed.
+  > - selfcheck: digest sha256:ac074a0b79a2d3c6782765480164c0465ac598359dfe91695e893e208f4e5034; code_version 0.2.0+fe357a1dbec1.
+  > - Flower guide renders as intended: sections 1-8 present, 16 code fences (all closed), 1 Mermaid sequence diagram, 6 images resolved, tables and heading levels consistent, in-page anchors resolve (structural check, 0 problems in my 5 files); grep-clean.
+  > - DoD 3 quick start on main, docs/getting-started.md verbatim with NO deviation (the doc's plain git clone gives main 642d0b4), one bash session, env -i, 18:16:55-18:19:24Z (2 min 29 s): digest ac074a0b...; {"ok": true, "name": "hub-core", "spec": false} / {"ok": true, "name": "mock-adapter"}; "status": "finished", final/test_acc 0.625; 'INV-1 full sim vs /tmp/agnosticfl/runs/mock-3r-latest: hashes_equal=True max_abs_diff=0.000e+00 -> PASS'; pytest 79 passed, 16 skipped; conformance mock 12 passed, 1 skipped; kill/rm without error. Every output equals the doc. Clones, data and processes removed; 8800/8819 free.
+  > confirm main 642d0b4 (flower).
+- **#1145** `2026-10-14T18:19:56+00:00` **nvflare → central** [reply] confirm main 642d0b4 (nvflare)
+  > PLAN 8.3, NVFlare VM, fresh clone of main (git clone -b main) = 642d0b4 'Merge pull request #3', fresh /tmp venv (torch 2.14.1+cpu, numpy 2.4.4, nvflare 2.9.0, pytest; testbed untouched):
+  > - scripts/docs/check_links.py: 735 relative links in 53 Markdown files, 0 problems; 23 figures, 0 unreferenced.
+  > - selfcheck: digest sha256:ac074a0b79a2d3c6782765480164c0465ac598359dfe91695e893e208f4e5034 (AMD EPYC-Rome AVX2); flhub_core 0.2.0+fe357a1dbec1.
+  > - unit tests (PYTHONPATH = the clone): 91 passed, 15 skipped (13 conformance without --adapter, flwr, pandas), exit 0; tests/unit/test_nvflare_adapter.py 12 passed; modules imported from the clone.
+  > - Rendering: docs/frameworks/nvflare.md on main is byte-identical to the reviewed guide; GitHub's rendered HTML (contents API, ref 642d0b4) has 23 headings = Markdown, 9 code blocks = 9 fences, 16 tables = 16 in the Markdown, 7 checklist boxes, 91 links incl. 7 figure links, no leftover table syntax or backticks; adapters/nvflare/README.md and clients/nvflare/README.md structurally ok.
+  > confirm main 642d0b4 (nvflare).
+- **#1146** `2026-10-14T18:20:05+00:00` **flower → all** [push] a64bc7b docs: flower stage-3 worklog: confirm main, final state
+  > branch: archive/agentic-build; paths: docs/agents/worklogs/stage3-flower.md; pull: optional; note: final flower worklog entry (R4 confirm main 642d0b4, testbed unchanged vs R0)
