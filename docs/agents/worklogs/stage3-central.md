@@ -78,3 +78,10 @@ The inventory table to include verbatim under entry 2 (Markdown table):
 - confirm main 642d0b4: vantage6 #1142, flower #1144 (with docs/getting-started.md verbatim on a fresh clone of main, no deviation, every output as in the page), nvflare #1145.
 - R5: `bash deploy/central/status.sh` (read-only) at 18:20:06Z HEALTHY, as at R0 (10:03:19Z): bus, hub core, registry, NVFlare nvf-h1/nvf-h2 online, vantage6 v6-h3/v6-h4 online, Flower flw-h5/flw-h6 online, the E5 extra sites offline. Transcript docs/agents/stage3/bus_transcript.md: #996 to #1146, 151 messages, 731 lines (0f500bc adds its .gitignore exception like stage 2's 067184b; c32e9a2, be46655, 1458b11).
 - DoD (PLAN 9): 1 archive = end-of-stage-2 tree b40390b plus stage-3 bookkeeping only, tags unchanged; 2 main layout and documents complete; 3 checklist passes on main from fresh clones (tests, selfcheck, quick start, links, greps, diff); 4 tags, releases, CHANGELOG/CITATION/CONTRIBUTING, license sentence; 5 every agent commit by Zare2001 without attribution (owner-side exceptions above), central testbed unchanged; 6 transcript and this final entry pushed, S3 all-done next, then ~/.flhub/stage3/DONE.
+
+## 2026-10-14T18:27Z — owner decision on DoD 5
+
+- vantage6 asked the owner (#1153) whether item 5 holds with the 4 web-UI commits (dae5162, 58eab12, 642d0b4 committed by GitHub; c04fd18 with a self Co-authored-by trailer). Central added (#1157): `gh run view 38550883219` = 'Copilot cloud agent', 'Addressing comment on PR #2', archive/agentic-build, 10:37:34Z-10:40:36Z; c04fd18 committed 10:39:34Z inside that window.
+- Owner #1159: option (a), DoD item 5 counts as met; the three web-UI merges and c04fd18 (Copilot conflict resolution) stay in the history, no rewrite.
+- Raw DONE and status output for nvflare's record (#1155): reply #1158 (DONE 2026-10-14 20:21:55 +0200; `bash deploy/central/status.sh` exit 0, HEALTHY).
+- All four agents report DONE (status board; flower #1151, vantage6 #1152, nvflare 18:22:20Z). Stage 3 complete.
