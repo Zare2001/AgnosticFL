@@ -172,11 +172,12 @@ def fig_equivalence(runs: list[dict]) -> None:
     ax = axes[0]
     markers = ["o", "s", "^", "D", "v"]
     colors = [fs.INK, fs.INK_2, fs.FRAMEWORK["nvflare"], fs.FRAMEWORK["vantage6"], fs.FRAMEWORK["flower"]]
+    offsets = [0.0, -0.24, -0.08, 0.08, 0.24]  # the four 3-round series would hide each other at rounds 0-3
     worst = 0.0
-    for (fname, label), mk, col in zip(EQUIVALENCE, markers, colors, strict=True):
+    for (fname, label), mk, col, dx in zip(EQUIVALENCE, markers, colors, offsets, strict=True):
         data = json.loads((EVIDENCE / fname).read_text())
         per_round = data.get("per_round") or data["rounds"]  # the vantage6 island file names it "rounds"
-        xs = [r["round"] for r in per_round]
+        xs = [r["round"] + dx for r in per_round]
         ys = [r["max_abs_diff"] for r in per_round]
         worst = max(worst, max(ys))
         ax.scatter(xs, ys, marker=mk, s=34 if mk == "o" else 26, color=col, label=label, zorder=3,
