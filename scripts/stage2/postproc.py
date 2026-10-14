@@ -88,6 +88,10 @@ def process(job: dict, workers: int) -> str:
                 for p in (sim_dir / "rounds").glob("*.safetensors") if sim_dir else []:
                     p.unlink()
             rc = rc or finalize([run_dir, "--mode", "real", *notes], log)
+            if rc == 0:  # finalized: the comparison is recorded, the sim's checkpoints are not needed (PLAN §7)
+                sim_dir = latest_run(f"{name}-inv1sim", RUNS / "inv1")
+                for p in (sim_dir / "rounds").glob("*.safetensors") if sim_dir else []:
+                    p.unlink()
     elif kind == "sim":
         if not finalized(job["counterpart"]):
             return "defer"
