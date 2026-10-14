@@ -65,7 +65,7 @@ E4a on the real system (final runs, `runs.md`, INV-1 full sim 0.000 for every ru
 | 64 MB | 3.67 | 2.56 | 0.43 | 2.20 | 0.72 |
 | 128 MB | 5.08 | 2.88 | 0.88 | 2.65 | 0.95 |
 | 256 MB | 10.29 | 6.29 | 1.69 | 3.48 | 1.35 |
-| 512 MB | not run: testbed disk limit on central (7.0 GB needed, 5.0 GB free; bus #250) | | | | |
+| 512 MB | 15.49 (extension run after disk was freed on central) | | | 5.01 | 2.11 |
 
 - No NVFlare limit was reached; bytes on the NVFlare VM's wire ≈ 1.06 × payload.
 - Below ~64 MB an NVFlare round costs ~2.3–2.6 s whatever the size: the server tells each client to wait
@@ -92,7 +92,33 @@ E4b on the real system: (S4 results).
   | s2-e6e-server-restart | (central: NVFlare server restarted after round 3 and mid round 6) | clients reconnected by themselves (~20 s); new relay jobs ~70 s and ~90 s after the restarts (keeper; stale job-store entries replaced); 21 rounds per site |
 
   No manual action in any run; INV-1 0.0 for all seven E6 runs (central).
-- Final-run results (E4b, E5, E7): (S4 results).
+- E5 (`s2-e5-12sites`): `nvf-h7`/`nvf-h8` started on request with the standard kits (`provision_extra.sh`: `nvflare provision
+  --add-client`, same root CA, no server restart), joined the relay job 42 s later (the keeper restarted it), trained
+  every round on `organamnist-iid12` (n = 2880) and were stopped afterwards; the base relay job kept running.
+- E7 native FedAvg vs hub (final runs `s2-e7-nvflare-{native,hub}-{cnn,payload}`; evidence
+  `docs/report/stage2/evidence/nvflare/e7-native-vs-hub.md`; native round = FedAvg `send_model` → aggregated model, hub
+  round = dispatch → envelopes → aggregated; medians over rounds ≥ 2):
+
+  | config | native round (s) | hub round (s) | hub overhead | hub total incl. eval (s) | max abs weight diff native vs hub |
+  |---|---|---|---|---|---|
+  | C1 cnn-small, iid, 20 rounds | 3.50 (IQR 0.50) | 3.27 (IQR 0.50) | −0.23 s (−6.5 %) | 5.25 | r1 2.98e-08 → r2 6.3e-04 → r20 0.68 |
+  | C2 payload-45 echo, 5 rounds | 2.52 (IQR 0.38) | 2.62 (IQR 0.27) | +0.10 s (+4.1 %) | 3.00 | 2.2e-08 (flat) |
+
+  - The hub path costs NVFlare nothing measurable: both paths sit on the same ~2.5 s NVFlare task-request floor; the
+    built-in FedAvg waits for its tasks in 0.5 s steps, the relay reacts within 0.1 s, so the cnn rounds were even
+    slightly shorter through the hub.
+  - Drift: the native clients train bit-exactly like hub clients (island check: client weights == local
+    `flhub_core.train`), so the round-1 difference is the aggregation alone: NVFlare's FedAvg sums `w_k · n_k` and scales by
+    `1/Σn` in float32 in arrival order (weights 5761/5760 not exactly representable), the hub sums `p_k w_k` in float64 and
+    casts once. Local SGD then amplifies that 1-ulp perturbation (6.3e-04 after one more round); the payload echo has no
+    training, so its difference stays at float32 rounding level. vantage6 and Flower native runs are hash-equal to the hub
+    because their two sites hold equal n (weights exactly 0.5).
+  - Extra processes on the hub path (central sysmon, RSS peak): orchestrator 403 MB (cnn; its CPU is mostly the per-round
+    test evaluation) / 570 MB (payload), NVFlare adapter 163 MB, hub core 44 MB; the relay's server job 136 MB (cnn) /
+    585 MB (payload-45).
+- E4a extension: `s2-e4a-nvflare-512mb` ran after the owner freed disk on central: median round 15.5 s, VM memory peak
+  5.0 GB, client job RSS 2.1 GB, wire ≈ 1.06 × payload: NVFlare carried every size of the sweep with default knobs.
+- E4b: (S4 results).
 
 ## 6. Problems and fixes
 
