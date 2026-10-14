@@ -20,6 +20,7 @@ python -m pytest tests/conformance --adapter mock   # conformance suite against 
 python -m flhub_core.selfcheck                      # determinism check: compare the digest with the reference
 ```
 
+- Continuous integration ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs the selfcheck, the unit tests and the mock conformance suite on every pull request and on `main`.
 - Changes to `flhub_core` change the content hash in `flhub_core.code_version()`, which every site reports. Keep training deterministic and check `selfcheck` on every platform you support; a changed digest means sites can no longer reproduce each other bit for bit.
 - Changes to an adapter must pass the conformance suite against a running deployment of that framework: `python -m pytest tests/conformance --adapter http://127.0.0.1:<port> -v -s` (see the framework guide for the sites it accepts).
 - Changes to the orchestrator or an aggregator must keep runs equal to the simulation: `python -m hub.sim --config <config> --compare <run dir>` must report `hashes_equal=True`.
