@@ -8,6 +8,8 @@ What every hospital-side client must do so that the hub can aggregate its update
 | vantage6 | [`clients/vantage6/v6_flhub/__init__.py`](../clients/vantage6/v6_flhub/__init__.py) | algorithm function with `@data(1)`, `@metadata`, run by `wrap_algorithm()` | [vantage6 §3](frameworks/vantage6.md#3-client-side-what-the-hospital-code-must-contain) |
 | Flower | [`clients/flower/flhub_flower/client_app.py`](../clients/flower/flhub_flower/client_app.py) | ClientApp with `@app.train()` and `@app.query()` | [Flower §3](frameworks/flower.md#3-client-side-what-the-hospital-code-must-contain) |
 
+Annotated copies that run without a deployment, every line marked as the framework's pattern or the hub's addition, are in [`examples/`](../examples/README.md): [NVFlare](../examples/nvflare/client/client.py), [vantage6](../examples/vantage6/client/v6_example/__init__.py), [Flower](../examples/flower/client/client_app.py). [`examples/new-framework/client.py`](../examples/new-framework/client.py) is the framework-independent part alone, for a new framework.
+
 ## What the client receives
 
 | Item | Content | NVFlare | vantage6 | Flower |

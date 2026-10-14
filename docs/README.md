@@ -8,6 +8,7 @@ AgnosticFL runs one federated-learning server (the hub) across hospitals that us
 | [Architecture](architecture.md) | Components, one round step by step, determinism, partial participation and resume, the trust and security model. |
 | [Protocol](protocol.md) | `flhub/0.1` and `flhub/0.2`: the JSON-RPC protocol between the orchestrator and the adapters, and the hub core API. |
 | [Client contract](client-contract.md) | What every hospital-side client must receive, run and return, independent of the framework. |
+| [Examples](../examples/README.md) | Per framework a minimal client and an annotated server side to copy, each runnable without a deployment; a skeleton for a new framework. |
 | [NVFlare](frameworks/nvflare.md), [vantage6](frameworks/vantage6.md), [Flower](frameworks/flower.md) | Per framework: the server-side adapter, the hospital-side code, deployment, cost, limits and troubleshooting. |
 | [Adding a framework](adding-a-framework.md) | A new adapter: `BaseAdapter` or `RelayAdapter`, the conformance suite, a checklist and the measured effort. |
 | [Aggregators](aggregators.md) | The six server aggregators, their parameters and tuned values, and how to add one. |

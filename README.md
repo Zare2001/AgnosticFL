@@ -95,6 +95,7 @@ Implementation cost, hospital-side cost, memory, network, scaling and robustness
 | [Architecture](docs/architecture.md) | components, one round, determinism, trust and security model |
 | [Protocol](docs/protocol.md) | `flhub/0.1` and `flhub/0.2` |
 | [Client contract](docs/client-contract.md) | what every hospital-side client must do |
+| [Examples](examples/README.md) | per framework a client and a server example to copy; a skeleton for a new framework |
 | Framework guides: [NVFlare](docs/frameworks/nvflare.md), [vantage6](docs/frameworks/vantage6.md), [Flower](docs/frameworks/flower.md) | adapter, hospital code, deployment, cost, limits, troubleshooting |
 | [Adding a framework](docs/adding-a-framework.md) | write an adapter, pass the conformance suite |
 | [Aggregators](docs/aggregators.md) | the six server aggregators and how to add one |
@@ -119,6 +120,7 @@ All pages: [docs/README.md](docs/README.md).
 | `flhub_core/` | the shared training library that every hospital runs |
 | `clients/{nvflare,vantage6,flower}/` | the hospital-side code per framework (`clients/flower` also holds the relay ServerApp, which runs only next to the SuperLink) |
 | `tests/` | unit tests, the adapter conformance suite, Flower relay tests |
+| `examples/` | per framework a minimal client and an annotated server side; a skeleton for a new framework ([README](examples/README.md)) |
 | `configs/` | run configurations of both test stages ([README](configs/README.md)) |
 | `deploy/` | install, start, stop and status scripts of the reference testbed ([README](deploy/README.md)) |
 | `scripts/` | equivalence check, monitoring, the stage-2 campaign tooling, docs tooling ([README](scripts/README.md)) |
@@ -127,7 +129,7 @@ All pages: [docs/README.md](docs/README.md).
 
 ## Project status
 
-Research prototype, version 0.2.0 ([changelog](CHANGELOG.md)). Tested with NVFlare 2.9.0, vantage6 4.15.2 and Flower 1.39.0 on Python 3.11.17 with torch 2.14.1 (CPU) on Ubuntu 24.04 ([`deploy/versions.env`](deploy/versions.env)). The hub sees every model update in plaintext and has no secure aggregation or differential privacy; see the [trust and security model](docs/architecture.md#trust-and-security-model) before you use it with real patient data. Contributions: [CONTRIBUTING.md](CONTRIBUTING.md).
+Research prototype, version 0.2.1 ([changelog](CHANGELOG.md)). Tested with NVFlare 2.9.0, vantage6 4.15.2 and Flower 1.39.0 on Python 3.11.17 with torch 2.14.1 (CPU) on Ubuntu 24.04 ([`deploy/versions.env`](deploy/versions.env)). The hub sees every model update in plaintext and has no secure aggregation or differential privacy; see the [trust and security model](docs/architecture.md#trust-and-security-model) before you use it with real patient data. Contributions: [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Citation
 
