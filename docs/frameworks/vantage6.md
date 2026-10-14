@@ -9,7 +9,7 @@ This guide covers the vantage6 adapter, the hospital-side vantage6 algorithm, an
 | Tested version | vantage6 **4.15.2**: server and node images `ghcr.io/vantage6/infrastructure/server:4.15.2` and `ghcr.io/vantage6/infrastructure/node:4.15.2`, server with its default SQLite database. Algorithm image on Python 3.11.17 with torch 2.14.1+cpu, numpy 2.4.4, safetensors 0.8.0 ([`deploy/versions.env`](../../deploy/versions.env)) |
 | Protocol | `flhub/0.2` (also serves `flhub/0.1` callers) |
 | Status | Tested in stage 1 (2 hospitals, `flhub/0.1`) and stage 2 (2 hospitals, plus 2 extra hospitals for the 12-site run; experiments E1–E7). Conformance suite v2 against the reference deployment: 13 of 13 tests pass, and every returned weight equals local training bit for bit (max abs diff 0.0). |
-| Hospital code | [`clients/vantage6/v6_flhub/__init__.py`](../../clients/vantage6/v6_flhub/__init__.py), 43 lines, a standard vantage6 algorithm in its own image. 0 lines changed since stage 1. Nothing hub-specific is installed on the hospital host. |
+| Hospital code | [`clients/vantage6/v6_flhub/__init__.py`](../../clients/vantage6/v6_flhub/__init__.py), 38 code lines ([lines of code](../results/evidence/loc.md)), a standard vantage6 algorithm in its own image. 0 lines changed since stage 1. Nothing hub-specific is installed on the hospital host. |
 | Rollout channel | A new tag of the algorithm image in the operator's registry. Nodes pull it at their next task: 0 hospital steps, 0 restarts. |
 | Main limit | With the default SQLite server database the round time grows faster than linearly with the model size: 128 MiB is the largest model delivered (468 s per round), 256 MiB results never arrive (§6). |
 
@@ -302,12 +302,15 @@ Comparison with the other frameworks: [`cost-and-efficiency.md`](../cost-and-eff
 
 | Item | Size |
 |---|---|
-| adapter, `adapters/vantage6/service.py` | TODO(verify) lines (`scripts/docs/loc.py`); 14 distinct vantage6 client calls |
-| hospital algorithm, `clients/vantage6/v6_flhub/__init__.py` | TODO(verify) lines (`scripts/docs/loc.py`) |
-| image, `clients/vantage6/Dockerfile` | TODO(verify) lines (`scripts/docs/loc.py`) |
-| unit tests, `tests/unit/test_vantage6_adapter.py` | 10 tests against a fake vantage6 client; they run without vantage6 installed |
-| E7 baseline tooling (`adapters/vantage6/native.py`, `deploy/central/vantage6/native/`) | not needed by the adapter |
+| adapter, `adapters/vantage6/` without `native.py` | 290 code lines (`service.py` 288); 14 distinct vantage6 client calls |
+| hospital algorithm, `clients/vantage6/v6_flhub/__init__.py` | 38 code lines |
+| image and package metadata, `clients/vantage6/Dockerfile`, `pyproject.toml` | 16 code lines, 11 configuration lines |
+| unit tests, `tests/unit/test_vantage6_adapter.py` | 225 code lines; 10 tests against a fake vantage6 client, which run without vantage6 installed |
+| reference deployment, `deploy/central/vantage6/` and `deploy/vantage6-vm/` | 28 files, 1,162 code lines and 107 configuration lines, including the experiment tools |
+| E7 baseline tooling, `adapters/vantage6/native.py` and `deploy/central/vantage6/native/` | `native.py` 198 code lines; not needed by the adapter |
 | vantage6 concepts used | user, organisation, collaboration, node, task, run, result, database label, algorithm image, node policy |
+
+Code lines are non-blank, non-comment lines with docstrings counted ([lines of code](../results/evidence/loc.md), `python3 scripts/docs/loc.py`; per-file values from the same counter).
 
 At the hospitals, 0 lines of hospital code changed between stage 1 and stage 2. Hospital steps in stage 2 (§3.3, §3.4): (a) code rollout of `flhub_core` 0.2: 0 steps, a new image tag (optional pre-pull 12.6 s); (b) data provisioning for the data variants: data only; (c) data-variant configuration: one database per variant in the node configuration, 1 restart per node, 14.7 s offline; (d) later code updates: 0 steps.
 
