@@ -64,3 +64,8 @@ Newest entry at the bottom. Format: `## <UTC> — <what>` then facts (commands, 
 - R5 testbed (read-only, 18:17Z): `bash deploy/vantage6-vm/status.sh` exit 0, v6-h3/v6-h4 OK connected (mode central, last task ids 2/1); containers 7a8af5ffe077 / 93dda6bf2aad started 2026-10-13T15:36Z, restarts 0 = the R0 baseline. A `tc qdisc show` in a combined check was denied by the deny rules (all tc commands); not needed by the plan, no other route used.
 - Clean-up: /tmp/v6s3 venv (916 MB), the vantage6 wheels and the main clone removed; the torch entry my temporary venv added to the uv cache removed with `uv cache clean torch` (711.8 MiB); 6.2 GB free (6.6 GB at R0).
 - Next: S3 all-done from central, then `touch ~/.flhub/stage3/DONE`.
+
+## 2026-10-14T18:30Z — S3 all-done: DoD verified from the vantage6 side, DONE
+
+- S3 all-done #1150 (main 642d0b4 = v0.2.0, archive/agentic-build 6c586df). Checked here, read-only: (1) git diff b40390b..origin/archive/agentic-build = stage-3 bookkeeping only (13 files: .gitignore exception, CLAUDE.md, stage-2 CLAUDE copy, stage-3 plan, roles, bus transcript, four stage-3 worklogs incl. this one); stage1-final 250157a and stage2-final b40390b unchanged; (2)/(3) my fresh-clone check of main 642d0b4 (#1142): links 735/0, 23/23 figures, pytest 80/15, vantage6 adapter 10/10, selfcheck ac074a0b…, guide renders, no agent material; quick start verbatim by flower (#1144); (4) v0.1.0 -> 250157a, v0.2.0 -> 642d0b4, releases 0.1.0 and 0.2.0, CHANGELOG.md, CITATION.cff, CONTRIBUTING.md, README line 138 'No license has been chosen yet.'; (5) vantage6 testbed = R0 baseline (18:17Z); (6) transcript and final worklogs on the archive branch.
+- `touch ~/.flhub/stage3/DONE`.
