@@ -20,8 +20,12 @@ Every change on the hospital side (framework VMs, or anything a hospital would h
 | 2026-10-13T21:41Z | flower | ops | watchdog cron line now `flock -n -o` (was `flock -n`); `install.sh` and `extra.sh` write it that way; crontab updated in place (`sed`) | a SuperNode supervisor started by the cron watchdog inherited the lock fd, so every later `flock -n` failed: the cron layer had been inert since 12:52Z (stage 1; the per-SuperNode restart loop kept working). Found when `straggler.sh prepare` could not take the lock. | 0 in `clients/` (install.sh 1, extra.sh 1) | no (flw-h6's old supervisor was replaced by `straggler.sh prepare` for E6b) | ADR-017 |
 | 2026-10-14T02:15Z | vantage6 | ops | task-folder GC cron entry removed (`crontab`) | the GC removed a fresh output: run ids are reused after the adapter's per-round task delete, a reused `task-<id>` folder keeps its old mtime, and the GC ran in the ~1 s between the training container's exit and the node reading the output (s2-e3-resnet18-gn-fedavg round 10, v6-h3; recovered by the hub's deadline + retry) | 0 in `clients/` | no | ADR-020 |
 
-## `git diff --stat stage1-final..HEAD -- clients/` (filled in by central at the end)
+## `git diff --stat stage1-final..HEAD -- clients/` (filled in by central; HEAD 98b4846, re-checked at the end)
 
 ```
-(pending)
+ clients/flower/flhub_flower/server_app.py | 313 ++++++++++++++++++------------
+ clients/flower/pyproject.toml             |   4 +-
+ 2 files changed, 191 insertions(+), 126 deletions(-)
 ```
+
+Justification: both files belong to the Flower FAB but neither is hospital glue. `server_app.py` is the relay ServerApp: it ships inside the FAB, but only central executes it (next to the SuperLink); SuperNodes run only the ClientApp. Its changes: flhub/0.2 per-site results, errors and cancel; relay timings; the stale-relay fix of #177/17cdfd1. `pyproject.toml` is FAB metadata (version 0.2.0, run-config key). The hospital-side ClientApp (`client_app.py`, `records.py`) and `clients/nvflare/`, `clients/vantage6/` have 0 changed lines.
