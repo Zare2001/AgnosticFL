@@ -117,7 +117,7 @@ python -m pytest
 | `run_adapter.py --check` | PASS; `/health` ok; `discover` answers with protocol `flhub/0.2` and both sites `unknown` (no vantage6 server: both login attempts were refused within 3 ms) |
 | `hub.sim` with `run-config.yaml` | 3 rounds, 2 of 2 sites in each; final test accuracy 0.625, the share of the majority class, which the federated stage-1 runs also kept for their first 10 rounds ([stage-1 results](../../docs/results/stage1.md)) |
 | the same with `--rounds 30` | final model `sha256:c6249b00…`, test accuracy 0.8638, AUC 0.9246: the final model of the stage-1 vantage6-only run, which used these two sites and settings ([`final-runs.json`](../../docs/results/evidence/stage1/final-runs.json)) |
-| `python -m pytest` | 80 passed, 15 skipped, as in [getting started](../../docs/getting-started.md); the examples add no tests |
+| `python -m pytest` | 80 passed, 15 skipped (your venv has pandas, as in [CONTRIBUTING](../../CONTRIBUTING.md#development-setup); without pandas, as in getting started, 79 passed, 16 skipped); the examples add no tests |
 
 Not tested here: building the image (the reference testbed builds no images in this stage; the Dockerfile has the steps of `clients/vantage6/Dockerfile`, which built the image of both test stages) and a run against a live vantage6 server (the adapter and the client were tested against the real deployment in both stages: [guide](../../docs/frameworks/vantage6.md) §1).
 
