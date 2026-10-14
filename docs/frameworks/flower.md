@@ -340,14 +340,16 @@ The testbed exchanges no credentials: Flower runs with `--insecure`, and the clo
 
 ### 4.5 Verify
 
-Run the conformance suite against the adapter. It checks dispatch, collect, cancel, subset rounds, partial collect, offline sites, an adapter restart, a 64 MiB payload and a data variant, and compares every site's weights with a local run of `flhub_core.train`:
+**Admission test.** The conformance suite compares every site's returned weights with a local run of `flhub_core.train` on the same data. It therefore accepts only the project's benchmark sites (`SITES` in `flhub_core.data`; for Flower `flw-h5` and `flw-h6`), whose data it can rebuild, and it fails for any other site id. To admit a new Flower deployment, connect two test SuperNodes with these site ids and the benchmark data (`python -m flhub_core.data materialize --sites flw-h5 flw-h6`, plus the variant files of §3.3 for `--variant`), add them to the adapter's `--sites`, and run:
 
 ```bash
 pytest tests/conformance --adapter http://127.0.0.1:8813 --sites flw-h5 flw-h6 \
     --variant organamnist-dir0.3 --restart-cmd 'bash deploy/central/flower/restart.sh adapter'
 ```
 
-Against the testbed this passed 13 of 13 checks with a weight difference of 0.0 in every round ([conformance-v2-flower-central.json](../results/evidence/stage2/conformance-v2-flower-central.json)). The suite needs the sites' data files on the machine that runs it (`--data-dir`; created if missing).
+It checks dispatch, collect, cancel, subset rounds, partial collect, offline sites, an adapter restart, a 64 MiB payload and a data variant. Against the testbed it passed 13 of 13 checks with a weight difference of 0.0 in every round ([conformance-v2-flower-central.json](../results/evidence/stage2/conformance-v2-flower-central.json)). The machine that runs the suite needs the same site files (`--data-dir`; created if missing).
+
+**Real hospitals.** After a run, each site's `client_code_version` is in the round records (`rounds/rNNNN.json`, list `updates`). With `strict_code_version: true` in the run configuration, as in the stage-2 configurations ([`configs/stage2/base.yaml`](../../configs/stage2/base.yaml)), an update from another `flhub_core` version fails the round (retried if `round_retries` allows); without it the hub only logs a warning.
 
 ### 4.6 The reference testbed
 
