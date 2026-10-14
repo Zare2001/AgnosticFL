@@ -35,7 +35,8 @@ w="$(crontab -l 2>/dev/null | grep -c 'deploy/vantage6-vm/start.sh')"
 check "base watchdog cron entry" "$([ "$w" = 1 ] && echo 0 || echo 1)" "$w entry"
 free_gb="$(df -BG --output=avail / | tail -1 | tr -dc 0-9)"
 check "disk free >= 3 GB" "$([ "$free_gb" -ge 3 ] && echo 0 || echo 1)" "$(df -h / | awk 'NR == 2 {print $4 " free of " $2}')"
-p="$(pgrep -fc 'scripts/sysmon.py run|deploy/vantage6-vm/run_follow.py|inject.sh _|straggler.sh _' || true)"
+# anchored on the processes' own command lines, so a shell that merely mentions them does not count
+p="$(pgrep -fc '^(/usr/bin/)?python3 \S*scripts/sysmon\.py run|^python3 \S*run_follow\.py|^bash \S*(inject|straggler)\.sh _' || true)"
 check "experiment processes" "$([ "$p" = 0 ] && echo 0 || echo 1)" "$p (sysmon, follower, injectors)"
 echo "end state: $([ "$fail" = 0 ] && echo CLEAN || echo NOT CLEAN)"
 exit $fail
