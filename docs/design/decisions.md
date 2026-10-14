@@ -2,7 +2,7 @@
 
 One record per decision that deviated from or filled a gap in the original project plan. Format: `## ADR-<n>: <title>` with **Context**, **Decision**, **Consequences**, plus the date and the side of the system it belongs to (`central` = the hub and the framework servers on the operator's machine; `nvflare`, `vantage6`, `flower` = that framework's adapter and hospitals).
 
-> These records were written while the system was built and tested (2026-10-13/14) and are kept as written; only file paths (now this repository's layout) and a few process words were updated. References to the original plans (`PLAN.md`, `PROJECT_PLAN.md`, `EXPERIMENTS.md`) and to messages on the testbed's message bus (`#123`) point to the development history on branch [`archive/agentic-build`](https://github.com/Zare2001/AgnosticFL/tree/archive/agentic-build). The protocol is [`docs/protocol.md`](../protocol.md) (cited as `PROTOCOL.md` in older text and code comments).
+> These records were written while the system was built and tested (2026-10-13/14) and are kept as written; only file paths (now this repository's layout) and a few process words were updated. References to the original plans (`PLAN.md`, `PROJECT_PLAN.md`, `EXPERIMENTS.md`) and to messages on the testbed's message bus (`#123`) point to the development history on branch [`archive/agentic-build`](https://github.com/Zare2001/AgnosticFL/tree/archive/agentic-build). The protocol is [`docs/protocol.md`](../protocol.md) (cited as `PROTOCOL.md` in older text and code comments). An *island* is a development setup of one framework on a single VM, used before a change went to the shared test deployment.
 
 ## ADR-001: Dataset = PneumoniaMNIST (MedMNIST v2), one CSV per site
 Date 2026-10-13, central.
@@ -130,7 +130,7 @@ Date 2026-10-13, vantage6.
 ## ADR-021: vantage6 rollout of flhub_core 0.2 = a new algorithm image tag
 Date 2026-10-13, vantage6.
 **Context**: PLAN.md §4.5 asks for the framework's own code-distribution channel. In vantage6 the training code lives in the algorithm image; nodes pull the image a task names (if their policy allows it) and keep no algorithm code on the host.
-**Decision**: central's `install.sh` builds `clients/vantage6` + `flhub_core` into `<registry>/flhub/v6-train:<git sha>`, pushes it to the registry on central and points the adapter at it; the nodes pull it at their first task of the new tag (policy `flhub/v6-train:<tag>` unchanged). The vantage6 operator pre-pulls it once on the nodes (only to keep the first round fast) and runs selfcheck v2 inside it with `--network none`. `clients/vantage6` has 0 changed lines since `stage1-final`.
+**Decision**: central's `install.sh` builds `clients/vantage6` + `flhub_core` into `<registry>/flhub/v6-train:<git sha>`, pushes it to the registry on central and points the adapter at it; the nodes pull it at their first task of the new tag (policy `flhub/v6-train:<tag>` unchanged). In the test the image was pre-pulled once at the hospital nodes (optional, only to keep the first round fast), and selfcheck v2 ran inside it with `--network none`. `clients/vantage6` has 0 changed lines since `stage1-final`.
 **Consequences**: hospital steps for a code update: 0 (a pre-pull is optional); no node restart. The one-time stage-2 changes on the hospital side are data and node config (ADR-014, ledger).
 
 ## ADR-022: vantage6 E7 native baseline = central function on the hub-operator node
