@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+# The algorithm package of the example. The Dockerfile installs it next to flhub_core and names it
+# in PKG_NAME, so that vantage6's wrap_algorithm() can find the method `train`.
+[project]
+name = "v6-flhub-example"
+version = "0.2.1"
+description = "Example vantage6 algorithm for the flhub hub (one local training round with flhub_core)"
+requires-python = ">=3.11"
+dependencies = ["flhub-core", "vantage6-algorithm-tools"]
+
+[tool.setuptools]
+packages = ["v6_example"]

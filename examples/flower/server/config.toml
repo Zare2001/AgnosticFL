@@ -1,0 +1,14 @@
+# $FLWR_HOME/config.toml of the Flower adapter (example). The adapter's `flwr run` and `flwr stop`
+# reach the SuperLink through the connection named here (adapter.py --connection, default "flhub").
+# FLWR_HOME is the adapter's --flwr-home; the staged FAB goes into its sibling directory fab-src/.
+
+[superlink]
+default = "flhub"
+
+[superlink.flhub]
+# The SuperLink's HTTP API (flower-superlink --host/--port; 127.0.0.1:9093 on the reference
+# testbed), not its Fleet API, which is the port the hospitals' SuperNodes connect to.
+address = "127.0.0.1:9093"
+# Without TLS, as on the reference testbed. With TLS replace this line by
+# root-certificates = "<CA certificate file>" (not tested).
+insecure = true

@@ -18,6 +18,8 @@ Sources for this guide. Full stage reports at their tags: [stage-1 NVFlare secti
 
 ## 2. Server side: how the adapter maps flhub onto NVFlare
 
+A small, commented version of this server side, with a check mode and an end-to-end run in NVFlare's simulator that needs no deployment, is in [`examples/nvflare/server/`](../../examples/nvflare/server/) ([example README](../../examples/nvflare/README.md#3-server)).
+
 ### 2.1 Components
 
 | Component | Code | Runs | Role |
@@ -133,6 +135,8 @@ The other files in [`deploy/nvflare-vm/`](../../deploy/nvflare-vm/) are experime
 ## 3. Client side: what the hospital code must contain
 
 The hospital runs NVFlare's standard client (the kit's `startup/start.sh`). The training code reaches it inside the relay job: NVFlare starts a job process with the `ClientAPIExecutor` (`execution_mode: in_process`, `task_script_path: client.py`, `params_exchange_format: numpy`), which runs `custom/client.py`. The whole script is 48 lines; these are the essential ones.
+
+A commented copy that you can run without an NVFlare deployment is [`examples/nvflare/client/client.py`](../../examples/nvflare/client/client.py) ([example README](../../examples/nvflare/README.md#2-client)).
 
 **Imports.** NVFlare's Client API, plus the shared training library.
 

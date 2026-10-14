@@ -2,6 +2,16 @@
 
 All notable changes to this project. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/). The protocol has its own version (`flhub/0.1`, `flhub/0.2`, see [docs/protocol.md](docs/protocol.md)).
 
+## [0.2.1] - 2026-10-14
+
+Examples for using the hub with each framework and for adding a framework. The hub, the adapters, `flhub_core` and the clients are unchanged.
+
+### Added
+
+- `examples/`: per framework (NVFlare, vantage6, Flower) a minimal hospital-side client of the client contract, with every line marked as the framework's pattern or the hub's addition, and the server side as thin annotated code over the library; each runs on one machine without a deployment (NVFlare's simulator, vantage6's `MockAlgorithmClient`, a local Flower SuperLink with two SuperNodes).
+- `examples/new-framework/`: a skeleton adapter in the direct (`BaseAdapter`) and in the relay (`RelayAdapter`) pattern on a toy framework, a client stub, and `check.sh`, which runs the conformance suite against both and three orchestrator rounds with the equivalence check.
+- CI runs `examples/new-framework/check.sh`.
+
 ## [0.2.0] - 2026-10-14
 
 The second test stage (full system and performance test) and the restructure of the repository into a documented library.
@@ -42,5 +52,6 @@ The first test stage: one FedAvg hub across NVFlare, vantage6 and Flower.
 - The adapter conformance suite (7 tests) and unit tests.
 - Install, start, stop and status scripts for a four-machine testbed.
 
+[0.2.1]: https://github.com/Zare2001/AgnosticFL/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/Zare2001/AgnosticFL/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Zare2001/AgnosticFL/releases/tag/v0.1.0

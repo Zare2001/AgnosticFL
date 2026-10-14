@@ -1,6 +1,6 @@
 # Adding a framework
 
-A new framework needs three things: an **adapter** on the operator's side that speaks the hub's protocol, a **hospital client** in the framework's standard pattern that calls `flhub_core.train`, and deployment scripts. The orchestrator, the hub core, the aggregators and the protocol do not change; none of them changed for NVFlare, vantage6 or Flower. The **conformance suite** is the admission test.
+A new framework needs three things: an **adapter** on the operator's side that speaks the hub's protocol, a **hospital client** in the framework's standard pattern that calls `flhub_core.train`, and deployment scripts. The orchestrator, the hub core, the aggregators and the protocol do not change; none of them changed for NVFlare, vantage6 or Flower. The **conformance suite** is the admission test. A runnable skeleton of both adapter patterns, with a client stub and a script that runs the conformance suite and three orchestrator rounds against it, is in [`examples/new-framework/`](../examples/new-framework/).
 
 ## `BaseAdapter` or `RelayAdapter`
 
@@ -71,7 +71,7 @@ An adapter that reports only at the end (the `flhub/0.1` style) still works, but
 
 ## The hospital side
 
-Write the client in the framework's standard pattern around one call to `flhub_core.train`, and ship it through the framework's own code channel (job, image, app bundle): see the [client contract](client-contract.md) and the three example clients in [`clients/`](../clients/). The only hub-specific items at a hospital should be the connection to the framework server, its credentials and the data location.
+Write the client in the framework's standard pattern around one call to `flhub_core.train`, and ship it through the framework's own code channel (job, image, app bundle): see the [client contract](client-contract.md), the three example clients in [`clients/`](../clients/) and their annotated copies in [`examples/`](../examples/README.md). The only hub-specific items at a hospital should be the connection to the framework server, its credentials and the data location.
 
 ## The conformance suite
 
@@ -107,7 +107,7 @@ The suite compares every update with local training on the benchmark partitions,
 
 ## Checklist
 
-- [ ] Adapter: `BaseAdapter` or `RelayAdapter` subclass; `site_status()`; per-site reporting, errors and cancels; the framework's own error text in failures.
+- [ ] Adapter: `BaseAdapter` or `RelayAdapter` subclass (start from [`examples/new-framework/`](../examples/new-framework/)); `site_status()`; per-site reporting, errors and cancels; the framework's own error text in failures.
 - [ ] Relay (if any): long-polls the adapter, sends the configuration unchanged, posts each site's result as it arrives, honours cancels, survives an adapter restart.
 - [ ] Hospital client: the framework's standard pattern, one call to `flhub_core.train`, returns weights, `num_examples`, metrics and `flhub_core.code_version()` ([client contract](client-contract.md)).
 - [ ] Rollout: new `flhub_core` versions reach the hospitals through the framework's code channel, with no hospital step.

@@ -1,0 +1,7 @@
+*
+!flhub_core/pyproject.toml
+!flhub_core/src
+!examples/vantage6/client/pyproject.toml
+!examples/vantage6/client/v6_example
+**/__pycache__
+**/*.egg-info
