@@ -78,9 +78,9 @@ def post_perf(name: str, start: str, end: str) -> None:
     """One line per performance run: VM memory peak (70 % rule), per-site RSS peaks, bytes on ens3."""
     try:
         d = json.loads((SUMMARIES / f"sysmon-flower-{name}.json").read_text())
-    except (OSError, ValueError):
+        mem = float(d["system"]["mem_used_mb_peak"])
+    except (OSError, ValueError, KeyError, TypeError):  # e.g. a run of a few seconds: no samples
         return
-    mem = d["system"]["mem_used_mb_peak"]
     procs = d.get("procs", {})
     sites = {s: round(sum(procs.get(f"{s}-{c}", {}).get("rss_mb_peak", 0) for c in ("supernode", "superexec",
                                                                                     "clientapp")))
@@ -144,7 +144,10 @@ def main() -> None:
             print(f"{now()} RUN end {name}: sysmon rc={proc.returncode}, anomalies {counts}, reconnects {reconnects}, "
                   f"{rec['health']}", flush=True)
             if name.startswith(PERF_RUNS):
-                post_perf(name, start, utc)
+                try:
+                    post_perf(name, start, utc)
+                except Exception as exc:  # a report must never stop the follower
+                    print(f"{now()} post_perf {name}: {exc}", flush=True)
             if proc.returncode != 0 or any(counts.values()) or not rec["health"].endswith(": HEALTHY"):
                 body = "\n".join([f"sysmon summary rc={proc.returncode}; {rec['health']}",
                                   f"SuperNode log lines flagged during {start}..{utc}: {counts}; "
