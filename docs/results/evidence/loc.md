@@ -27,6 +27,6 @@ Code lines are non-blank, non-comment lines (Python: tokenized, docstrings count
 | deploy | deploy: Flower (central + hospital VM) | 25 | 940 | 27 | `deploy/central/flower/*`, `deploy/flower-vm/**/*` |
 | scripts | scripts: equivalence check, sysmon, W&B clean-up | 4 | 392 | 0 | `scripts/*.py`, `scripts/*.sh` |
 | scripts | scripts: stage-2 campaign and report tooling | 27 | 2810 | 0 | `scripts/stage2/*` |
-| scripts | scripts: docs tooling | 1 | 125 | 0 | `scripts/docs/*.py` |
+| scripts | scripts: docs tooling | 5 | 665 | 0 | `scripts/docs/*.py` |
 
-Code lines per group: hub 2783, adapter 1547, library 1009, client 168, baseline 900, tests 1998, deploy 3426, scripts 3327.
+Code lines per group: hub 2783, adapter 1547, library 1009, client 168, baseline 900, tests 1998, deploy 3426, scripts 3867.
