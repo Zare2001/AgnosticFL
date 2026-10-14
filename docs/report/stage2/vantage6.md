@@ -83,7 +83,14 @@ Evidence: vantage6 4.15.2 source (server/node wheels, client, algorithm tools) a
   - Server restart (E6e, `restart_server.sh`): rounds complete without a retry (29-48 s with 0-20 s extra downtime); `discover` answers `unknown` within 2.2 s during the outage.
 - Per-task cost at small models (node log phases on v6-h3, mean of the 50 rounds of s2-e1-dir0.3-fedavg vs E4a vantage6-1mb; #705): 'Starting task' -> training 3.3 s vs 3.0 s (image check, container start, python/torch import 1.2 s, wrapper; the variant CSV read by the wrapper is 0.29 s for 5760 rows vs 0.05 s for 785, before `flhub_core.train` starts, so `data_load_s` is 0 at vantage6 sites); training 1.9 s vs 0; output -> result sent 2.3 s vs 1.7 s. The fixed per-round vantage6 cost is ~6.3 s (1 MB echo fan-out); cnn-small rounds take ~9.1 s.
 - E3 (vantage6 side): resnet18-gn trains ~3.9 min per round on v6-h3 (1 thread, n=5760); the 116 MB task folder per site-round is removed by the GC after the round. In round 2 of s2-e3-resnet18-gn-fedavg the response to v6-h3's status PATCH (the whole run incl. its 79 MB input) was cut by uWSGI while the worker was busy (`IncompleteRead`, logged as an error in `run_forever`); the PATCH had reached the server, the training container kept running and the result was delivered (no effect on the round).
-- E7 native (ADR-022): central function `v6_native.fedavg` on the hub-operator node; island C1 hashes equal to the hub run in every round (8.5 s vs 8.1-8.8 s per round); final comparison _(to be filled)_.
+- E7 (ADR-022; run data and compare from central, bus files #219/#221): native = vantage6 central function `v6_native.fedavg` on the hub-operator node next to the server (one multi-organisation `train` subtask per round, FedAvg float64 in site order); hub = the adapter's per-site tasks. Median of rounds 2..N (IQR):
+
+  | config | native round | hub round | hub - native | weights |
+  |---|---|---|---|---|
+  | C1 cnn-small, iid, 20 rounds | 8.81 s (8.74-8.88) | 8.81 s (8.56-9.56) | 0.00 s (0 %) | global hash equal in all 21 checkpoints, max diff 0.0 |
+  | C2 payload-45, 5 rounds | 95.5 s (94.3-98.5) | 82.1 s (81.1-86.5) | -13.4 s (-14 %) | hash equal in all 6, max diff 0.0 |
+
+  The hub path costs nothing measurable at cnn-small and is faster at 45 MB: the native central function moves every input and result through the node proxy (container -> node -> server, 2 x 80 MB each way per round) and waits on one multi-organisation subtask, while the adapter uploads per site in parallel and fetches each result as soon as that site is done. Hub aggregation 0.0-0.07 s vs native 0.002-0.56 s (payload: decoding in the container). Extra on the hub path: the adapter process on central (RSS < 1 GB at 45 MB) and the hub core; extra on the native path: the hub-operator node + its central-function container on central.
 
 ## 6. Problems and fixes
 
