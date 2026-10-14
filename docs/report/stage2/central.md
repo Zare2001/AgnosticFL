@@ -15,7 +15,7 @@ The hub side of stage 2 (PLAN.md §4.1–§4.3, roles/CENTRAL.md): the protocol 
 | configs | `configs/stage2/{base,tuned,topology}.yaml` + 98 run configs (generated) | — |
 | campaign tools | `scripts/stage2/*.py`, `scripts/sysmon.py`, `deploy/central/netem.sh` | — |
 
-*(pending: git diff --stat stage1-final..HEAD for these directories at the end of S4)*
+`git diff --shortstat stage1-final..HEAD -- <path>` at the end of S5: `adapters/common` 8 files +462/−96; `adapters/mock` 1 file +64/−12; `hub/` 15 files +1539/−342; `flhub_core/` 7 files +767/−106; `configs/stage2/` 110 files +1101 (generated run configs and partition manifests); `scripts/stage2/` 28 files +3333; `scripts/sysmon.py` +278; `deploy/central/netem.sh` +107; `tests/` 12 files +1298/−100; `docs/agents/PROTOCOL.md` +35/−4. `clients/`: no central change (the Flower FAB's relay ServerApp is the Flower agent's, ledger).
 
 ## 3. Rollout (central side)
 
@@ -28,7 +28,20 @@ Central ran the framework agents' deploy-requests in arrival order: NVFlare #141
 
 ## 5. Experiments run
 
-All final runs: `docs/report/stage2/runs.md` (W&B project `AgnosticFL-stage2`). *(pending: summary after S4)*
+All final runs: `docs/report/stage2/runs.md` (W&B project `AgnosticFL-stage2`); results in `REPORT_STAGE2.md` §3–§7.
+
+| experiment | final runs | central's part |
+|---|---|---|
+| E1 | 24 (7 real, 14 sim, 3 reference) | runs, INV-1 full sim, seed sims, centralized and local-only references |
+| E2 | 45 (15 real, 30 sim) | runs, INV-1, seed sims; FedProx μ through `train_config` |
+| E3 | 4 real | runs with a vantage6 store purge before each, INV-1 (full sim for the CNNs, replay for `resnet18-gn`) finalized between runs for disk |
+| E4 | 28 real (E4a 24, E4b 4) | sweep with the stop rule and disk projections; extension at the owner's request after freeing disk; netem on central for E4b |
+| E5 | 2 real | handshakes for the extra sites; INV-1 full sim |
+| E6 | 7 real | ARM/ARMED handshakes, hub and adapter SIGKILL + resume (E6d), server restarts (E6e) |
+| E7 | 12 (6 real, 6 native) | ran the framework agents' native scripts and the hub runs; native-vs-hub gate per round |
+| INV-4 | 2 re-runs (not uploaded) | `inv4_check.py`, identical in all 50 rounds |
+
+Diagnostics that were not uploaded: `diag-e6c-fedavgm-eta0.3` (sim; FedAvgM with η 0.3 is stable at 50 % participation), the E6d dry run, the E3/E4b cost model fit.
 
 ## 6. Problems and fixes
 
