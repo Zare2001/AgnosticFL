@@ -107,3 +107,8 @@ Newest entries at the bottom. Format: `### <UTC timestamp> — S<n> — <title>`
 - docs/report/stage2/flower.md final (1aea1aa); ledger: 7 flower rows incl. the S4 actions row. REPORT_STAGE2.md flower parts checked: no corrections, 3 optional notes (#975). pytest at 16ec325: no failures.
 - End state: sysmon and run follower stopped; island runtime data and temp analysis files removed; `deploy/flower-vm/endstate.sh` -> CLEAN (tc fq_codel, no flhub-netem timers, no straggler scopes, nothing armed, no experiment processes, E5 extras stopped, flw-h5/flw-h6 HEALTHY, 14 GB free).
 - Next: report-ready to central; on 'S2 all-done' final worklog entry and ~/.flhub/stage2/DONE.
+
+### 2026-10-14T09:35Z — S5 — S2 all-done; DoD items verified from the flower VM
+- Central #985 `S2 all-done` (DoD verified, REPORT_STAGE2.md §12). Checked here: milestones S0-ready #116, S1-core #129, S2-flower #154, S2-nvflare #165, S2-vantage6 #199, S2-mixed #200, S3-frozen #210 (re-freeze #396), S4-done #959 on the bus; README.md and REPORT.md each link REPORT_STAGE2.md; docs/report/stage2/bus_transcript.md pushed (#98-#989, 892 messages, 2c4e0e8; asked for in #988); 287 commits since stage1-final all Zare2001 author+committer, no trailers or attribution; pytest at 2c4e0e8: no failures; flower section and ledger rows final.
+- Flower VM end state (endstate.sh, stable): CLEAN - tc fq_codel, no flhub-netem timers, no straggler scopes, nothing armed, no experiment processes, E5 extras stopped, flw-h5 + flw-h6 connected and HEALTHY (watchdog cron flock -o), 14 GB free. Island venv removed; the VM holds the hospital side (~/venvs/flower, ~/flhub-data, ~/flhub-runtime/flower) and the repo checkout.
+- ~/.flhub/stage2/DONE created.
