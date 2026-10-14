@@ -189,9 +189,11 @@ def main() -> int:
     ap.add_argument("--rounds", type=int, default=3)
     ap.add_argument("--keep", action="store_true", help="keep the working directory (logs, run directories)")
     args = ap.parse_args()
-    # SIGTERM (from `timeout` or a cancelled CI job, for example) would end Python without running the
-    # clean-up below; as SystemExit it stops the started processes and removes the working directory.
-    signal.signal(signal.SIGTERM, lambda *_: sys.exit(143))
+    # SIGTERM (from `timeout` or a cancelled CI job) and SIGHUP (a closed terminal or SSH session) would end
+    # Python without running the clean-up below; as SystemExit they stop the started processes and remove
+    # the working directory.
+    for sig in (signal.SIGTERM, signal.SIGHUP):
+        signal.signal(sig, lambda signum, _frame: sys.exit(128 + signum))
     work = Path(tempfile.mkdtemp(prefix="flhub-flower-example-"))
     print(f"working directory {work}", flush=True)
     try:
