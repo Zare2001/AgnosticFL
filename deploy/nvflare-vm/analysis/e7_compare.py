@@ -38,8 +38,11 @@ def main():
     hub_total = {r: h[r].get("round/total_s") for r in rounds}
     diffs = {}
     nvh = nat / "native_vs_hub.json"
-    if nvh.exists():
-        diffs = {r["round"]: r for r in json.loads(nvh.read_text())["rounds"]}
+    if nvh.exists():  # adapters.nvflare.native compare ("rounds") or central's finalize_run.py ("per_round")
+        d = json.loads(nvh.read_text())
+        for r in d.get("rounds") or d.get("per_round") or []:
+            diffs[r["round"]] = {"global_max_abs_diff": r.get("global_max_abs_diff", r.get("max_abs_diff")),
+                                 "one_step_aggregation_diff": r.get("one_step_aggregation_diff")}
     print("| round | native s | hub s (dispatch..aggregated) | hub total s (+eval) | global max abs diff | one-step aggregation diff |")
     print("|---|---|---|---|---|---|")
     for r in rounds:
@@ -54,7 +57,8 @@ def main():
         summary["overhead_pct"] = round(100 * (sh["median"] - sn["median"]) / sn["median"], 1)
     if diffs:
         summary["native_vs_hub_max_diff"] = max((v.get("global_max_abs_diff") or 0) for v in diffs.values())
-        summary["max_one_step_aggregation_diff"] = max((v.get("one_step_aggregation_diff") or 0) for v in diffs.values())
+        steps = [v["one_step_aggregation_diff"] for v in diffs.values() if v.get("one_step_aggregation_diff") is not None]
+        summary["max_one_step_aggregation_diff"] = max(steps) if steps else None
     print()
     print(json.dumps(summary, indent=1))
 
