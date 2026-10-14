@@ -2,7 +2,7 @@
 
     python scripts/stage2/cost_model.py [--out docs/report/stage2/cost_model.md]
 
-Per framework, least squares on the E4a single-framework sweeps (echo training, train ≈ 0): fan-out
+Per framework, least squares on relative residuals on the E4a single-framework sweeps (echo training, train ≈ 0): fan-out
 time (dispatch to the last result of the framework's two sites; median of rounds 2-3) = a + b · P,
 with P the payload in MiB. vantage6 grows superlinearly beyond 64 MiB (its server is CPU-bound in one process), so
 its predictions use the linear fit on 1-64 MiB (the learning models are <= 43 MiB); a quadratic fit
@@ -56,7 +56,8 @@ def median_rounds(name: str, fn, first: int = 2) -> float | None:
 
 
 def fit(x: list[float], y: list[float], deg: int) -> tuple[np.ndarray, float]:
-    coef = np.polyfit(x, y, deg)
+    # relative residuals (w = 1/y): sizes span 1-256 MiB, an unweighted fit would ignore the small ones
+    coef = np.polyfit(x, y, deg, w=1 / np.array(y))
     pred = np.polyval(coef, x)
     ss_res = float(np.sum((np.array(y) - pred) ** 2))
     ss_tot = float(np.sum((np.array(y) - np.mean(y)) ** 2))
