@@ -43,6 +43,8 @@ new_weights, num_examples, metrics = train(weights, load_site(path_or_dataframe)
 
 `data_fp` (32 bits of the fingerprint of the data the site trained on) lets the hub check that a site used the intended data variant. `client_code_version` lets it check that every site ran byte-identical training code; with `strict_code_version: true` in the run configuration, the hub rejects updates from other code. The adapter adds the envelope fields the hospital does not need to know (round, base model, configuration hash; [protocol](protocol.md) §3).
 
+The vantage6 algorithm also returns `site_id` (taken from the `sites` input) and `base_model`, the sha256 reference of the weights it received; the adapter rejects a result whose site or base model does not match ([vantage6 §3.1](frameworks/vantage6.md#31-the-algorithm)).
+
 ## Determinism requirements
 
 - Run `flhub_core` as shipped by the operator, byte-identical (its `code_version` must match the hub's).

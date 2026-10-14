@@ -37,7 +37,7 @@ class MyAdapter(BaseAdapter):
 
 `run_round` should poll `task.cancelled`, `task.site_cancelled(site)` and `task.deadline_exceeded()` while it waits, and stop the framework's work for a cancelled site; `on_cancel_sites(task, sites)` is called right after a per-site cancel. Start the service with `MyAdapter(sites, HubClient(hub_url)).serve(host, port)`.
 
-**`RelayAdapter`** ([`adapters/common/relay.py`](../adapters/common/relay.py)): the adapter class needs little more than its name (optionally its own `site_status()`). The relay runs inside the framework server:
+**`RelayAdapter`** ([`adapters/common/relay.py`](../adapters/common/relay.py)): the adapter class needs little more than its name (optionally its own `site_status()`). In practice the adapter also keeps the relay itself alive: the NVFlare adapter submits, adopts and restarts the relay job through the FLARE API and probes which sites run it (most of its 239-line `service.py`); the Flower adapter launches and relaunches the relay run with `flwr run`. The relay runs inside the framework server:
 
 ```python
 relay = RelayClient("http://127.0.0.1:<adapter port>")

@@ -32,11 +32,12 @@ Each finding is described with its cause in the framework guide's §6, and draft
 **vantage6 4.15.2** ([guide](frameworks/vantage6.md#6-limits-known-issues-and-knobs)):
 
 1. A node drops a finished result when its websocket is down, and trains again after reconnecting.
-2. The server rewrites the whole run row (including its input) for every algorithm log line; with SQLite this blocks the single worker for minutes with large models.
-3. Task listings load every stored input and result; deleting a task with subtasks orphans their runs.
-4. Nodes never delete their task folders.
-5. The large-result store is not usable (1 MiB upload chunks against uWSGI's 1 MiB limit).
-6. The command-line tool has formatting bugs on Python 3.11 (worked around, ADR-005 in [design/decisions.md](design/decisions.md)).
+2. A node receives each run's full input four times per site and round (the run listing, the responses to its two PATCH requests, an extra `GET run/<id>`), and that input is base64-encoded twice, so the network carries 5–9× the payload.
+3. The server rewrites the whole run row (including its input) for every algorithm log line; with SQLite this blocks the single worker for minutes with large models.
+4. Task listings load every stored input and result; deleting a task with subtasks orphans their runs.
+5. Nodes never delete their task folders.
+6. The large-result store is not usable (1 MiB upload chunks against uWSGI's 1 MiB limit).
+7. The command-line tool has formatting bugs on Python 3.11 (worked around, ADR-005 in [design/decisions.md](design/decisions.md)).
 
 **Flower 1.39.0** ([guide](frameworks/flower.md#6-limits-known-issues-and-knobs)):
 
@@ -61,7 +62,7 @@ In order of priority:
 
 1. **Privacy and security.** Secure aggregation between the adapters, so that the hub sees only the aggregate (a protocol extension with masked updates and an aggregation step), and differential privacy at the clients through `flhub_core`. TLS on every link: Flower TLS with SuperNode authentication, HTTPS for vantage6, an authenticated registry and images pinned by digest; the NVFlare admin port on loopback; authentication for the hub's own services; separate operators per framework.
 2. **vantage6 at larger models.** A PostgreSQL server database or `share_algorithm_logs: false` at the nodes (both candidates are untested), support for encrypted collaborations in the adapter, and a test with vantage6 5.x.
-3. **Framework isolation and latency.** One NVFlare relay job per hospital, so that one hospital's failure no longer touches the others; a lower NVFlare `task_request_interval` for small models; a Flower relay that survives a SuperLink restart and a SuperLink database that releases space.
+3. **Framework isolation and latency.** One NVFlare relay job per hospital, so that one hospital's failure no longer touches the others; a lower NVFlare `task_request_interval` for small models; a Flower relay that survives a SuperLink restart and a SuperLink database that releases space; for Flower, ClientApp processes that serve more than one message (a Flower change: in 1.39.0 every message starts a fresh `flwr-clientapp`, in both isolation modes, which is most of Flower's 5.5 s floor).
 4. **Methods.** More seeds on the real system; a wider tuning grid, with server learning rates per model size and participation level; longer runs of larger models; federated evaluation at the sites; robust aggregators; client control variates (SCAFFOLD).
 5. **Infrastructure.** Heterogeneous hardware with the tolerance mode, real wide-area links, the hub on a separate host from the framework servers, and a pilot with real hospitals, data-quality checks and a governance model for the hub operator.
 6. **More frameworks** through the same adapter contract ([adding a framework](adding-a-framework.md)).

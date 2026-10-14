@@ -14,8 +14,8 @@ The hospitals keep their framework, client and credentials. Everything below hap
    | Framework | What the adapter needs | Hospital-side items |
    |---|---|---|
    | NVFlare 2.9 | an admin startup kit allowed to submit jobs with custom code; the relay job exported with `python -m adapters.nvflare.job` | remove an installed `flhub_core` and restart the client once; the data file |
-   | vantage6 4.15 | a vantage6 user in an organisation that takes part in an unencrypted collaboration; the algorithm image in a registry the nodes can reach | allow the image in the node policy; one database per data variant; restart the node once |
-   | Flower 1.39 | access to the SuperLink's HTTP API (`flwr run`) through a connection in `$FLWR_HOME/config.toml` | `site-id` (and optionally `data-path`) in the SuperNode's node config; restart it once; the data file |
+   | vantage6 4.15 | a vantage6 user in an organisation that takes part in an unencrypted collaboration; the algorithm image in a registry the nodes can reach | allow the image in the node policy; one database per data variant; `share_config: false` (recommended); restart the node once |
+   | Flower 1.39 | access to the SuperLink's HTTP API (`flwr run`) through a connection in `$FLWR_HOME/config.toml`; the hub package with numpy and safetensors in the environment from which the SuperLink starts its ServerApps (the relay imports `adapters.common`; `flhub_core` comes with the FAB) | `site-id` (and optionally `data-path`) in the SuperNode's node config; restart it once; the data file |
 
 5. **Configuration.** List each adapter's URL and sites in a topology ([`configs/stage2/topology.yaml`](../configs/stage2/topology.yaml)) and write run configurations that name the sites ([`configs/`](../configs/README.md)).
 6. **Check.** Every adapter's `discover` lists its sites as `online`. Run the conformance suite against test clients provisioned with the benchmark site ids ([adding a framework](adding-a-framework.md#the-conformance-suite)), then a few rounds with the real hospitals: every site's `client_code_version` is in the round records (`rounds/rNNNN.json`), and `strict_code_version: true` rejects updates from other code.
@@ -40,7 +40,7 @@ These are the testbed's values ([`deploy/topology.env`](../deploy/topology.env))
 | Framework | The adapter holds | The hospitals hold | Hub-specific for hospitals |
 |---|---|---|---|
 | NVFlare | the operator's admin kit (controls the NVFlare project) | their startup kits (mTLS certificates) from `nvflare provision` | none |
-| vantage6 | a user password (controls what that user's organisation may do) | their node API keys from the server | none |
+| vantage6 | a user password. On the testbed the user came from the entities import, which gives every imported user a role with all rules of the server (vantage6 4.15.2 `controller/fixture.py`), so this password controls the whole vantage6 server; a role limited to the collaboration's tasks was not tested | their node API keys from the server | none |
 | Flower | none on the testbed (`--insecure`) | none on the testbed | none |
 
 The hub adds no credentials at the hospitals. Keep the operator's credentials in files readable only by the operator (the testbed uses `~/flhub-runtime/` and `~/.flhub/secrets.env`, mode 600, never the repository). What a production deployment must add (TLS, authentication, image pinning) is in the [trust and security model](architecture.md#trust-and-security-model).
