@@ -70,3 +70,11 @@ Newest entry at the bottom. Format: `## <UTC> — <what>` then facts (commands, 
 - #1199 (pytest without FLHUB_DATA_DIR writes into ~/flhub-data): on this VM nothing in ~/flhub-data is newer than 10:00Z; nvf-h1.csv/v6-h3.csv date from 2026-10-13T15:43Z (stage-2 baseline) and stay (#1203).
 - Testbed end state (read-only `bash deploy/flower-vm/status.sh`, 19:19:08Z, exit 0): flw-h5 pid 457389 node 1904685626967891070, flw-h6 pid 474920 node 16440330416478537649, connected, watchdog enabled, HEALTHY: unchanged since R0. All temporary clones, venvs and example directories under /tmp removed except the dev venv /tmp/flwex (removed at close).
 - Next: after central's `S3 examples-done`, recreate ~/.flhub/stage3/DONE.
+
+## 2026-10-14T21:35Z — examples-done on hold: process leaks; flower SIGTERM fix f649b4f
+
+- Central held `S3 examples-done` (#1208): examples/new-framework/check.sh leaked 2 adapters per run ('cd $REPO && python ... &' gives $! = the subshell). Flower VM check (#1210): no example processes; only the testbed's SuperNodes/SuperExecs and 2 defunct flwr-clientapp zombies of the testbed SuperExec started 09:01:45Z/09:01:48Z (stage 2), left untouched. Reviewed central's fix f5f73d2: correct (#1212).
+- Own finding: examples/flower/run_local.py cleans up in `finally` with killpg, but Python's default SIGTERM ends without `finally`. Test: SIGTERM after 'relay run started' leaked hub core, SuperLink, adapter, 2 SuperNodes, orchestrator and the working directory (stopped by process group and removed; the dying adapter's `flwr stop` recreated `<workdir>/flwr-home` once, removed too). Fix f649b4f on fix/examples-check-cleanup: SIGTERM -> `sys.exit(143)` at the start of main() (#1220, CHANGELOG text for central included).
+- Mistake noted: my first re-test started the script with `cd ... && python ... &`, so SIGTERM hit a subshell (the bug of #1208); repeated with the command started directly.
+- Verified from a fresh clone of f649b4f + fresh venv, 21:28:58-21:31:21Z: --check ok; run_local PASS (INV-1 hashes_equal=True); SIGTERM -> exit 143, no example process left (right after exit and 5 s later), working directory removed (#1226). An apparent '2 left' was my checking shell's own command line matching the pgrep pattern.
+- Next: central's PR for the fix branch, owner merge, confirm main, `S3 examples-done`, then recreate DONE.
