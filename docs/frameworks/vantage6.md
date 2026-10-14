@@ -352,7 +352,7 @@ vantage6 set the round time of the mixed federation for every model. Its overhea
 | linear, 1–128 MiB | 3.65 | 1.680 | 0.581 |
 | with a quadratic term, 1–128 MiB (c = 0.019 s/MiB²) | | | 0.981 |
 
-Predictions with the 1–64 MiB fit plus the slowest site's training: −31 to −38 % for `cnn-small` (the line underestimates the fixed cost per task, and real training adds reading the database and a slower container exit), −3 to −4 % for `cnn-medium`, +10 % for `resnet18-gn`. The cost per MiB is 1.49 s against 0.021 s for NVFlare and 0.061 s for Flower, and growth above 64 MiB is superlinear (§6.1).
+Predictions with the 1–64 MiB fit plus the slowest site's training: −31 to −38 % for `cnn-small`, −3 to −4 % for `cnn-medium`, +10 % for `resnet18-gn`. For small models the line underestimates the fixed cost per task (a = 4.13 s against 6.3 s measured at 1 MiB), and real training adds about 0.8 s per task that the echo runs do not have: reading the CSV database into a DataFrame, and a slower container exit after a torch run ([stage-2 report](https://github.com/Zare2001/AgnosticFL/blob/stage2-final/REPORT_STAGE2.md) §6.6). The cost per MiB is 1.49 s against 0.021 s for NVFlare and 0.061 s for Flower, and growth above 64 MiB is superlinear (§6.1).
 
 ### 5.4 Network efficiency
 
