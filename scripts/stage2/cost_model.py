@@ -1,6 +1,6 @@
 """Round-time cost model for RQ4 (REPORT_TEMPLATE §6): round_time ≈ a + b·payload + max_k train_k.
 
-    python scripts/stage2/cost_model.py [--out docs/report/stage2/cost_model.md]
+    python scripts/stage2/cost_model.py [--out docs/results/evidence/stage2/cost_model.md]
 
 Per framework, least squares on relative residuals on the E4a single-framework sweeps (echo training, train ≈ 0): fan-out
 time (dispatch to the last result of the framework's two sites; median of rounds 2-3) = a + b · P,
@@ -25,7 +25,7 @@ import numpy as np
 
 REPO = Path(__file__).resolve().parents[2]
 RUNS = Path.home() / "flhub-runtime" / "runs" / "stage2"
-OUT = REPO / "docs" / "report" / "stage2" / "cost_model.md"
+OUT = REPO / "docs" / "results" / "evidence" / "stage2" / "cost_model.md"
 FWS = ["nvflare", "vantage6", "flower"]
 SIZES = [1, 8, 32, 64, 128, 256, 512]
 PREFIX = {"nvflare": "nvf-", "vantage6": "v6-", "flower": "flw-"}

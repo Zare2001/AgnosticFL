@@ -84,5 +84,5 @@ def enqueue(job: dict) -> Path:
 
 
 def finalized(name: str) -> bool:
-    rows = (REPO / "docs" / "report" / "stage2" / "runs.md").read_text().splitlines()
+    rows = (REPO / "docs" / "results" / "evidence" / "stage2" / "runs.md").read_text().splitlines()
     return any(r.startswith(f"| {name} |") for r in rows)

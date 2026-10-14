@@ -14,7 +14,7 @@ trap 'rm -f "$RUNS/HOLD_POST"' EXIT
 v6purge() { bash deploy/central/vantage6/purge.sh --vacuum 2>&1 | tail -3; sleep 30; }
 drain() {  # drain <name>: post-processing runs (no E3 run active) until <name> is finalized or failed
   rm -f "$RUNS/HOLD_POST"
-  until grep -q "^| $1 |" docs/report/stage2/runs.md || ls "$RUNS/queue-failed/"*"-$1.json" >/dev/null 2>&1; do
+  until grep -q "^| $1 |" docs/results/evidence/stage2/runs.md || ls "$RUNS/queue-failed/"*"-$1.json" >/dev/null 2>&1; do
     sleep 30
   done
   echo "drained $1 $(date -u +%FT%TZ)"

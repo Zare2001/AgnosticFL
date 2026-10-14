@@ -1,10 +1,10 @@
 """Read-only W&B audit for the stage-2 Definition of Done (PLAN.md stage 2 §9.5).
 
-    python scripts/stage2/wandb_audit.py [--out docs/report/stage2/evidence/wandb_audit.json]
+    python scripts/stage2/wandb_audit.py [--out docs/results/evidence/stage2/wandb_audit.json]
 
 Lists every run of project AgnosticFL-stage2 and checks: state finished, tag `final`, group and tag
 E<n> matching the name (s2-e<n>[a-e]-...), unique names, and that the set of names equals the rows of
-docs/report/stage2/runs.md. Counts the runs of the stage-1 project AgnosticFL (must stay 6). Never
+docs/results/evidence/stage2/runs.md. Counts the runs of the stage-1 project AgnosticFL (must stay 6). Never
 writes to or deletes from W&B. Exit 0 only if every check passes.
 """
 
@@ -19,8 +19,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
-RUNS_MD = REPO / "docs" / "report" / "stage2" / "runs.md"
-OUT = REPO / "docs" / "report" / "stage2" / "evidence" / "wandb_audit.json"
+RUNS_MD = REPO / "docs" / "results" / "evidence" / "stage2" / "runs.md"
+OUT = REPO / "docs" / "results" / "evidence" / "stage2" / "wandb_audit.json"
 NAME = re.compile(r"^s2-e(\d)[a-e]?-[a-z0-9.\-]+$")
 
 

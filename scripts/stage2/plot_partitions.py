@@ -1,7 +1,7 @@
 """Site x class heat maps of the stage-2 partitions (report figure 1).
 
     python scripts/stage2/plot_partitions.py [--manifests configs/stage2/partitions]
-                                             [--out docs/report/stage2/figures/partitions.png]
+                                             [--out docs/results/figures/partitions.png]
 
 One panel per OrganAMNIST pid; cell = share of the site's samples in that class (row-normalised),
 row label = site and its size, so both label skew and quantity skew are visible.
@@ -35,7 +35,7 @@ def main(argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--manifests", default="configs/stage2/partitions")
     ap.add_argument("--dataset", default="organamnist")
-    ap.add_argument("--out", default="docs/report/stage2/figures/partitions.png")
+    ap.add_argument("--out", default="docs/results/figures/partitions.png")
     args = ap.parse_args(argv)
     cmap = LinearSegmentedColormap.from_list("blue", BLUE_RAMP)
     plt.rcParams.update({"font.size": 8, "text.color": TEXT, "axes.labelcolor": TEXT2,
