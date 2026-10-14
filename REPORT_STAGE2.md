@@ -256,7 +256,21 @@ The model explains NVFlare and Flower within 8 % across a 200× range of model s
 - **Accuracy drops with more, smaller sites** at the same number of rounds (81.7 → 74.9 %): each site makes half as many local steps per round, so the averaged update is smaller.
 - Registered but offline sites did not block any other run: the extra sites stayed registered and offline in every run before and after E5, as in conformance v2 (§3).
 
-*(pending: E7)*
+### 6.5 E7 — overhead against each framework's native FedAvg
+
+Same two hospitals, same `flhub_core.train`, same config: C1 = `cnn-small`, `iid`, 20 rounds; C2 = `payload-45` echo, 5 rounds. The native server part ran on central next to the idle hub relay (NVFlare's built-in FedAvg controller, vantage6's central function on a hub-operator node, Flower's `FedAvg` strategy in a ServerApp). Median round time over rounds ≥ 2, each framework agent with one definition for both paths (dispatch to aggregated model; details in the framework sections). Finalized as mode `native` with the per-round weight comparison against the matching hub run.
+
+![e7](docs/report/stage2/figures/e7_native_vs_hub.png)
+
+| framework | C1 native / hub (s) | hub overhead C1 | C2 native / hub (s) | hub overhead C2 | native vs hub weights |
+|---|---|---|---|---|---|
+| NVFlare | 3.50 / 3.27 | −0.23 s (−6.5 %) | 2.52 / 2.62 | +0.10 s (+4.1 %) | 3.0e-8 after round 1 (NVFlare's FedAvg accumulates in float32); C1: SGD amplifies it to 0.68 by round 20; C2 (echo): 2.2e-8 throughout |
+| vantage6 | 8.81 / 8.81 | 0.00 s (0 %) | 95.5 / 82.1 | −13.4 s (−14 %) | hash-identical in every round |
+| Flower | 9.48 / 7.55 | −1.93 s (−20 %) | 7.45 / 8.19 | +0.73 s (+9.8 %) | hash-identical in every round |
+
+- **The translation layer costs at most 0.7 s per round here, and is often faster than the native path.** Where the hub path is slower it pays for the weights' round trip through the hub core (Flower C2: push 0.63 s, store 0.19 s per site). It is faster where the native exchange waits more: Flower's `Grid.send_and_receive` sleeps 3 s between pulls, while the relay pulls every second. vantage6's native central function moves inputs and results through the node proxy and waits on one multi-organisation subtask, while the adapter uploads per site in parallel and fetches each result as soon as that site is done.
+- **The hub's FedAvg equals the native FedAvg** of vantage6 and Flower bit for bit. Both sites hold the same number of examples, so p_k = 0.5 is exact in float32. NVFlare's built-in aggregator accumulates in float32 and differs by 3e-8 after one round, within the 1e-5 tolerance. Over 20 rounds of training the two trajectories drift apart, as any two numerically different runs do (round-by-round test accuracy follows the same dips; mean over rounds 16–20: 63.5 % native, 66.8 % hub). The Flower agent's island test with unequal sizes (`qty`) shows the same float32 effect for Flower (3e-8, growing through SGD).
+- **Extra processes on the hub path:** the adapter (about 40–170 MB RSS), the hub core (about 45 MB) and, for NVFlare and Flower, the long-lived relay job or ServerApp; the orchestrator replaces the native server logic. For Flower C1 the hub path used 0.6 GB in total against 0.62 GB for the native ServerApp (C2: 1.05 against 0.89 GB).
 
 ## 7. RQ5 — Robustness (E6)
 

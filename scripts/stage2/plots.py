@@ -453,10 +453,17 @@ def fig_e7(out: Path) -> None:
     x = np.arange(len(rows))
     ax.bar(x - 0.18, [r[2] or 0 for r in rows], width=0.34, color=SERIES[2], label="native FedAvg")
     ax.bar(x + 0.18, [r[1] or 0 for r in rows], width=0.34, color=SERIES[0], label="hub path")
+    for i, (_, hub_t, nat_t) in enumerate(rows):
+        for dx, v in ((-0.18, nat_t), (0.18, hub_t)):
+            if v:
+                ax.annotate(f"{v:.1f}", (i + dx, v), xytext=(0, 3), textcoords="offset points", ha="center",
+                            fontsize=7, color=TEXT)
+    ax.set_yscale("log")
     ax.set_xticks(x, [r[0] for r in rows])
-    ax.set_ylabel("median round time (s, rounds >= 2)")
-    ax.set_title("E7: native FedAvg vs the hub path per framework", loc="left")
-    ax.legend(fontsize=8)
+    ax.set_ylabel("median round time (s, rounds >= 2, log)")
+    ax.set_title("E7: native FedAvg vs the hub path per framework (round/duration_s as recorded)", loc="left",
+                 fontsize=9)
+    ax.legend(fontsize=8, loc="upper left")
     save(fig, "e7_native_vs_hub", out)
 
 
