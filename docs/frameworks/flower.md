@@ -1,0 +1,369 @@
+# Flower guide
+
+This guide explains how the hub drives a [Flower](https://flower.ai) federation: what runs on the server side, what a Flower hospital runs, how to deploy the adapter next to an existing Flower federation, what it costs, and what we learned in testing. The framework-independent part of the client contract is in [client-contract.md](../client-contract.md); the wire protocol between the hub and the adapters is in [protocol.md](../protocol.md).
+
+## 1. Summary
+
+| | |
+|---|---|
+| Tested version | Flower (`flwr`) 1.39.0, Python 3.11.17, torch 2.14.1+cpu, numpy 2.4.4, safetensors 0.8.0 ([`deploy/versions.env`](../../deploy/versions.env)) |
+| Status | Tested in stage 1 (flhub/0.1) and stage 2 (flhub/0.2). Conformance suite v2: 13 of 13 checks pass against the deployed system, weight difference 0.0 in every round. 53 of the 69 stage-2 real runs included the Flower sites; all 69 equal the framework-free simulation (maximum weight difference 0.0). |
+| Server side | the Flower adapter [`adapters/flower/service.py`](../../adapters/flower/service.py) (flhub on `127.0.0.1:8813`) and the relay ServerApp [`clients/flower/flhub_flower/server_app.py`](../../clients/flower/flhub_flower/server_app.py), which runs inside one long-lived Flower run on the SuperLink |
+| Hospital side | the standard `flower-supernode` with the standard ClientApp [`clients/flower/flhub_flower/client_app.py`](../../clients/flower/flhub_flower/client_app.py), which calls `flhub_core.train` |
+| Rollout channel | the FAB (Flower App Bundle). The adapter packs `flhub_core` into the FAB of the relay run; connected SuperNodes fetch it with the next run. A new `flhub_core` version needs no hospital action and no restart. |
+| Transport security in the testbed | none (`--insecure`), restricted by the cloud firewall. TLS and SuperNode authentication are future work (§8). |
+
+What the adapter does: it keeps one Flower run alive on the SuperLink. That run's ServerApp, the *relay*, takes each round from the adapter and sends one standard TRAIN message per site through Flower's `Grid`; the hospitals answer through Flower's Message API, and the relay hands every reply back to the adapter as a per-site result.
+
+Sources for this guide. Full stage reports and Flower sections at their tags: [stage-1 report](https://github.com/Zare2001/AgnosticFL/blob/stage1-final/REPORT.md), [stage-1 Flower section](https://github.com/Zare2001/AgnosticFL/blob/stage1-final/docs/report/flower.md), [stage-2 report](https://github.com/Zare2001/AgnosticFL/blob/stage2-final/REPORT_STAGE2.md), [stage-2 Flower section](https://github.com/Zare2001/AgnosticFL/blob/stage2-final/docs/report/stage2/flower.md). Decisions: ADR-007, ADR-016 and ADR-017 in [design/decisions.md](../design/decisions.md). Evidence: conformance reports [stage 1](../results/evidence/stage1/conformance-flower-central.json) and [stage 2](../results/evidence/stage2/conformance-v2-flower-central.json), the run tables in [tables.md](../results/evidence/stage2/tables.md) (the equivalence check of every real run is under RQ1) and the [hospital ledger](../results/evidence/hospital-ledger.md). Summaries of both stages: [results/stage1.md](../results/stage1.md), [results/stage2.md](../results/stage2.md).
+
+## 2. Server side: how the adapter maps flhub onto Flower
+
+### 2.1 Components
+
+All server-side components run on the central host, next to the hub.
+
+| Component | Process | Listens on | Code |
+|---|---|---|---|
+| SuperLink | `flower-superlink` | Fleet API `0.0.0.0:9092` (hospitals), HTTP API `127.0.0.1:9093` (`flwr run`, ServerApp runtime) | Flower |
+| relay ServerApp | `flwr-serverapp`, started by Flower's `flower-superexec` for the relay run | none (client of 9093 and 8813) | [`server_app.py`](../../clients/flower/flhub_flower/server_app.py) |
+| Flower adapter | `python -m adapters.flower.service` | `127.0.0.1:8813` (flhub JSON-RPC and `/relay/*` routes) | [`service.py`](../../adapters/flower/service.py), on [`adapters.common.RelayAdapter`](../../adapters/common/relay.py) |
+| hub core | `python -m hub.core` | `127.0.0.1:8800` (blob store) | [`hub/`](../../hub/) |
+
+The relay is a normal ServerApp: Flower starts it like any other run, and it only uses the public `Grid` API. It exists because a Flower server workflow must run inside a Flower run; the adapter itself stays outside Flower.
+
+### 2.2 One round, step by step
+
+```mermaid
+sequenceDiagram
+    participant O as Orchestrator
+    participant A as Flower adapter (:8813)
+    participant R as Relay ServerApp
+    participant H as Hub core (:8800)
+    participant L as SuperLink
+    participant N as Hospital SuperNode + ClientApp
+    O->>A: dispatch (round, sites, global model ref, train_config, deadline)
+    R->>A: GET /relay/next (long poll)
+    A-->>R: train job
+    R->>H: fetch global weights (blob ref)
+    R->>L: push one TRAIN message per site
+    N->>L: pull message (and the run's FAB, once)
+    N->>N: fresh flwr-clientapp runs flhub_core.train
+    N->>L: reply: new weights, num-examples, metrics, site-info
+    R->>L: pull replies (every 1 s)
+    R->>H: store each site's weights (blob)
+    R->>A: per-site result or per-site error
+    O->>A: collect
+```
+
+1. The orchestrator calls `dispatch` on the adapter. [`RelayAdapter`](../../adapters/common/relay.py) queues a job: job id, round, sites, the global model's blob reference, `config` (the dispatch `train_config` plus `round`) and the deadline.
+2. The relay long-polls `GET /relay/next` (5 s timeout, `poll-timeout-s`) and sends its FAB id with every poll. It fetches the global weights from the hub core and wraps them in an `ArrayRecord`, keeping tensor names and order.
+3. For every site with a connected SuperNode, the relay pushes one TRAIN `Message` whose content is `RecordDict({"arrays": ArrayRecord, "config": ConfigRecord})`. The message goes to that site's node id, `ttl` is the time left until the deadline, and `group_id` is the hub round. Sites without a connected SuperNode get up to min(60 s, deadline/4) to connect while the others already train; then they fail alone.
+4. Each SuperNode pulls its message over the Fleet API, fetches the run's FAB if it does not have it yet, and starts a fresh `flwr-clientapp` process that runs the ClientApp's `@app.train()` handler (§3).
+5. The relay pulls replies every second. For each reply it checks the reported `site-id`, stores the weights in the hub core and posts the site's result to the adapter at once (`/relay/site_result`). It adds its own timings to the metrics: `flower_relay_prep_s`, `flower_relay_push_s`, `flower_relay_reply_s` and `flower_relay_store_s`. Failures go to `/relay/site_error`, one site at a time.
+6. Every 5 s the relay asks the adapter which sites it still waits for (`/relay/job`). Cancelled sites are dropped; their late replies are still pulled, so they do not stay in the SuperLink, and then discarded. Every 5 s it also re-reads the online nodes: a site whose node went offline, or was replaced by a restarted SuperNode, fails at once instead of at the deadline.
+7. The adapter turns the per-site results into flhub envelopes. The orchestrator collects them, also partially (flhub/0.2 partial collect and per-site cancel).
+
+### 2.3 Sites: discovery and identity
+
+A SuperNode gets a new random node id at every start, and a ServerApp cannot read a SuperNode's `--node-config`. The relay therefore maps node ids to hub site ids with a standard Flower QUERY message:
+
+- Every 5 s the relay reads `Grid.get_node_ids()` (online nodes only) and sends a QUERY to every node it does not know yet. The ClientApp's `@app.query()` handler answers with its `site-id` (and its `flhub_core` code version).
+- The queries do not block: replies are collected on later passes; a node that does not answer within 60 s is asked again after 30 s.
+- If two nodes claim the same site (a restarted SuperNode while its old id is still listed as online), the node that answered last wins and the old id is ignored.
+- The relay reports the mapped sites to the adapter with every beat (`/relay/sites`); the adapter's `discover` lists them as `online`. Sites registered with the adapter (`--sites`) but not mapped are `offline`. Without a live relay, `discover` lists every site as `unknown`, because nothing can be dispatched.
+
+### 2.4 Relay lifecycle and liveness
+
+The adapter's relay launcher keeps exactly one relay run alive ([ADR-007, ADR-016](../design/decisions.md)):
+
+- **Start.** At start-up the adapter copies `clients/flower` and the `flhub_core` package into one FAB source directory (default `~/flhub-runtime/flower/fab-src`) and computes a content id, the *fab id* (sha256 prefix over paths and bytes). It submits the directory with `flwr run <fab-src> flhub --run-config "adapter-url=... hub-url=... fab-id=..."`; `flhub` is a connection in `$FLWR_HOME/config.toml` that points to the SuperLink's HTTP API.
+- **Liveness.** The relay posts `/relay/beat` every 5 s from its own thread (fab id, run id, current job, `flhub_core` code version). The adapter declares the relay lost after 20 s without a poll, progress post or beat. It then fails the rounds that relay had taken at once and submits a new run. It retries every 10 s while `flwr run` fails and gives a submitted run 60 s to start polling. At adapter start it waits 15 s, so that a relay that is still running can re-attach.
+- **Stale relays.** A relay that reports another fab id, for example one left over from a rollout, is told to leave and never gets a job.
+- **Stop.** On SIGTERM the adapter asks the relay to shut down and waits up to 15 s; if the relay does not take the request, the adapter runs `flwr stop <run-id>`. The relay also exits by itself when the adapter has been unreachable for 600 s.
+
+The relay's log is the Flower run log: `FLWR_HOME=<runtime>/flwr-home flwr log <run-id> flhub --show`. `curl http://127.0.0.1:8813/relay/status` shows `relay_alive`, the fab id, the relay's run id and its `flhub_core` code version.
+
+### 2.5 Ports
+
+| Port | Host | Bound to | Who connects |
+|---|---|---|---|
+| 9092 | central | all interfaces | hospital SuperNodes (Fleet API, gRPC). The only port hospitals need. |
+| 9093 | central | `127.0.0.1` | the adapter's `flwr run` / `flwr stop` and the relay ServerApp (SuperLink HTTP API) |
+| 8813 | central | `127.0.0.1` | the orchestrator (flhub JSON-RPC) and the relay (`/relay/*`) |
+| 8800 | central | `127.0.0.1` | the adapter and the relay (hub core blobs) |
+| 9094, 9095 | hospital | local | each SuperNode's own runtime API (`--port`); two SuperNodes on one host need two ports |
+
+Flower 1.39 has no separate ServerAppIo port: `flwr run` and the ServerApp share the one HTTP API on `--host/--port`. Port 9091, planned for ServerAppIo, is unused ([ADR-007](../design/decisions.md)).
+
+### 2.6 Configuration
+
+Adapter options (`python -m adapters.flower.service --help`):
+
+| Option | Default | Meaning |
+|---|---|---|
+| `--host`, `--port` | `127.0.0.1`, `8813` | flhub endpoint |
+| `--sites` | `flw-h5 flw-h6` | hub site ids served by this adapter |
+| `--hub` | `$FLHUB_HUB_URL` or `http://127.0.0.1:8800` | hub core |
+| `--app-dir` | `clients/flower` | the Flower app that goes into the FAB |
+| `--core-dir` | `flhub_core/src/flhub_core` | the `flhub_core` package that goes into the FAB |
+| `--flwr-home` | `~/flhub-runtime/flower/flwr-home` | `FLWR_HOME` for `flwr run`; the FAB source goes next to it |
+| `--connection` | `flhub` | connection name in `$FLWR_HOME/config.toml` |
+| `--no-launch` | off | never start a relay run (tests) |
+
+The adapter declares `max_payload_mb` 2048 in its capabilities. The relay's run config lives in [`clients/flower/pyproject.toml`](../../clients/flower/pyproject.toml) (`[tool.flwr.app.config]`: `adapter-url`, `hub-url`, `poll-timeout-s` 5.0, `query-timeout-s` 60.0, `fab-id`); the adapter overrides `adapter-url`, `hub-url` and `fab-id` when it submits the run.
+
+SuperLink command in the testbed ([`deploy/central/flower/start.sh`](../../deploy/central/flower/start.sh)):
+
+```bash
+FLWR_HOME=~/flhub-runtime/flower/flwr-home flower-superlink --insecure \
+    --fleet-api-address 0.0.0.0:9092 --host 127.0.0.1 --port 9093 \
+    --database ~/flhub-runtime/flower/superlink.db --disable-runtime-dependency-installation
+```
+
+- `--database` keeps node ids and runs across a SuperLink restart, so connected SuperNodes stay registered.
+- `--disable-runtime-dependency-installation`: the dependencies are preinstalled; the SuperLink never installs FAB dependencies at run time.
+- The SuperLink and the SuperNodes start `flower-superexec`, `flwr-serverapp` and `flwr-clientapp` by bare name, so the venv's `bin` directory must be on `PATH`.
+
+### 2.7 Start, stop, health
+
+The reference scripts in [`deploy/central/flower/`](../../deploy/central/flower/):
+
+| Command | What it does |
+|---|---|
+| `bash deploy/central/flower/install.sh` | venv with `flwr`, torch (CPU), `flhub_core` and the hub package; writes the `flhub` connection to `$FLWR_HOME/config.toml` |
+| `bash deploy/central/flower/start.sh` | starts the SuperLink, then the adapter; the adapter starts the relay run within about 20 s |
+| `bash deploy/central/flower/status.sh [--no-sites]` | checks SuperLink ports, adapter, relay liveness and `discover`; exit 0 only when the base sites are online (`--no-sites`: do not require them) |
+| `bash deploy/central/flower/stop.sh` | stops the adapter (which ends the relay run), then the SuperLink |
+| `bash deploy/central/flower/restart.sh adapter` | rollout of a new `flhub_core`: new FAB, new relay run; SuperLink and hospitals stay connected |
+| `bash deploy/central/flower/restart.sh superlink [--kill]` | restarts the SuperLink; the adapter relaunches the relay |
+| `bash deploy/central/flower/purge.sh [--online]` | reclaims SuperLink database space (§5.5); `--online` only checkpoints the WAL |
+
+## 3. Client side: what the hospital code must contain
+
+### 3.1 What runs at a hospital
+
+A Flower hospital runs only standard Flower software plus the shared training library:
+
+- the standard `flower-supernode` process, started with the SuperLink address and a node config that names the site and its data file:
+
+  ```bash
+  flower-supernode --insecure --superlink <central-host>:9092 --port 9094 \
+      --node-config "site-id='flw-h5' data-path='/home/<user>/flhub-data/flw-h5.csv'"
+  ```
+
+- the ClientApp from the run's FAB: [`client_app.py`](../../clients/flower/flhub_flower/client_app.py) and [`records.py`](../../clients/flower/flhub_flower/records.py), plus the `flhub_core` package that the adapter puts into the same FAB;
+- a Python environment with `flwr`, torch, numpy and safetensors at the pinned versions ([`deploy/versions.env`](../../deploy/versions.env)). Flower does not install FAB dependencies at the hospital.
+
+The same FAB also carries [`server_app.py`](../../clients/flower/flhub_flower/server_app.py), the relay. It is central-side code: a SuperNode loads only the `clientapp` entry of the FAB's [`pyproject.toml`](../../clients/flower/pyproject.toml), so the relay is never imported at a hospital.
+
+```toml
+[tool.flwr.app.components]
+serverapp = "flhub_flower.server_app:app"   # relay, runs only on the central host
+clientapp = "flhub_flower.client_app:app"   # hospital ClientApp
+```
+
+In the testbed the hospital environment could not import the hub (`import adapters` and `import hub` fail), and the SuperNodes run with a working directory outside the repository.
+
+### 3.2 The ClientApp, line by line
+
+The training handler is the whole hospital-side integration ([`client_app.py`](../../clients/flower/flhub_flower/client_app.py), lines 27 and 46–61, docstring omitted):
+
+```python
+app = ClientApp()
+
+@app.train()
+def train(msg: Message, context: Context) -> Message:
+    weights = arrayrecord_to_weights(msg.content[ARRAYS])
+    train_config = dict(msg.content[CONFIG])  # flhub_core.TrainConfig keys incl. "round"
+    site_id = str(context.node_config["site-id"])
+    data_path = context.node_config.get("data-path") or site_path(site_id)
+    new_weights, num_examples, metrics = flhub_train(weights, load_site(data_path), train_config)
+    reply = RecordDict(
+        {
+            ARRAYS: weights_to_arrayrecord(new_weights),
+            METRICS: MetricRecord({"num-examples": num_examples, **metrics}),
+            SITE_INFO: _site_info(context),
+        }
+    )
+    return Message(reply, reply_to=msg)
+```
+
+| Line | Flower standard | flhub-specific |
+|---|---|---|
+| `app = ClientApp()`, `@app.train()`, `train(msg, context)` | the Message API pattern of every Flower 1.x ClientApp | — |
+| `msg.content[ARRAYS]`, `msg.content[CONFIG]` | the request's `RecordDict`; `"arrays"` and `"config"` are also the default keys of Flower's own strategies | the config holds `flhub_core.TrainConfig` keys (`lr`, `local_epochs`, `model`, `data_variant`, ...) and the hub round as `round`; it is passed on unchanged |
+| `context.node_config["site-id"]`, `.get("data-path")` | node config set on the SuperNode command line | the hub's site id and the site's data file; without `data-path` the client uses `$FLHUB_DATA_DIR/<site-id>.csv` (default `~/flhub-data`) |
+| `flhub_train(weights, load_site(data_path), train_config)` | where a Flower app runs its own training loop | **the only training code**: `flhub_core.train`, identical in every framework, deterministic (one CPU thread, seeded data order) |
+| `RecordDict({...})`, `MetricRecord`, `Message(reply, reply_to=msg)` | the standard reply | the reply carries the new weights, `num-examples` (FedAvg weight; also the default `weighted_by_key` of Flower's FedAvg) with the metrics of `flhub_core.train` (`train_loss`, `train_acc`, `train_time_s`, `data_load_s`, `peak_rss_mb`, `data_fp`), and a `site-info` record |
+
+The weights are converted without renaming or reordering ([`records.py`](../../clients/flower/flhub_flower/records.py)):
+
+```python
+def weights_to_arrayrecord(weights: Mapping[str, np.ndarray]) -> ArrayRecord:
+    return ArrayRecord(
+        {name: Array(np.ascontiguousarray(arr)) for name, arr in weights.items()}
+    )
+
+def arrayrecord_to_weights(record: ArrayRecord) -> OrderedDict[str, np.ndarray]:
+    return OrderedDict((name, arr.numpy()) for name, arr in record.items())
+```
+
+`ArrayRecord` and `Array` are Flower's standard containers. The flhub-specific part is the canonical weight format: an ordered mapping of `flhub_core` state-dict names to float32 arrays. Flower serializes each `Array` with `np.save`, so float32 values arrive bit-exact.
+
+The site-info QUERY handler lets the relay map random node ids to site ids (§2.3):
+
+```python
+def _site_info(context: Context) -> ConfigRecord:
+    return ConfigRecord(
+        {
+            "site-id": str(context.node_config["site-id"]),
+            "client-code-version": code_version(),
+            "flwr-version": version("flwr"),
+        }
+    )
+
+@app.query()
+def query(msg: Message, context: Context) -> Message:
+    return Message(RecordDict({SITE_INFO: _site_info(context)}), reply_to=msg)
+```
+
+`@app.query()` is Flower's standard handler for QUERY messages. `client-code-version` is `flhub_core.code_version()`, the package version plus a hash of its source files; the hub receives it with every site result, so it can show that every site ran the same training code. The same record is attached to every training reply.
+
+Because the record keys are Flower's defaults, the same ClientApp also served Flower's built-in `FedAvg` strategy unchanged in the native baseline (E7, §5.3).
+
+### 3.3 Data and data variants
+
+- The node config `data-path` points to the site's CSV file in the `flhub_core` layout ([client-contract.md](../client-contract.md)). `load_site(data_path)` returns a lazy handle.
+- If the round's `train_config` has a `data_variant` (for example `organamnist-dir0.3`), `flhub_core.train` reads `<variant>-<site>.csv` from the same directory instead. The SuperNode's node config is the same for every variant; no restart is needed to switch.
+- In the testbed the files were created with `flhub_core`'s provisioning tool, sha256-checked against the committed manifests:
+
+  ```bash
+  python -m flhub_core.data materialize --sites flw-h5 flw-h6                  # stage-1 files <site>.csv
+  python -m flhub_core.data materialize --variants all --sites flw-h5 flw-h6 flw-h11 flw-h12 \
+      --manifests configs/stage2/partitions                                   # stage-2 variants
+  ```
+
+  The stage-2 step took 44 s. The 20 variant files of the four Flower sites hold 222.7 MB (`du -b`); the tool also downloads the 38.2 MB OrganAMNIST source file once.
+
+### 3.4 Packaging and rollout
+
+The FAB is Flower's own code-distribution channel ([ADR-016](../design/decisions.md)):
+
+- **What a FAB may hold.** By default `flwr run` packs the app directory's `*.py`, `*.toml`, `*.md`, `*.yaml`, `*.yml`, `*.json` and `*.jsonl` files. It skips `test_*.py`, `*_test.py`, `build/`, `lib/`, `__pycache__/` and files ignored by `.gitignore`, and refuses FABs larger than 10 MiB (`FAB_INCLUDE_PATTERNS`, `FAB_EXCLUDE_PATTERNS` and `FAB_MAX_SIZE` in `flwr/common/constant.py`). `flhub_core` must therefore stay pure Python without data files.
+- **How a new version arrives.** Every message starts a fresh `flwr-clientapp`. It unpacks the run's FAB into `$FLWR_HOME/apps/<publisher>.<name>.<version>.<hash8>` and puts that directory first on `sys.path` before it imports the ClientApp (`flwr/supercore/object_ref.py:182`). A `flhub_core/` inside the FAB therefore wins over any copy installed in the hospital environment. Connected SuperNodes fetch a new run's FAB by its hash, without a restart.
+- **Rollout procedure.** Restart the adapter on the new commit (`bash deploy/central/flower/restart.sh adapter`). It stages a new FAB, starts a new relay run and retires the old one. Rollback is the same command on the old commit.
+
+The rollout of `flhub_core` 0.2 on the real system (2026-10-13; [hospital-ledger.md](../results/evidence/hospital-ledger.md)):
+
+| Step | Who | Wall time | Hospital restarts | Hospital downtime |
+|---|---|---|---|---|
+| `restart.sh adapter` on the central host | operator | 29.6 s to HEALTHY | 0 | 0 s (no relay for about 30 s on the server side) |
+| SuperNodes fetch and unpack FAB `agnosticfl.flhub-flower.0.2.0.3733e3db` | automatic, with the new relay's first message | 21.5 s after the adapter's SIGTERM | 0 | 0 s |
+
+Afterwards both hospitals reported `flhub_core` 0.2.0+fe357a1dbec1, and `python -m flhub_core.selfcheck` in the hospital runtime (hospital Python with the FAB first on `sys.path`) printed the same digest as the central host, `sha256:ac074a0b…`. The hospital environment still holds the stage-1 copy of `flhub_core` (0.1.0), which the FAB copy shadows; a hospital without any installed `flhub_core` was not tested.
+
+### 3.5 Hospital-side change ledger
+
+Every change on the Flower hospital VM during stage 2 ([hospital-ledger.md](../results/evidence/hospital-ledger.md), Flower rows). The hospital-executed code (`client_app.py`, `records.py`) has 0 changed lines since stage 1.
+
+| UTC (2026-10-13/14) | Type | What | Lines in `clients/` | Restart |
+|---|---|---|---|---|
+| 13:55 | ops | hospital venv: `flhub_core` 0.1.0 reinstalled as a fixed copy of the stage-1 release instead of an editable link to the VM's checkout | 0 (`install.sh`: 10) | no |
+| 14:41 | data | stage-2 data variants provisioned next to `<site>.csv`, sha256-checked | 0 | no |
+| 14:45 | ops | fault-injection and straggler tools for the robustness experiments | 0 | no |
+| 14:50 | ops | start/stop script for the two extra sites of the scaling experiment | 0 | no |
+| 15:10 | code | `flhub_core` 0.2 inside the FAB (§3.4) | 0 hospital-executed lines; FAB metadata only (`pyproject.toml`: version 0.2.0, `fab-id` key) | no: 0 steps, 0 restarts, 0 s downtime |
+| 21:41 | ops | watchdog cron line uses `flock -n -o` | 0 (`install.sh` 1, `extra.sh` 1) | no |
+| 16:01–09:00 | ops | experiment actions (kills, CPU quota, extra sites, traffic shaping), all reverted | 0 | automatic restarts only |
+
+### 3.6 Checklist: your Flower client must
+
+1. be a standard Flower `ClientApp`, referenced as `clientapp` in `[tool.flwr.app.components]` of the FAB's `pyproject.toml`;
+2. in `@app.train()`, read the global weights from the `"arrays"` `ArrayRecord` and the training configuration from the `"config"` `ConfigRecord`, and pass that configuration unchanged (it contains `round`) to `flhub_core.train`;
+3. train only through `flhub_core.train(weights, load_site(data_path), config)`, never with its own loop, so that every framework runs byte-identical training code;
+4. reply with `"arrays"` (the new weights: same names, same order, float32), `"metrics"` (`num-examples` plus every metric `flhub_core.train` returns, including `data_fp`) and `"site-info"` (`site-id`, `client-code-version` = `flhub_core.code_version()`);
+5. answer the site-info QUERY in `@app.query()` with its `site-id`;
+6. read `site-id` (required) and `data-path` (optional) from the SuperNode's `--node-config`;
+7. ship `flhub_core` inside the FAB and stay within the FAB rules; the hospital environment provides `flwr`, torch, numpy and safetensors at the pinned versions;
+8. import nothing from the hub (`hub`, `adapters`): only `flwr`, `flhub_core` and numpy.
+
+## 4. Deploying next to an existing Flower federation
+
+Apart from the site's data and the Python packages for training, the only change to a running Flower federation is one node-config entry per SuperNode. The adapter talks to the SuperLink as an ordinary Flower user: it submits a run with `flwr run`, and that run's ServerApp is the relay. General deployment of the hub is in [deployment.md](../deployment.md).
+
+### 4.1 Requirements
+
+- A Flower 1.39 SuperLink with connected SuperNodes (other versions are not tested).
+- The hub core and the Flower adapter on a host that reaches the SuperLink's HTTP API (`--host/--port`, the API that `flwr run` uses). In the testbed both run on the SuperLink host and the API is bound to `127.0.0.1:9093`; a separate adapter host was not tested.
+- At each hospital: torch, numpy and safetensors in the SuperNode's environment, at the versions pinned in [`deploy/versions.env`](../../deploy/versions.env). Bit-identical training across sites needs the same torch version everywhere ([client-contract.md](../client-contract.md)).
+
+### 4.2 Server side
+
+1. Install an environment with `flwr` (the SuperLink's version), torch (CPU), `flhub_core` and the hub package. [`deploy/central/flower/install.sh`](../../deploy/central/flower/install.sh) has the exact commands.
+2. Add a connection for the adapter to `$FLWR_HOME/config.toml`:
+
+   ```toml
+   [superlink]
+   default = "flhub"
+
+   [superlink.flhub]
+   address = "127.0.0.1:9093"
+   insecure = true
+   ```
+
+   For a SuperLink with TLS, replace `insecure = true` by `root-certificates = "<CA certificate file>"`. Flower 1.39 reads the keys `address`, `root-certificates`, `insecure`, `federation` and `options` (`flwr/cli/constant.py`). Not tested.
+3. Decide how the SuperLink treats the FAB's dependencies (`flwr`, numpy, safetensors in [`clients/flower/pyproject.toml`](../../clients/flower/pyproject.toml)). The testbed runs the SuperLink with `--disable-runtime-dependency-installation` and preinstalls them; the SuperLink's default (install at run time) was not tested. SuperNodes do not install dependencies unless started with `--allow-runtime-dependency-installation`.
+4. Start the hub core and the adapter from the repository checkout:
+
+   ```bash
+   python -m hub.core --port 8800
+   python -m adapters.flower.service --sites <site-id> [<site-id> ...] --hub http://127.0.0.1:8800 \
+       --flwr-home <dir containing config.toml> --connection flhub
+   ```
+
+5. Within about 20 s the adapter submits the relay run, and the relay maps each SuperNode with one QUERY (§2.3). `curl -s http://127.0.0.1:8813/relay/status` must show `"relay_alive": true`, and `discover` must list the sites as `online`. In the testbed an adapter restart took 29.6 s until both sites were online again (§3.4).
+
+### 4.3 Hospital side
+
+1. Give each SuperNode a hub site id: add `site-id='<site-id>'` and, if the data is not at `~/flhub-data/<site-id>.csv`, `data-path='<file>'` to its `--node-config`, then restart it once. The site id must be unique and must appear in the adapter's `--sites`.
+2. Provide the site's data in the `flhub_core` CSV layout at that path ([client-contract.md](../client-contract.md)), plus the variant files if the experiments use data variants (§3.3).
+3. Nothing else. The ClientApp and `flhub_core` arrive in the relay run's FAB; later `flhub_core` versions arrive the same way (§3.4).
+
+If the SuperNodes accept only signed FABs (`--trusted-entities`), the hub's FAB must be signed by a trusted entity; this was not tested.
+
+### 4.4 Credentials
+
+The testbed exchanges no credentials: Flower runs with `--insecure`, and the cloud firewall restricts the Fleet API port to the hospital hosts ([ADR-007](../design/decisions.md)). The adapter needs only access to the SuperLink's HTTP API. It needs no hospital credentials, and the hospitals need none from the hub. A federation with TLS or SuperNode authentication keeps its own certificates and keys; the adapter's connection then needs the CA certificate (§4.2 step 2).
+
+### 4.5 Verify
+
+Run the conformance suite against the adapter. It checks dispatch, collect, cancel, subset rounds, partial collect, offline sites, an adapter restart, a 64 MiB payload and a data variant, and compares every site's weights with a local run of `flhub_core.train`:
+
+```bash
+pytest tests/conformance --adapter http://127.0.0.1:8813 --sites flw-h5 flw-h6 \
+    --variant organamnist-dir0.3 --restart-cmd 'bash deploy/central/flower/restart.sh adapter'
+```
+
+Against the testbed this passed 13 of 13 checks with a weight difference of 0.0 in every round ([conformance-v2-flower-central.json](../results/evidence/stage2/conformance-v2-flower-central.json)). The suite needs the sites' data files on the machine that runs it (`--data-dir`; created if missing).
+
+### 4.6 The reference testbed
+
+[`deploy/central/flower/`](../../deploy/central/flower/) runs the server side (§2.7). [`deploy/flower-vm/`](../../deploy/flower-vm/) runs two hospitals on one VM:
+
+| Command | What it does |
+|---|---|
+| `bash deploy/flower-vm/install.sh` | hospital venv (torch CPU, `flwr`, a fixed copy of the stage-1 `flhub_core`; newer versions come with the FAB), site data, watchdog cron entry |
+| `bash deploy/flower-vm/start.sh` | starts one supervised `flower-supernode` per site ([`supernode.sh`](../../deploy/flower-vm/supernode.sh) restarts it if it exits); `FLHUB_SUPERLINK=<host>:9092` selects the SuperLink |
+| `bash deploy/flower-vm/status.sh` | per site: process alive and TCP connection to the SuperLink; HEALTHY or UNHEALTHY |
+| `bash deploy/flower-vm/stop.sh` | stops the SuperNodes and disables the watchdog |
+
+Each SuperNode has its own `FLWR_HOME` (so two nodes never unpack the same FAB at the same time), its own runtime port (9094, 9095) and a working directory outside the repository. A cron watchdog re-runs the idempotent `start.sh` every minute while the nodes are enabled.
+
+## 5. Cost and efficiency for Flower
+
+## 6. Limits, known issues and knobs
+
+## 7. Troubleshooting
+
+## 8. Future work and upstream reports
