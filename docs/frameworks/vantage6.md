@@ -253,7 +253,7 @@ Selfcheck v2 inside the pulled image, run with `--network none`, printed the hub
 
 The adapter is a vantage6 user, so an existing vantage6 4.15 server and its nodes need no new software.
 
-1. **Organisation and user for the hub.** Create or choose an organisation for the hub operator and make it a participant of the collaboration the hub will use; only participants can create tasks. Create a user for the adapter in it. In the reference deployment the users come from the entities import, which gives them the superuser role; a narrower role was not tested.
+1. **Organisation and user for the hub.** Create or choose an organisation for the hub operator and make it a participant of the collaboration the hub will use; only participants can create tasks. Create a user for the adapter in it. In the reference deployment the users come from the entities import, which gives every imported user a role with all rules of the server (`server/controller/fixture.py:81-91`), so the adapter's password controls the whole vantage6 server. The adapter needs much less (§2.2): view collaborations, organisations and nodes; create, view, kill and delete tasks; view their runs and results. A role limited to that was not tested.
 2. **Collaboration.** It must be unencrypted (`encrypted: false`), because the adapter calls `setup_encryption(None)`; an encrypted collaboration needs adapter support (§8). Each node's `encryption.enabled` must equal the collaboration's `encrypted`.
 3. **Algorithm image.** Build and push the image (§3.3) to a registry the nodes can reach. A plain-HTTP registry needs an `insecure-registries` entry in each hospital's Docker daemon, because the node pulls through the host's Docker socket. The node also supports registry logins (`docker_registries` in its configuration); this was not tested.
 4. **Hospitals.** Each hospital adds the image to its `allowed_algorithms` policy and, for data variants, one database per variant (§3.2), then restarts its node once. Recommended: `share_config: false`.
@@ -262,7 +262,7 @@ The adapter is a vantage6 user, so an existing vantage6 4.15 server and its node
 
 | Credential | Created by | Kept in |
 |---|---|---|
-| adapter user password | operator | the adapter's environment, read from a mode-600 file |
+| adapter user password (on the testbed: all rules of the server, see step 1) | operator | the adapter's environment, read from a mode-600 file |
 | `root` password, server JWT secret | operator (`install.sh`) | mode-600 files on the operator host |
 | node API key | the vantage6 server, when the node is created | the hospital's node configuration (`api_key`, mode 600) |
 | registry credentials | registry owner | none in the reference deployment (plain HTTP, limited by the firewall) |
