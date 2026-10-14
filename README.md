@@ -6,7 +6,7 @@
 
 Measured on a reference testbed of four VMs, two simulated hospitals per framework ([results](docs/results/README.md)):
 
-- **Exact.** Every compared real run is byte-identical to a framework-free FedAvg simulation: the stage-1 mixed run and all 69 stage-2 real runs, with weight difference 0.0 in every round.
+- **Exact.** Every compared real run equals its framework-free reference with weight difference 0.0: the stage-1 mixed run in all 31 checkpoints, and all 69 stage-2 real runs (66 simulated round by round, the 2 `resnet18-gn` runs by replaying rounds 1-3 and the last, the resumed run against the uninterrupted run).
 - **On par with centralized training.** 86.5 % accuracy / 0.925 AUC federated across NVFlare, vantage6 and Flower, against 86.1 % / 0.928 centralized on the pooled data (PneumoniaMNIST, 30 rounds).
 - **No hospital code changes.** 0 changed lines in the hospitals' client code while aggregators, data, models and participation changed on the hub; 0 hospital steps per library update.
 - **Small overhead.** −20 % to +10 % round time against each framework's own FedAvg, at most +0.73 s per round.
@@ -80,7 +80,7 @@ The last command prints `INV-1 … hashes_equal=True max_abs_diff=0.000e+00 -> P
 | Adapter code (code lines) | 604 | 290 | 553 |
 | Hospital steps per library update | 0 | 0 | 0 |
 | Hub vs native FedAvg, per round (small CNN / 45 MiB) | −6.5 % / +4.1 % | 0 % / −14 % | −20 % / +9.8 % |
-| Fixed cost per round + cost per MiB | 2.23 s + 0.021 s/MiB | 4.13 s + 1.49 s/MiB | 5.48 s + 0.061 s/MiB |
+| Fixed cost per round + cost per MiB | 2.23 s + 0.021 s/MiB | 4.13 s + 1.49 s/MiB up to 64 MiB, superlinear above | 5.48 s + 0.061 s/MiB |
 | Bytes on the wire ÷ update size | 1.005–1.064 | 4.97–9.08 | 1.002–1.005 |
 
 ![Round time of each framework's own FedAvg against the hub](docs/results/figures/e7_native_vs_hub.png)

@@ -218,7 +218,7 @@ Detection time is a framework property: vantage6 reports a dead algorithm contai
 
 ## 9. Learning efficiency
 
-Federated training through the hub learns exactly what a framework-free FedAvg simulation learns (all real runs hash-identical, [results](results/README.md)), so the learning cost is the cost of federation itself, not of the hub.
+Federated training through the hub learns exactly what a framework-free FedAvg simulation learns (every compared real run equals its framework-free reference, [results](results/README.md)), so the learning cost is the cost of federation itself, not of the hub.
 
 - **Stage 1** (PneumoniaMNIST, 6 IID sites, 30 rounds): federated 86.5 % test accuracy / 0.925 AUC against 86.1 % / 0.928 for centralized training on the pooled data. The federated runs stay at the majority class (62.5 %) through round 13 and reach 80 % at round 23; centralized training reaches it after 3 epochs ([final-runs.json](results/evidence/stage1/final-runs.json), [stage-1 results](results/stage1.md)).
 - **Stage 2** (OrganAMNIST, 11 classes, 50 rounds; centralized 84.7 %, target 80.5 % = 95 % of it): IID data reaches the target in 16 rounds (83.8 % final), quantity skew in 12 (84.3 %), framework-correlated skew in 20 (82.9 %); label skew (Dirichlet α 1.0 to 0.1) costs 6–9 points and does not reach the target in 50 rounds. Server momentum (FedAvgM) and FedYogi recover 2–4 points under label skew ([tables.md](results/evidence/stage2/tables.md), [stage-2 results](results/stage2.md), [aggregators](aggregators.md)).

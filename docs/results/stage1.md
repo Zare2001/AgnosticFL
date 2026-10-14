@@ -90,7 +90,7 @@ Each hospital ran its framework's standard client pattern; the only hub-specific
 | Code that runs | standard Client API loop around `flhub_core.train` | algorithm `train` (`@data(1)`, `@metadata`, `wrap_algorithm()`) around `flhub_core.train` | ClientApp `@app.train()` around `flhub_core.train`, `@app.query()` for the site id |
 | How it arrives | job custom code, deployed by the NVFlare server | image pulled by the node from the operator's registry | FAB sent by `flwr run` |
 
-Every envelope carried the same `client_code_version` (`0.1.0+9c6b064c1e96`) as the hub. In stage 2, `flhub_core` reached the NVFlare and Flower hospitals inside the job and the FAB instead of as an installed package ([stage 2](stage2.md)). The per-framework details are in the guides: [NVFlare](../frameworks/nvflare.md), [vantage6](../frameworks/vantage6.md), [Flower](../frameworks/flower.md).
+Every envelope carried the same `client_code_version` (`0.1.0+9c6b064c1e96`) as the hub. In stage 2, `flhub_core` reached the NVFlare and Flower hospitals inside the job and the FAB: the NVFlare hospitals removed their installed copy once, and on the Flower hospitals the FAB copy takes precedence over the installed one ([stage 2](stage2.md)). The per-framework details are in the guides: [NVFlare](../frameworks/nvflare.md), [vantage6](../frameworks/vantage6.md), [Flower](../frameworks/flower.md).
 
 ## Threats to validity and limits
 

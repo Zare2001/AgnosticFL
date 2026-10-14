@@ -10,7 +10,7 @@ The system was tested in two stages on a reference testbed of four VMs (the hub 
 
 | | Result | Source |
 |---|---|---|
-| Equivalence | Every compared real run is byte-identical to the framework-free FedAvg simulation: the stage-1 mixed run (31 of 31 checkpoints) and all 69 stage-2 real runs (difference 0.0 in every round, including the server-optimizer state) | [stage 1](stage1.md#results), [stage-2 tables](evidence/stage2/tables.md) |
+| Equivalence | Every compared real run equals its framework-free reference with difference 0.0: the stage-1 mixed run (31 of 31 checkpoints) and all 69 stage-2 real runs (66 simulated round by round, 2 replayed, 1 resumed run against the uninterrupted run), including the server-optimizer state | [stage 1](stage1.md#results), [stage-2 tables](evidence/stage2/tables.md) |
 | Federated vs centralized | Stage 1: 86.5 % accuracy / 0.925 AUC federated across three frameworks, against 86.1 % / 0.928 centralized on the pooled data | [final-runs.json](evidence/stage1/final-runs.json) |
 | Hospital code changed | 0 lines in stage 2, while aggregators, data, models and participation changed on the hub | [hospital ledger](evidence/hospital-ledger.md) |
 | Hospital steps per library update | 0 for all three frameworks (job custom code, image tag, FAB) | [hospital ledger](evidence/hospital-ledger.md) |
