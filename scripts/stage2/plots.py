@@ -128,13 +128,14 @@ def fig_e1_final(out: Path) -> None:
     save(fig, "e1_final_and_worst_site", out)
 
 
-def fig_e2_grid(out: Path) -> None:
+def fig_e2_grid(out: Path, key: str = "global/test_acc", fname: str = "e2_final_accuracy_grid",
+                what: str = "final test accuracy") -> None:
     pids = ["iid", "dir0.3", "dir0.1"]
     data = {}
     for pid in pids:
         for agg in AGGS:
             name = f"s2-e1-{pid}-fedavg" if agg == "fedavg" else f"s2-e2-{pid}-{agg}"
-            data[(pid, agg)] = seed_values(name, "global/test_acc")
+            data[(pid, agg)] = seed_values(name, key)
     if not any(data.values()):
         print("e2_grid: no E2 runs yet")
         return
@@ -147,10 +148,15 @@ def fig_e2_grid(out: Path) -> None:
         ax.bar(x + (i - 2.5) * width, means, width=width * 0.92, color=SERIES[i], label=agg, yerr=sds, capsize=2,
                ecolor=TEXT2)
     ax.set_xticks(x, pids)
-    ax.set_ylabel("final test accuracy (mean ± sd, 3 seeds)")
-    ax.set_title("E2: aggregator × partition (seed 2026 real, 2027/2028 hub.sim)", loc="left")
+    ax.set_ylabel(f"{what} (mean ± sd, 3 seeds)")
+    ax.set_title(f"E2: {what}, aggregator × partition (seed 2026 real, 2027/2028 hub.sim)", loc="left",
+                 fontsize=10)
     ax.legend(ncol=6, fontsize=8, loc="upper center", bbox_to_anchor=(0.5, -0.1), frameon=False)
-    save(fig, "e2_final_accuracy_grid", out)
+    save(fig, fname, out)
+
+
+def fig_e2_worst(out: Path) -> None:
+    fig_e2_grid(out, "siteshaped/min_acc", "e2_worst_site_grid", "worst-site accuracy (site-shaped)")
 
 
 def fig_e2_dir01(out: Path) -> None:
@@ -454,7 +460,8 @@ def fig_e7(out: Path) -> None:
     save(fig, "e7_native_vs_hub", out)
 
 
-FIGURES = {"e1_acc": fig_e1_acc, "e1_final": fig_e1_final, "e2_grid": fig_e2_grid, "e2_dir01": fig_e2_dir01,
+FIGURES = {"e1_acc": fig_e1_acc, "e1_final": fig_e1_final, "e2_grid": fig_e2_grid, "e2_worst": fig_e2_worst,
+           "e2_dir01": fig_e2_dir01,
            "e3": fig_e3_breakdown, "e4a_time": fig_e4a_time, "e4a_rss": fig_e4a_rss, "e4b": fig_e4b, "e5": fig_e5,
            "e6": fig_e6_timeline, "e7": fig_e7}
 

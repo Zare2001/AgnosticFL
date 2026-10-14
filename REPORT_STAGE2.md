@@ -154,6 +154,8 @@ Final test accuracy % (mean ± sd over 3 seeds; in brackets the worst-site accur
 
 Hyperparameters from S3 (tuned on `dir0.3`, validation split): fedavgm η 1.0 (β 0.9), fedadam η 0.03, fedyogi η 0.03, fedadagrad η 0.03, fedprox μ 0.01; the client lr 0.1 is shared.
 
+![e2 worst site](docs/report/stage2/figures/e2_worst_site_grid.png)
+
 ![e2 dir0.1](docs/report/stage2/figures/e2_dir01_accuracy_vs_round.png)
 
 - **Server momentum and Yogi help under label skew.** On `dir0.3` and `dir0.1`, fedavgm and fedyogi gain 2–4 pp of test accuracy over FedAvg (and up to 5 pp on the worst site on `dir0.3`). With IID data they gain nothing and reach the target later (27 and 19 rounds against 16), because their server learning rates were tuned for the skewed case.
