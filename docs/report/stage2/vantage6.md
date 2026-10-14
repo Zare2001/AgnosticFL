@@ -1,6 +1,6 @@
 # Stage 2 — vantage6 agent (145.38.186.63)
 
-Draft during S4; the experiment numbers in §5 are filled in from the final runs (`docs/report/stage2/runs.md`).
+Final (S5). Numbers come from the final runs (`docs/report/stage2/runs.md`, run data from central as bus files #72/#73/#219/#221), the vantage6 node logs on this VM and central's summaries (bus ids given).
 
 ## 1. Scope
 
@@ -14,8 +14,8 @@ Draft during S4; the experiment numbers in §5 are filled in from the final runs
 - Central scripts: `add_sites.sh` (E5 organisations and nodes through the API), `restart_server.sh` (E6e), `restart_adapter.sh` (conformance, E6d), `purge.sh [--vacuum]` (E4a), `native/` (E7), overrides for a development island (`V6_RT`, `V6_VENV`, `V6_SERVER_BIND`); extra sites listed in the adapter, health = base sites.
 - Hospital scripts: node configs with one database per data variant and `share_config: false` (ADR-014), `taskdir_gc.sh` (cron), `extra.sh` (E5), `inject.sh` and `straggler.sh` (E6, ADR-015), `netem.sh` (E4b), `sysmon.sh` and `run_follow.py` (S4 monitoring); `island.sh` and `island_round.py` for development only.
 - ADRs: 013 (adapter), 014 (data variants), 015 (E6 tools), 020 (payload path), 021 (rollout), 022 (E7 native).
-- Ledger rows: data provisioning, node config switch, task-folder GC cron (`docs/report/stage2/ledger.md`).
-- `git diff --stat stage1-final..HEAD -- clients/vantage6`: empty. For all vantage6 directories (at c2871ea): 27 files, +1589/-145 (adapter 304, native 226+165, hospital scripts ~840, central scripts ~250).
+- Ledger rows (`docs/report/stage2/ledger.md`): data provisioning; node config switch; task-folder GC cron (installed, removed after the E3 race, fixed and re-installed, removed for E4b); E5 extra nodes; E6 injections; E4b shaping.
+- `git diff --stat stage1-final..HEAD -- clients/vantage6`: empty (0 lines). For all vantage6 directories (`adapters/vantage6 clients/vantage6 deploy/vantage6-vm deploy/central/vantage6`, at the final push): 28 files, +1666/-145 (adapter service 310, native 226 + 165, hospital scripts ~900, central scripts ~250); none of it runs inside the hospitals' training code.
 
 ## 3. Rollout of flhub_core 0.2
 
@@ -69,7 +69,7 @@ Evidence: vantage6 4.15.2 source (server/node wheels, client, algorithm tools) a
   Where a vantage6 site's time goes (median of rounds 2-3, `site/<id>/*` in the run dirs from central, bus file #72): at 128 MB t_result 467 s = training 0.05 s + adapter 33-38 s (`vantage6_create_s` 10-11 s: input encoding and upload; `vantage6_fetch_s` 15-21 s: result download and decode; `vantage6_store_s` 1-2 s: hub-core store) + ~430 s inside vantage6 (server DB rows, node download/upload, log streaming). At 64 MB: 115 s = 0.03 + ~13-17 + ~100 s. Training-container peak RSS (`peak_rss_mb`): 303 MB at 1 MB, 573 MB at 64 MB, 851 MB at 128 MB.
 - E4a mixed scope (bus file #73): vantage6 sets the round time (`adapter/vantage6/fanout_s` = round duration): 1 MB 6.5 s, 8 MB 13.3 s, 32 MB 58.9 s, 64 MB 116.2 s; 128 MB 393.8 s (E4a extension, after central freed disk); 256 MB testbed disk limit.
 - E4b (payload-45, mixed, central #958; `netem.sh` on this VM shaped egress to central 7601/5050, applied/cleared per profile with the revert timer first): vantage6 fan-out (median r2-3) none 81.8 s, wan1g 83.3 s, wan100 129.5 s, wan20 463.8 s; the plan's lower bound 4P/rate (75.5 s at wan20) gives efficiency 0.16. vantage6 moves more than the plan's model assumes: per VM link and round 2 sites x (4 input copies + 1 result) x 1.78 encoding x P = 17.8P (§4), i.e. ~800 MB -> ~320 s at 20 Mbit/s, so against its own byte volume the efficiency is ~0.69 (the rest is server time).
-- E5: `extra.sh` for v6-h9/v6-h10 (configs installed, keys from central's `add_sites.sh`): _(results)_.
+- E5: `extra.sh start` brought v6-h9/v6-h10 online in 7.4 s (06:08Z; organisations and keys from central's `add_sites.sh`, database `organamnist_iid12`, image already local); each trained the 20 rounds of s2-e5-12sites; `extra.sh stop` (06:13Z) stopped them and removed their watchdog entry. vantage6 fan-out 9.1 s (6 sites) -> 10.4 s (12 sites), overhead per site 6.7 -> 8.2 s, VM CPU mean 26.7 -> 42.0 % (four training containers on 4 vCPUs; central §6.4). Registered but offline, the extras never blocked a run.
 - E6 final runs (vantage6 side; central's E6 table from the 'E6 inject' messages has the round-level outcome):
   - s2-e6a-strict: v6-h3 round-10 training start 21:27:58.939Z, SIGKILL of its training container 21:27:59.431Z (exit 137, run crashed); the strict retry's task reached v6-h3 at 21:28:01; 20 rounds finished; node up throughout.
   - s2-e6a-minsites: same injection at 21:33:17.648Z; the round went on with the other five sites.
@@ -104,10 +104,15 @@ Evidence: vantage6 4.15.2 source (server/node wheels, client, algorithm tools) a
 | island registry lost images | image missing after `island.sh up` | install.sh replaced a stopped registry container | restart it instead | d7be8ba | 5 min |
 | VM disk < 3 GB twice | df 2.5 GB / 2.0 GB | island images, build cache, payload task folders | prune, GC cron, island removal | 2e2061b | 15 min |
 | GC removed a fresh output (final run) | s2-e3-resnet18-gn-fedavg r10: v6-h3 run 'active' 30 min, node 'FileNotFoundError .../output' | adapter deletes >= 16 MB tasks per round -> sqlite reuses run ids -> the node reuses `task-<id>/` and overwrites its files, the folder mtime stays old; the cron GC (minute boundary) hit the ~1 s between container exit and the node reading the output | GC off for E3 (02:15Z); hub deadline + retry recovered r10; GC now ages a folder by its newest file | eb24d43 | ~30 min of the run |
+| ARM reply late (E6a-minsites) | ARMED 34 s after the request | my wait loop stopped on RUN end and missed the ARM | loop stops on any message to vantage6 | — | 0.5 min of the schedule |
+| NETEM CLEAR wan20 late | cleared 1 min after the request | background wait loop exceeded its time limit | — | — | 1 min (shaping stayed on 1 min after the run) |
 | deploy-request late | central waited for vantage6 (#168) | the payload investigation above | — | — | ~40 min schedule slip |
 
 ## 7. Recommendations
 
-- For large models with vantage6 4.15: run the server on PostgreSQL and set `share_algorithm_logs: false` on the nodes, or keep payloads small; the large result store needs the uWSGI chunk-limit fix and a non-sqlite DB.
-- Nodes with many CSV databases: set `share_config: false` (or use a smaller column list); otherwise every reconnect blocks the server.
-- Add a cleanup of finished task folders to the node (or a cron like `taskdir_gc.sh`).
+- Large models with vantage6 4.15: run the server on PostgreSQL (row updates do not rewrite the TOASTed input) and/or set `share_algorithm_logs: false` on the nodes; in DB mode with sqlite, 256 MB results are never delivered. The large result store would need the uWSGI chunk-limit fix and a non-sqlite DB first.
+- vantage6 node: send the result before (or independently of) the socket status event; a dropped websocket currently drops the result and triggers a re-run of the whole task.
+- vantage6 server: delete subtasks' runs with their tasks (orphaned rows hold payloads); avoid loading full run rows for `task/<id>/status` and task listings; put large columns last (or in a separate table) so status scans do not walk them.
+- Nodes with many CSV databases: set `share_config: false` (every column becomes a server row that is deleted row by row on each reconnect).
+- Task-folder clean-up next to a vantage6 node must age folders by their newest file (run ids are reused after deletes) and should run inside the node; best: the node deletes a run's folder after sending its result.
+- For adapters: map one flhub site to one vantage6 task (exact per-site state and cancel); poll by model size in DB mode.
