@@ -107,3 +107,15 @@ Rows are appended by `scripts/stage2/finalize_run.py` (or by hand for native run
 | s2-e3-resnet18-gn-fedavgm | E3 | real | [run](https://wandb.ai/hpml_surf-surf/AgnosticFL-stage2/runs/h7amndau) | 20 | 0.5074 | 0.4439 | 0.8901 | 268.06 | replay | 0.000 |  |
 | s2-e5-6sites | E5 | real | [run](https://wandb.ai/hpml_surf-surf/AgnosticFL-stage2/runs/dykojfi7) | 20 | 0.8167 | 0.8035 | 0.9783 | 9.10 | full-sim | 0.000 |  |
 | s2-e5-12sites | E5 | real | [run](https://wandb.ai/hpml_surf-surf/AgnosticFL-stage2/runs/cml3zumo) | 20 | 0.7488 | 0.7289 | 0.9675 | 10.37 | full-sim | 0.000 |  |
+| s2-e7-nvflare-hub-cnn | E7 | real | [run](https://wandb.ai/hpml_surf-surf/AgnosticFL-stage2/runs/8lvxxxu8) | 20 | 0.6716 | 0.6406 | 0.9591 | 3.27 | full-sim | 0.000 |  |
+| s2-e7-nvflare-hub-payload | E7 | real | [run](https://wandb.ai/hpml_surf-surf/AgnosticFL-stage2/runs/aq17b9z4) | 5 | - | - | - | 2.55 | full-sim | 0.000 |  |
+| s2-e7-nvflare-native-payload | E7 | native | [run](https://wandb.ai/hpml_surf-surf/AgnosticFL-stage2/runs/vphzfi4d) | 5 | - | - | - | - | native | - |  |
+| s2-e7-vantage6-hub-cnn | E7 | real | [run](https://wandb.ai/hpml_surf-surf/AgnosticFL-stage2/runs/t8efg2iz) | 20 | 0.7842 | 0.7568 | 0.9754 | 8.81 | full-sim | 0.000 |  |
+| s2-e7-vantage6-native-cnn | E7 | native | [run](https://wandb.ai/hpml_surf-surf/AgnosticFL-stage2/runs/4crdvh5a) | 20 | - | - | - | - | native | - |  |
+| s2-e7-vantage6-hub-payload | E7 | real | [run](https://wandb.ai/hpml_surf-surf/AgnosticFL-stage2/runs/6bq28hx1) | 5 | - | - | - | 82.12 | full-sim | 0.000 |  |
+| s2-e7-vantage6-native-payload | E7 | native | [run](https://wandb.ai/hpml_surf-surf/AgnosticFL-stage2/runs/sp0v1urn) | 5 | - | - | - | - | native | - |  |
+| s2-e7-flower-hub-cnn | E7 | real | [run](https://wandb.ai/hpml_surf-surf/AgnosticFL-stage2/runs/mj2qwsza) | 20 | 0.7950 | 0.7827 | 0.9744 | 7.55 | full-sim | 0.000 |  |
+| s2-e7-flower-native-cnn | E7 | native | [run](https://wandb.ai/hpml_surf-surf/AgnosticFL-stage2/runs/zlcfc7ft) | 20 | 0.7950 | 0.7827 | 0.9744 | 9.48 | native | - |  |
+| s2-e7-flower-hub-payload | E7 | real | [run](https://wandb.ai/hpml_surf-surf/AgnosticFL-stage2/runs/yysy845n) | 5 | - | - | - | 8.19 | full-sim | 0.000 |  |
+| s2-e7-flower-native-payload | E7 | native | [run](https://wandb.ai/hpml_surf-surf/AgnosticFL-stage2/runs/elcis89r) | 5 | - | - | - | 7.45 | native | - |  |
+| s2-e7-nvflare-native-cnn | E7 | native | [run](https://wandb.ai/hpml_surf-surf/AgnosticFL-stage2/runs/fp298ask) | 20 | - | - | - | - | native | - |  |
