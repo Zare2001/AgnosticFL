@@ -8,8 +8,8 @@ This guide covers the NVFlare adapter, the hospital-side NVFlare client, and wha
 |---|---|
 | Tested version | NVFlare **2.9.0** with Python 3.11.17, torch 2.14.1+cpu, numpy 2.4.4, safetensors 0.8.0 ([`deploy/versions.env`](../../deploy/versions.env)) |
 | Protocol | `flhub/0.2` (also serves `flhub/0.1` callers) |
-| Status | Tested in stage 1 (2 hospitals, `flhub/0.1`) and stage 2 (2 hospitals, plus 2 extra hospitals for the 12-site run). Conformance suite v2 against the reference deployment: 13 of 13 tests pass, and every returned weight equals local training bit for bit (max abs diff 0.0). In stage 1, the mixed 6-site final run (2 NVFlare sites) is bit-identical to the framework-free simulation; in stage 2, all 69 real runs, including every run with NVFlare sites, matched their framework-free reference bit for bit. |
-| Hospital code | [`clients/nvflare/client.py`](../../clients/nvflare/client.py), 48 lines, the standard NVFlare Client API loop. 0 lines changed since stage 1. |
+| Status | Tested in stage 1 (2 hospitals, `flhub/0.1`) and stage 2 (2 hospitals, plus 2 extra hospitals for the 12-site run). Conformance suite v2 against the reference deployment: 13 of 13 tests pass, and every returned weight equals local training bit for bit (max abs diff 0.0). In stage 1, the mixed 6-site final run (2 NVFlare sites) is bit-identical to the framework-free simulation; in stage 2, all 69 real runs passed the equivalence check (INV-1) with a maximum weight difference of 0, including every run with NVFlare sites ([tables.md](../results/evidence/stage2/tables.md)). |
+| Hospital code | [`clients/nvflare/client.py`](../../clients/nvflare/client.py), 48 lines (39 code lines), the standard NVFlare Client API loop. 0 lines changed since stage 1. |
 | Rollout channel | The job's custom code (`custom/client.py` and `custom/flhub_core/`), deployed by the NVFlare server like any other job. |
 
 The adapter is a small HTTP service next to the NVFlare server. It keeps one long-running NVFlare job, `flhub-relay`, alive through the FLARE API. Inside that job, a server workflow (the *relay*) takes each hub round from the adapter, sends it to the hospitals as one standard NVFlare task per site, and hands each hospital's reply to the hub as soon as it arrives.
@@ -232,7 +232,7 @@ The hub reuses an NVFlare 2.9 project as it is: the server, its provisioning and
 
    The job builder copies `clients/nvflare/client.py` and `flhub_core/` from the clone, so keep the editable install of step 1. Use the NVFlare client names as site ids in the orchestrator's configuration.
 5. **Hospitals.** No new credentials and no new software. Each hospital removes `flhub_core` if it had installed it, restarts its client once, and places its data file at `$FLHUB_DATA_DIR/<site>.csv` or sets `FLHUB_DATA_PATH` in the client's environment. Its Python environment needs torch, numpy and safetensors next to NVFlare; for bit-exact results, the versions of [`deploy/versions.env`](../../deploy/versions.env).
-6. **Check.** `discover` must list every site as `online` (see `deploy/central/nvflare/status.sh`). Then run the conformance suite against the adapter: `pytest tests/conformance --adapter http://127.0.0.1:8811`.
+6. **Check.** `discover` must list every site as `online` (`deploy/central/nvflare/status.sh` does this on the testbed). Then run a few rounds and check each site's `client_code_version` in the round records (`rounds/rNNNN.json`, `updates[].client_code_version`); the orchestrator logs a warning when it differs from the hub's `flhub_core`, and with `strict_code_version: true` in the run configuration it rejects such updates. The conformance suite (`pytest tests/conformance --adapter http://127.0.0.1:8811`) compares every returned update with local training on the same data, so it accepts only the project's benchmark sites (`nvf-h1`, `nvf-h2` with the partitions of `flhub_core.data`): it tests the adapter, for example on test clients provisioned with those names, not the real hospitals.
 
 **Credentials in use:** the hospitals' kits (mTLS client certificates, unchanged), the operator's admin kit (adapter only) and the root CA from `nvflare provision`. New hospitals get kits from `nvflare provision --add-client` with the same root CA; the running server and the existing kits stay valid ([`provision_extra.sh`](../../deploy/central/nvflare/provision_extra.sh)). The testbed kits expire on 2027-10-08; `provision.sh --force` issues new ones, which must then be redistributed. NVFlare 2.9 kits have no `signature.json`, so nothing checks the integrity of a kit's `startup/` folder; the mTLS certificates are the trust anchor.
 
@@ -246,8 +246,8 @@ All numbers are from the reference testbed (4 vCPU AMD EPYC-Rome VMs in one data
 
 | Dimension | NVFlare | Source |
 |---|---|---|
-| Adapter code | TODO(verify): `scripts/docs/loc.py` for `adapters/nvflare/` (without `native.py`, which is only for E7) | `scripts/docs/loc.py` |
-| Hospital code | 48 lines (`client.py`), 0 changed since stage 1 | [ledger](../results/evidence/hospital-ledger.md) |
+| Adapter code | 604 code lines in 5 files (`adapters/nvflare/` without `native.py`, which is only for E7) | [loc.md](../results/evidence/loc.md) |
+| Hospital code | 39 code lines (`client.py`, 48 lines with comments and blank lines), 0 changed since stage 1 | [loc.md](../results/evidence/loc.md), [ledger](../results/evidence/hospital-ledger.md) |
 | Hospital steps for the `flhub_core` 0.2 rollout | once: remove the installed copy and restart the client (50.3 s offline per site) | [ledger](../results/evidence/hospital-ledger.md) |
 | Hospital steps per later code version | 0: the next relay job carries it | ADR-018 |
 | Hub overhead against NVFlare's own FedAvg (E7) | −0.23 s (−6.5 %) per round with `cnn-small`; +0.10 s (+4.1 %) with a 45 MiB payload | [e7-native-vs-hub.md](../results/evidence/stage2/nvflare/e7-native-vs-hub.md) |
@@ -255,16 +255,29 @@ All numbers are from the reference testbed (4 vCPU AMD EPYC-Rome VMs in one data
 | Bytes on the wire ÷ payload (E4a) | 1.005–1.064 | [e4_bytes.md](../results/evidence/stage2/e4_bytes.md) |
 | Bandwidth efficiency at 20 Mbit/s (E4b) | 0.94 of the lower bound | [cost_model.md](../results/evidence/stage2/cost_model.md) |
 | Largest payload carried | 512 MiB per site and direction (15.5 s per round); 1024 MiB on a single-host test | §5.5 |
-| Memory at 512 MiB | hospital VM 5.0 GiB (two clients), one client job 2.1 GiB; relay job on the central host 3.8 GiB | §5.5 |
+| Memory at 512 MiB | hospital VM 5.0 GiB (two clients), one client job 2.1 GiB; relay job on the central host 3.7 GiB | §5.5 |
 | Overhead per site and round (E3) | 1.6 s (`cnn-small`), 1.9 s (`cnn-medium`), 2.7 s (`resnet18-gn`) | [tables.md](../results/evidence/stage2/tables.md) |
 | 6 → 12 sites (E5) | NVFlare fan-out 3.0 s → 2.8 s | [tables.md](../results/evidence/stage2/tables.md) |
 | Hospital crash (E6a): detected / recovered | 33.1 s / 74.0 s, no manual action | [e6.md](../results/evidence/stage2/e6.md) |
 
 ### 5.2 Implementation and integration cost
 
-TODO(verify): line counts per file from `scripts/docs/loc.py` once it exists.
+Code lines are non-blank, non-comment lines, counted with the rule of [`scripts/docs/loc.py`](../../scripts/docs/loc.py); the component totals are in [loc.md](../results/evidence/loc.md).
 
-The adapter touches these NVFlare interfaces:
+| Code | Code lines | Role |
+|---|---|---|
+| `adapters/nvflare/service.py` | 239 | adapter service, relay-job keeper, site watcher |
+| `adapters/nvflare/relay_controller.py` | 208 | relay workflow inside the NVFlare server |
+| `adapters/nvflare/flare_admin.py` | 84 | FLARE API session |
+| `adapters/nvflare/job.py` | 72 | relay job export |
+| `adapters/nvflare/__init__.py` | 1 | |
+| **NVFlare adapter** | **604** | on top of `adapters/common` (1182 lines, shared by every adapter) |
+| `clients/nvflare/client.py` | 39 | hospital script |
+| `adapters/nvflare/native.py` | 240 | E7 baseline only |
+| `tests/unit/test_nvflare_adapter.py` | 175 | 12 unit tests of the keeper and site status |
+| `deploy/central/nvflare/`, `deploy/nvflare-vm/` | 1137 (+10 configuration) | testbed scripts, including the experiment tooling |
+
+The adapter touches six NVFlare concepts: the server workflow (`ModelController`), the model container (`FLModel`), the Client API, the Job API, the FLARE API and provisioning.
 
 | NVFlare interface | Used for |
 |---|---|
@@ -272,7 +285,7 @@ The adapter touches these NVFlare interfaces:
 | `FLModel`, `ParamsType.FULL`, `FLMetaKey`, `ReturnCode`, `SendOrder` | model exchange and reply checks |
 | Client API: `nvflare.client.init`, `receive`, `send`, `is_running`, `get_site_name` | the hospital script |
 | Job API: `FedJob`, `to_server`, `to_clients`, `to`, `set_app_packages`, `export_job`, `ScriptRunner` | building the relay job |
-| FLARE API: `new_secure_session`, `list_jobs`, `get_job_meta`, `submit_job`, `abort_job`, `delete_job`, `get_client_job_status`, `get_system_info` | the keeper and the online probe |
+| FLARE API: `new_secure_session`, `list_jobs`, `submit_job`, `abort_job`, `delete_job`, `get_client_job_status`; `get_job_meta` for the E7 baseline | the keeper, the online probe and `purge.sh` |
 | Provisioning: `nvflare provision`, `--add-client` | kits for the server, hospitals and admin |
 
 Moving the adapter from `flhub/0.1` to `flhub/0.2` (one task per site, per-site results and cancels, keeper changes, the job that ships `flhub_core`) changed `adapters/nvflare/` by +313 −94 lines in four files, plus `native.py` (+284) for the E7 baseline; `deploy/central/nvflare/` by +137 −13 lines; `clients/nvflare/` by 0 lines (`git diff --stat stage1-final stage2-final`).
@@ -333,14 +346,14 @@ Source: [cost_model.md](../results/evidence/stage2/cost_model.md); figure [e4b_m
 ### 5.5 Memory and payload size
 
 - **Hospital VM** (memory in use at peak, two clients and the operating system): 1.68 GiB at 1 MiB up to 5.01 GiB at 512 MiB, 16 % of the VM's 31.3 GiB; one client's job process 0.43 GiB up to 2.11 GiB; the NVFlare client process itself 89–96 MiB (table in §5.3).
-- **Central host:** the relay's server job process peaked at 3.8 GiB at 512 MiB; at 45 MiB (E7 C2) it took 585 MiB, the adapter 163 MiB and the hub core 44 MiB. Sources: `REPORT_STAGE2.md` §6.1 at [tag `stage2-final`](https://github.com/Zare2001/AgnosticFL/blob/stage2-final/REPORT_STAGE2.md) (relay job), [stage-2 NVFlare section](https://github.com/Zare2001/AgnosticFL/blob/stage2-final/docs/report/stage2/nvflare.md) §5 (E7 processes).
+- **Central host** (peak RSS, [central-e4a-memory.md](../results/evidence/stage2/central-e4a-memory.md)): the relay's server job process 2.48 GiB at 256 MiB (9.9 × the payload) and 3.69 GiB at 512 MiB (7.4 ×); the adapter 167 MiB and the hub core 47 MiB at 512 MiB. The adapter stays small because the relay reads the global model from the hub core itself (`RelayAdapter.needs_weights = False`). At 45 MiB (E7 C2) the relay job took 585 MiB, the adapter 163 MiB and the hub core 44 MiB ([stage-2 NVFlare section](https://github.com/Zare2001/AgnosticFL/blob/stage2-final/docs/report/stage2/nvflare.md) §5).
 - **Largest payload:** 512 MiB per site and direction on the testbed (15.5 s per round, every round hash-equal to the simulation). On a single-host test with NVFlare's default settings: 128 MiB 5–6 s, 256 MiB 9–10 s, 512 MiB 16–17 s and 1024 MiB 32.8 s per round. No NVFlare limit was reached; the stops were the testbed's disk.
 
 ### 5.6 Scaling and robustness
 
-**6 → 12 sites (E5).** Two extra NVFlare hospitals with standard kits from the same root CA, no server restart. NVFlare's fan-out stayed flat (3.0 s → 2.8 s): the clients poll the server in parallel, and each trains on half the data (training 0.73 s → 0.36 s, overhead per site 1.9 s → 1.7 s). The extra sites were online 62 s after the request; joining the relay job took a keeper restart of the job. Source: [tables.md](../results/evidence/stage2/tables.md); figure [e5_scaling.png](../results/figures/e5_scaling.png).
+**6 → 12 sites (E5).** Two extra NVFlare hospitals with standard kits from the same root CA, no server restart. NVFlare's fan-out stayed flat (3.0 s → 2.8 s): the clients poll the server in parallel, and each trains on half the data (training 0.73 s → 0.36 s, overhead per site 1.9 s → 1.7 s). The extra sites were online 62 s after the request; joining the relay job took a keeper restart of the job. Sources: [tables.md](../results/evidence/stage2/tables.md), `REPORT_STAGE2.md` §6.4 at [tag `stage2-final`](https://github.com/Zare2001/AgnosticFL/blob/stage2-final/REPORT_STAGE2.md) (time to online); figure [e5_scaling.png](../results/figures/e5_scaling.png).
 
-**Faults (E6).** No run needed a manual action, and every run kept bit-identical weights against the simulation.
+**Faults (E6).** No run needed a manual action, and every run passed its equivalence check with a weight difference of 0: against the simulation with the recorded participants, and for the resumed run against the uninterrupted run.
 
 | Scenario | NVFlare result |
 |---|---|
@@ -364,7 +377,7 @@ Source: [e6.md](../results/evidence/stage2/e6.md); figures [e6_timeline_s2-e6a-m
 5. **Latency floor of ~2.5 s per round** from `task_request_interval` (§5.3).
 6. **Stale job-store entries.** After an abrupt server stop, NVFlare 2.9.0 keeps the jobs that were running as `RUNNING` in its job store (`JobRunner.update_abnormal_finished_jobs()` is never called). Abort answers "not running", delete answers "still running". The keeper ignores such entries; tools that count active jobs must do the same.
 7. **Slow failure detection.** A dead client stays "connected" in `get_system_info()` for minutes. The adapter's probe sees it within about 1 s; the site watcher fails the site after 30 s offline (`OFFLINE_FAIL_S`), so a hospital crash costs the round about 33 s (E6a).
-8. **Two non-public members.** The relay calls `BaseModelController._prepare_task` and wraps `Task.result_received_cb`. Check both when you upgrade NVFlare.
+8. **Internal API use.** The relay calls the non-public `BaseModelController._prepare_task` and wraps the task's `result_received_cb` to see error replies that `ModelController` drops. Check both when you upgrade NVFlare.
 
 ### 6.2 Knobs
 

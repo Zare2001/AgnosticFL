@@ -5,7 +5,7 @@
 Runs the config again (real system, or hub.sim with --sim) under the name inv4-<name> in
 ~/flhub-runtime/runs/inv4/ (not uploaded), then compares every round's global_ref and
 agg_state_ref with the original final run ~/flhub-runtime/runs/stage2/<name>-latest. Writes
-docs/report/stage2/evidence/inv4-<name>.json. Exit 0 only if every round is identical.
+docs/results/evidence/stage2/inv4-<name>.json. Exit 0 only if every round is identical.
 """
 
 from __future__ import annotations
@@ -68,7 +68,7 @@ def main(argv: list[str] | None = None) -> int:
            "mode": "sim" if args.sim else "real", "head": git("rev-parse", "HEAD"), "rc": rc,
            "all_equal": rc == 0 and all(x["global_equal"] and x["state_equal"] for x in rounds),
            "rounds": len(rounds) - 1, "per_round": rounds, "utc": utc()}
-    out = REPO / "docs" / "report" / "stage2" / "evidence" / f"inv4-{cfg.name}.json"
+    out = REPO / "docs" / "results" / "evidence" / "stage2" / f"inv4-{cfg.name}.json"
     out.write_text(json.dumps(res, indent=1) + "\n")
     print(f"INV-4 {cfg.name}: all rounds identical = {res['all_equal']} ({out})")
     return 0 if res["all_equal"] else 1

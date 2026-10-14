@@ -14,7 +14,7 @@ Findings: (1) FedAvg replaces the model meta after each round, so the hub train_
 so the job ships the workflow module as BYOC server code; (3) running the builder as `python -m` would serialize the
 class as `__main__`-derived `native.NativeFedAvg`, so the job is built from the package import.
 
-## Native vs hub with central's E7 config (dry run, 3 rounds, island)
+## Native vs hub with the E7 configuration (dry run, 3 rounds, island)
 
 `configs/stage2/e7/s2-e7-nvflare-hub-cnn.yaml` (organamnist-iid, cnn-small, lr 0.1, nvf-h1 n=5761, nvf-h2 n=5760):
 native `s2-e7-nvflare-native-cnn` (native/run.sh path, `--rounds 3`) vs hub orchestrator v2 (`--only nvflare --rounds 3`).

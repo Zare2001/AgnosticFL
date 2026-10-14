@@ -5,7 +5,7 @@ This page runs the whole hub on one machine, without any federated-learning fram
 ## Requirements
 
 - Linux on x86_64 with `git`, `curl` and [uv](https://docs.astral.sh/uv/). The project was tested on Ubuntu 24.04 (AMD EPYC-Rome, AVX2); other platforms are untested.
-- About 1.1 GB of disk for the virtual environment (mostly torch) and 20 MB for data.
+- About 0.9 GB of disk for the virtual environment (mostly torch) and 20 MB for data.
 - Internet access to PyPI, `download.pytorch.org` (CPU wheels of torch) and `zenodo.org` (the 4 MB PneumoniaMNIST file, downloaded and checked against a pinned sha256 on first use).
 - Ports 8800 (hub core) and 8819 (mock adapter) free on 127.0.0.1; `configs/mock-3r.yaml` uses them. On a machine that already runs a hub, copy that config and change both URLs.
 
@@ -62,7 +62,7 @@ The run directory is `/tmp/agnosticfl/runs/mock-3r-<UTC time>`, with the symlink
 |---|---|
 | `config.json` | the resolved run configuration and the environment |
 | `metrics.jsonl` | one line per round: test metrics, round time, per-site metrics |
-| `events.jsonl` | retries, failures, dropped sites, resumes |
+| `events.jsonl` | retries, failures, dropped sites, resumes; written only when one of them happens |
 | `rounds/rNNNN.safetensors`, `rNNNN.state.safetensors`, `rNNNN.json` | global weights, aggregator state and the round record (with the sha256 of both) after round N |
 | `summary.json` | final metrics and the hash of the final model |
 
@@ -78,7 +78,7 @@ python -m hub.sim --config configs/mock-3r.yaml --runs-dir /tmp/agnosticfl/runs 
 INV-1 full sim vs /tmp/agnosticfl/runs/mock-3r-latest: hashes_equal=True max_abs_diff=0.000e+00 -> PASS
 ```
 
-`hashes_equal=True` means that the global weights after every round are byte-identical. Every real run of the two test stages passed this check, across NVFlare, vantage6 and Flower ([results](results/README.md)).
+`hashes_equal=True` means that the global weights after every round are byte-identical. All 69 real runs of stage 2 passed this check, as did the stage-1 30-round run across NVFlare, vantage6 and Flower ([results](results/README.md)).
 
 ## Run the tests
 
@@ -87,7 +87,7 @@ python -m pytest
 python -m pytest tests/conformance --adapter mock
 ```
 
-- The first command runs the unit tests: `80 passed, 15 skipped`. The skipped tests are the conformance suite (it needs `--adapter`) and two framework tests that need the NVFlare or Flower packages.
+- The first command runs the unit tests: `79 passed, 16 skipped`. The skipped tests are the conformance suite (13; it needs `--adapter`), two framework test modules that need the NVFlare or Flower packages (`tests/unit/test_nvflare_adapter.py`, `tests/flower/test_flower_relay.py`), and one `flhub_core` test that needs pandas (a site given as a pandas DataFrame, as vantage6 passes it). With pandas installed: `80 passed, 15 skipped`.
 - The second runs the **adapter conformance suite** against an in-process hub core and mock adapter on free ports: `12 passed, 1 skipped`. The skipped data-variant test also needs `--variant organamnist-dir0.3`, which downloads the 38 MB OrganAMNIST file. A new adapter must pass the same suite; see [Adding a framework](adding-a-framework.md).
 
 ## Stop and clean up

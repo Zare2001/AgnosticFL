@@ -2,7 +2,7 @@
 
 **Status: flhub/0.1 FROZEN 2026-10-13; flhub/0.2 (stage 2, ADR-008) adds optional fields only (§7).** Reference implementation: `adapters/common/` (server side) and `adapters/common/rpcclient.py` (orchestrator side).
 
-The translation layer between the framework-free orchestrator and one framework. Inspired by MCP: one small, versioned protocol; each framework gets an adapter that speaks it; the orchestrator never contains framework code. Changes need an ADR and a version bump (`flhub/0.2`), announced on the bus.
+The translation layer between the framework-free orchestrator and one framework. Inspired by MCP: one small, versioned protocol; each framework gets an adapter that speaks it; the orchestrator never contains framework code. Changes need a decision record ([design/decisions.md](design/decisions.md)) and a version bump (`flhub/0.2`).
 
 ## 1. Roles
 
@@ -87,23 +87,23 @@ Weights blobs are `safetensors` files of float32 tensors keyed by the `flhub_cor
 
 ## 5. Mapping per framework (what each adapter translates)
 
-| flhub | NVFlare 2.9 | vantage6 4.15 | Flower 1.39 |
+| flhub | NVFlare 2.9.0 | vantage6 4.15.2 | Flower 1.39.0 |
 |---|---|---|---|
-| dispatch(round, model) | relay `ModelController.run()` gets the job, `send_model_and_wait(targets, FLModel(params, params_type=FULL, current_round))` | `client.task.create(..., input_={"method":"train","kwargs":{weights_b64, train_config}})` to the 2 orgs | relay `ServerApp`: `Message(content=RecordDict({"arrays":ArrayRecord, "config":ConfigRecord}), message_type=TRAIN, dst_node_id=…)` via `grid.send_and_receive` |
-| client config | `FLModel.meta` / job config | task kwargs | `ConfigRecord` |
-| site_id | NVFlare client name | organisation name (or node name) | SuperNode `--node-config site-id=…` echoed in the reply |
-| num_examples | a `num_examples` meta key | returned in the algorithm result dict | `MetricRecord["num-examples"]` |
-| weights back | `FLModel.params` (FULL) | base64 safetensors in the result | `ArrayRecord` |
-| client_code_version | meta key | result dict | `ConfigRecord` |
-| sites online | connected clients (FLARE API `get_system_info`) | node status via vantage6 client | `grid.get_node_ids()` + site ids |
+| dispatch(round, model) | relay `HubRelayController(ModelController)` long-polls the adapter and sends one task per site: `Controller.send(task, targets=[site])` with `FLModel(params, params_type=FULL, current_round=round)` | one task per site: `client.task.create(collaboration, organizations=[org_id], name="flhub-r<round>", image, input_={"method":"train","kwargs":{weights_b64, train_config, sites}}, databases=[{"label": db_label(data_variant)}])` (stage 1: one task for both organisations) | relay `ServerApp` in a long-lived run long-polls the adapter and pushes one `Message(RecordDict({"arrays": ArrayRecord, "config": ConfigRecord}), node_id, MessageType.TRAIN, ttl=<time left to the deadline>, group_id=<round>)` per site with `grid.push_messages`; replies arrive through `grid.pull_messages` |
+| client config | `FLModel.meta["train_config"]` (the hub round is `FLModel.current_round`) | task kwargs | `ConfigRecord` `"config"`: the dispatch train_config + `round`, plus the informational keys `base-model` and `job-id` (ignored by `flhub_core.train`) |
+| site_id | NVFlare client name (certificate CN; checked against the reply's `meta["client_name"]`) | organisation name; the algorithm gets its organisation id and maps it with the `sites` kwarg | SuperNode node config `site-id`, learned with a site-info QUERY message (answered by `@app.query()`) and checked in every reply |
+| num_examples | `FLModel.meta["num_examples"]` (fallback `NUM_STEPS_CURRENT_ROUND`) | returned in the algorithm result dict | `MetricRecord["num-examples"]` |
+| weights back | `FLModel.params` (FULL, numpy) | base64 safetensors in the result | `ArrayRecord` |
+| client_code_version | `FLModel.meta["client_code_version"]` | result dict | `ConfigRecord` `"site-info"`, key `client-code-version` |
+| sites online | client of the running relay job AND FLARE API `get_client_job_status()` shows it running that job (`get_system_info` keeps dead clients "connected" for minutes) | node `status` per organisation (`GET node?collaboration_id=…`) | `grid.get_node_ids()` + the site-info QUERY (the newest node per site wins) |
 
-Verify the exact API names for the installed versions before coding; update this table if they differ.
+The cells describe the adapters as implemented for the tested versions; the framework guides ([NVFlare](frameworks/nvflare.md), [vantage6](frameworks/vantage6.md), [Flower](frameworks/flower.md)) have the details.
 
-**Relay pattern** (NVFlare, Flower; internal to an adapter, not part of the protocol): the framework's server-side workflow runs inside the framework server and long-polls its adapter (`GET /relay/next`, `POST /relay/result`, `/relay/progress`, `/relay/sites`, `/relay/shutdown`); weights travel as hub-core blob refs. Implemented once in `adapters/common/relay.py` (`RelayAdapter`, `RelayClient`).
+**Relay pattern** (NVFlare, Flower; internal to an adapter, not part of the protocol): the framework's server-side workflow runs inside the framework server and long-polls its adapter (`GET /relay/next`, `POST /relay/result`, `/relay/progress`, `/relay/sites`, `/relay/shutdown`, `GET /relay/status`; flhub/0.2 adds `POST /relay/site_result`, `POST /relay/site_error` and `GET /relay/job`, §7); weights travel as hub-core blob refs. The Flower adapter adds `POST /relay/beat`, a liveness beat of its relay run (ADR-016). Implemented once in `adapters/common/relay.py` (`RelayAdapter`, `RelayClient`).
 
 ## 6. Adding a new framework (BranchKey, others)
 
-Implement the 5 methods above in a service on a free local port (simplest: subclass `adapters.common.BaseAdapter` and implement `site_status()` and `run_round()`), keep the hospital side standard for that framework, and pass `tests/conformance/`. Nothing in the orchestrator or hub core may change.
+Implement the 5 methods above in a service on a free local port (simplest: subclass `adapters.common.BaseAdapter` and implement `site_status()` and `run_round()`), keep the hospital side standard for that framework, and pass `tests/conformance/`. Nothing in the orchestrator or hub core may change. The full guide is [Adding a framework](adding-a-framework.md).
 
 ## 7. flhub/0.2 — backward-compatible extensions (stage 2, ADR-008)
 
@@ -117,7 +117,7 @@ flhub/0.2 adds optional request fields and extra response fields only. A 0.2 ada
 "capabilities":{..., "max_payload_mb":1024, "site_progress":true, "partial_collect":true, "site_cancel":true}
 ```
 - **Payload cap**: `max_payload_mb` ≥ 1024. The hub core and `RpcServer` accept bodies up to 2048 MiB (`FLHUB_MAX_BODY_MB`); hub-core blobs are streamed to and from disk.
-- **Readiness per run**: `sites` still lists every registered site with its status. A run needs only the sites in its own `sites` list to be online. A registered but offline site (for example an E5 extra site) must not block a dispatch to the others; an adapter's health check covers its base sites.
+- **Readiness per run**: `sites` still lists every registered site with its status. A run needs only the sites in its own `sites` list to be online. A registered but offline site (for example an extra site of the stage-2 scaling test E5) must not block a dispatch to the others; an adapter's health check covers its base sites.
 
 **Data variant hint.** `dispatch` takes an optional `"data_variant": "<dataset>-<pid>"` (for example `"organamnist-dir0.3"`). It repeats `train_config["data_variant"]` for adapters that must select the data inside their framework (vantage6 labelled databases); `train_config` stays opaque, and adapters that do not need the hint ignore it. Relay jobs carry it as `"data_variant"`.
 

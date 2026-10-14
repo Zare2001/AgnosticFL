@@ -1,6 +1,6 @@
 """E6 robustness tables (EXPERIMENTS.md E6): injections, per-run outcome, straggler windows.
 
-    python scripts/stage2/e6_table.py [--out docs/report/stage2/e6.md]
+    python scripts/stage2/e6_table.py [--out docs/results/evidence/stage2/e6.md]
 
 Framework-side injections come from the bus ('E6 inject ...' info messages from the framework agents'
 inject.sh) inside each E6 run's window: detection = first failed attempt or dropped site after the
@@ -26,7 +26,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
 RUNS = Path.home() / "flhub-runtime" / "runs" / "stage2"
-OUT = REPO / "docs" / "report" / "stage2" / "e6.md"
+OUT = REPO / "docs" / "results" / "evidence" / "stage2" / "e6.md"
 NAMES = ["s2-e6a-strict", "s2-e6a-minsites", "s2-e6b-straggler", "s2-e6c-fedavg", "s2-e6c-fedavgm",
          "s2-e6d-resume", "s2-e6e-server-restart"]
 STRAGGLERS = {"nvf-h2": (1, 6), "v6-h4": (7, 13), "flw-h6": (14, 20)}

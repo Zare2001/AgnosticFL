@@ -12,7 +12,7 @@ Gates:  real       INV-1 passed: <run_dir>/inv1.json (full sim) or inv1-replay.j
         reference  finished, every metric finite
         native     finished; per-round max abs weight difference to the matching hub run recorded
 On PASS: W&B run in project AgnosticFL-stage2 only (tag final, group E<n>), a row in
-docs/report/stage2/runs.md, then retention (rounds 0, every 10th, last; replay-checked runs keep
+docs/results/evidence/stage2/runs.md, then retention (rounds 0, every 10th, last; replay-checked runs keep
 0-3, last-1, last) and hub-core blob GC. On FAIL: nothing is uploaded and all files stay.
 """
 
@@ -35,7 +35,7 @@ from hub.orchestrator.checkpoint import RunDir, retention_rounds, utc_now  # noq
 
 PROJECT = "AgnosticFL-stage2"
 FORBIDDEN_PROJECTS = {"AgnosticFL"}  # stage 1: read-only
-RUNS_MD = REPO / "docs" / "report" / "stage2" / "runs.md"
+RUNS_MD = REPO / "docs" / "results" / "evidence" / "stage2" / "runs.md"
 
 
 class GateFailed(RuntimeError):

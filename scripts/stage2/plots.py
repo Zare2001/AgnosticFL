@@ -1,6 +1,6 @@
 """Report figures for REPORT_STAGE2.md (docs/agents/stage2/REPORT_TEMPLATE.md, figure list).
 
-    python scripts/stage2/plots.py [--runs ~/flhub-runtime/runs/stage2] [--out docs/report/stage2/figures]
+    python scripts/stage2/plots.py [--runs ~/flhub-runtime/runs/stage2] [--out docs/results/figures]
                                    [--only e1_acc ...]
 
 Reads the run dirs (metrics.jsonl, summary.json, rounds/*.json, sysmon/*.json); every figure is
@@ -23,7 +23,7 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 
 RUNS = Path.home() / "flhub-runtime" / "runs" / "stage2"
-OUT = Path(__file__).resolve().parents[2] / "docs" / "report" / "stage2" / "figures"
+OUT = Path(__file__).resolve().parents[2] / "docs" / "results" / "figures"
 SERIES = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#6250d6", "#e34948"]
 FW_COLOR = {"nvflare": SERIES[0], "vantage6": SERIES[1], "flower": SERIES[2], "mixed": SERIES[6]}
 SURFACE, TEXT, TEXT2, GRID = "#fcfcfb", "#0b0b0b", "#52514e", "#e4e3df"

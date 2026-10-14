@@ -1,6 +1,6 @@
 """Bytes on wire per framework for E4 runs (PLAN.md stage 2 §4.3): sysmon interface deltas.
 
-    python scripts/stage2/e4_bytes.py [--runs ~/flhub-runtime/runs/stage2] [--out docs/report/stage2/e4_bytes.md]
+    python scripts/stage2/e4_bytes.py [--runs ~/flhub-runtime/runs/stage2] [--out docs/results/evidence/stage2/e4_bytes.md]
 
 For every E4a/E4b/E7-payload run with sysmon summaries from the framework VMs: rx/tx bytes of the
 VM's main interface over the run window, the payload the protocol had to move (sites on that VM x
@@ -15,7 +15,7 @@ import json
 from pathlib import Path
 
 RUNS = Path.home() / "flhub-runtime" / "runs" / "stage2"
-OUT = Path(__file__).resolve().parents[2] / "docs" / "report" / "stage2" / "e4_bytes.md"
+OUT = Path(__file__).resolve().parents[2] / "docs" / "results" / "evidence" / "stage2" / "e4_bytes.md"
 FWS = {"nvflare": "nvf", "vantage6": "v6", "flower": "flw"}
 
 

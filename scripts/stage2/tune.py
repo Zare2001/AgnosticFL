@@ -5,7 +5,7 @@
 1. client lr with fedavg -> lr* (best final validation accuracy);
 2. writes lr* to configs/stage2/tuned.yaml, regenerates the configs, runs the 17 aggregator settings;
 3. best value per aggregator; A* = best of fedavgm, fedadam, fedyogi, fedadagrad, fedprox;
-4. writes configs/stage2/tuned.yaml (tuned: true) and docs/report/stage2/tuning.md.
+4. writes configs/stage2/tuned.yaml (tuned: true) and docs/results/evidence/stage2/tuning.md.
 Runs land in ~/flhub-runtime/runs/s3/ and are not uploaded.
 """
 
@@ -99,7 +99,7 @@ def main(argv: list[str] | None = None) -> int:
     for a in AGGS:
         lines.append(f"- {a}: **{'mu' if a == 'fedprox' else 'eta'} = {best[a][0]:g}** (final val acc {best[a][1]:.4f})")
     lines += ["", f"**A\\* = {a_star}** (best final validation accuracy among the five; used by E3 and E6)."]
-    (REPO / "docs" / "report" / "stage2" / "tuning.md").write_text("\n".join(lines) + "\n")
+    (REPO / "docs" / "results" / "evidence" / "stage2" / "tuning.md").write_text("\n".join(lines) + "\n")
     print(json.dumps(tuned))
     return 0
 

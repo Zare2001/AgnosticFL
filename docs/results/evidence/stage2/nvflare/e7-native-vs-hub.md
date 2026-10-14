@@ -1,6 +1,6 @@
 # NVFlare E7: native FedAvg vs hub path (final runs)
 
-Run data from central (copied from the run directories); script deploy/nvflare-vm/analysis/e7_compare.py; diffs from central's finalize (native_vs_hub.json). Native round = FedAvg send_model -> aggregated model; hub round = dispatch -> envelopes -> aggregated (round/duration_s + round/agg_s); hub total adds evaluation and checkpointing. Medians/IQR over rounds >= 2.
+Run data: the run directories on the central machine; script `deploy/nvflare-vm/analysis/e7_compare.py`; weight differences from the finalize step (`native_vs_hub.json`). Native round = FedAvg send_model -> aggregated model; hub round = dispatch -> envelopes -> aggregated (round/duration_s + round/agg_s); hub total adds evaluation and checkpointing. Medians/IQR over rounds >= 2.
 
 ## C1: cnn
 

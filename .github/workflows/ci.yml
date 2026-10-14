@@ -1,0 +1,41 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Install (versions of deploy/versions.env, CPU torch)
+        run: |
+          uv venv --python 3.11.17 .venv
+          uv pip install --python .venv/bin/python "torch==2.14.1+cpu" --index-url https://download.pytorch.org/whl/cpu
+          uv pip install --python .venv/bin/python numpy==2.4.4 safetensors==0.8.0 pyyaml==6.0.3 pandas pytest -e ./flhub_core -e .
+
+      - name: Determinism selfcheck (prints the digest of this machine)
+        run: .venv/bin/python -m flhub_core.selfcheck
+
+      - name: Unit tests
+        env:
+          FLHUB_DATA_DIR: ${{ runner.temp }}/flhub-data
+        run: .venv/bin/python -m pytest
+
+      - name: Conformance suite against the mock adapter
+        env:
+          FLHUB_DATA_DIR: ${{ runner.temp }}/flhub-data
+        run: .venv/bin/python -m pytest tests/conformance --adapter mock

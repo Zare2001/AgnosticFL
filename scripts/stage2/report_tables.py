@@ -1,6 +1,6 @@
 """Markdown tables for REPORT_STAGE2.md, computed from the run dirs (no hand-copied numbers).
 
-    python scripts/stage2/report_tables.py [--runs ~/flhub-runtime/runs/stage2] [--out docs/report/stage2/tables.md]
+    python scripts/stage2/report_tables.py [--runs ~/flhub-runtime/runs/stage2] [--out docs/results/evidence/stage2/tables.md]
 
 Sections: E1, E2 (mean ± sd over seeds 2026 real + 2027/2028 sim, rounds-to-target), E3 round-time
 breakdown, E4a, E4b, E5, E6, E7. Tables whose runs are missing say so.
@@ -14,7 +14,7 @@ import statistics
 from pathlib import Path
 
 RUNS = Path.home() / "flhub-runtime" / "runs" / "stage2"
-OUT = Path(__file__).resolve().parents[2] / "docs" / "report" / "stage2" / "tables.md"
+OUT = Path(__file__).resolve().parents[2] / "docs" / "results" / "evidence" / "stage2" / "tables.md"
 PIDS = ["iid", "dir1.0", "dir0.3", "dir0.1", "qty", "fwcorr", "mix"]
 AGGS = ["fedavg", "fedavgm", "fedadam", "fedyogi", "fedadagrad", "fedprox"]
 FWS = ["nvflare", "vantage6", "flower"]
@@ -243,7 +243,7 @@ def main(argv: list[str] | None = None) -> int:
                 lines.append(f"| {fw} | {c} | {fmt(a, 2)} | {fmt(b, 2)} | {fmt(ov, 2)} | "
                              f"{fmt(100 * ov / a if ov is not None and a else None, 1)} |")
     # RQ1: INV-1 per final real run (from runs.md, which finalize_run.py fills after the gate passed)
-    runs_md = Path(__file__).resolve().parents[2] / "docs" / "report" / "stage2" / "runs.md"
+    runs_md = Path(__file__).resolve().parents[2] / "docs" / "results" / "evidence" / "stage2" / "runs.md"
     rows = [[c.strip() for c in x.strip().strip("|").split("|")] for x in runs_md.read_text().splitlines()
             if x.startswith("| s2-")]
     real = [r for r in rows if r[2] == "real"]
