@@ -1,105 +1,172 @@
-# s2-e4a-vantage6-256mb: node log excerpts (vantage6 VM), UTC; filtered lines, tracebacks shortened
+# s2-e4a-vantage6-256mb: node log excerpts (vantage6 VM), UTC 07:39-08:15 (round 1 cancelled by central 08:11:56Z); filtered lines
 ## v6-h3
 2026-10-14 07:39:06 - socket         - INFO     - Websocket connection established
 2026-10-14 07:39:06 - node           - INFO     - Received 0 tasks
 2026-10-14 07:40:10 - node           - INFO     - Starting task 2 - flhub-r1
 2026-10-14 07:40:58 - task (2)       - INFO     - [Task 2]: info > Writing output to /mnt/data/task-000000002/output
 2026-10-14 07:42:02 - common         - ERROR    - Connection error... Retrying
-2026-10-14 07:42:02 - common         - INFO     - ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))
 2026-10-14 07:42:06 - node           - ERROR    - ('Connection broken: IncompleteRead(2708306 bytes read, 474520758 more expected)', IncompleteRead(2708306 bytes read, 474520758 more expected))
-    raise IncompleteRead(self._fp_bytes_read, self.length_remaining)
 2026-10-14 07:42:31 - engineio.client - WARNING  - Server has stopped communicating, aborting
 2026-10-14 07:43:03 - common         - ERROR    - Connection error... Retrying
-2026-10-14 07:43:03 - common         - INFO     - ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))
 2026-10-14 07:44:04 - common         - ERROR    - Connection error... Retrying
-2026-10-14 07:44:04 - common         - INFO     - ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))
 2026-10-14 07:45:05 - common         - ERROR    - Connection error... Retrying
-2026-10-14 07:45:05 - common         - INFO     - ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))
 2026-10-14 07:45:27 - node           - ERROR    - Speaking thread had an exception
-    raise exceptions.BadNamespaceError(
 socketio.exceptions.BadNamespaceError: /tasks is not a connected namespace.
 2026-10-14 07:45:35 - socket         - INFO     - Websocket connection established
 2026-10-14 07:46:01 - node           - INFO     - Received 1 tasks
 2026-10-14 07:46:01 - node           - INFO     - Starting task 2 - flhub-r1
 2026-10-14 07:46:42 - task (2)       - INFO     - [Task 2]: info > Writing output to /mnt/data/task-000000002/output
 2026-10-14 07:47:42 - node           - ERROR    - ('Connection broken: IncompleteRead(2708306 bytes read, 474520758 more expected)', IncompleteRead(2708306 bytes read, 474520758 more expected))
-    raise IncompleteRead(self._fp_bytes_read, self.length_remaining)
 2026-10-14 07:47:47 - common         - ERROR    - Connection error... Retrying
-2026-10-14 07:47:47 - common         - INFO     - ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))
 2026-10-14 07:48:07 - engineio.client - WARNING  - Server has stopped communicating, aborting
 2026-10-14 07:48:48 - common         - ERROR    - Connection error... Retrying
-2026-10-14 07:48:48 - common         - INFO     - ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))
 2026-10-14 07:49:49 - common         - ERROR    - Connection error... Retrying
-2026-10-14 07:49:49 - common         - INFO     - ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))
 2026-10-14 07:50:36 - node           - ERROR    - Speaking thread had an exception
-    raise exceptions.BadNamespaceError(
 socketio.exceptions.BadNamespaceError: /tasks is not a connected namespace.
 2026-10-14 07:50:38 - socket         - INFO     - Websocket connection established
 2026-10-14 07:51:13 - node           - INFO     - Received 1 tasks
 2026-10-14 07:51:13 - node           - INFO     - Starting task 2 - flhub-r1
 2026-10-14 07:51:53 - task (2)       - INFO     - [Task 2]: info > Writing output to /mnt/data/task-000000002/output
 2026-10-14 07:52:53 - node           - ERROR    - ('Connection broken: IncompleteRead(2708306 bytes read, 474520758 more expected)', IncompleteRead(2708306 bytes read, 474520758 more expected))
-    raise IncompleteRead(self._fp_bytes_read, self.length_remaining)
 2026-10-14 07:52:57 - common         - ERROR    - Connection error... Retrying
-2026-10-14 07:52:57 - common         - INFO     - ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))
 2026-10-14 07:53:18 - engineio.client - WARNING  - Server has stopped communicating, aborting
 2026-10-14 07:53:58 - common         - ERROR    - Connection error... Retrying
-2026-10-14 07:53:58 - common         - INFO     - ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))
+2026-10-14 07:54:59 - common         - ERROR    - Connection error... Retrying
+2026-10-14 07:55:47 - node           - ERROR    - Speaking thread had an exception
+socketio.exceptions.BadNamespaceError: /tasks is not a connected namespace.
+2026-10-14 07:55:50 - socket         - INFO     - Websocket connection established
+2026-10-14 07:56:18 - node           - INFO     - Received 1 tasks
+2026-10-14 07:56:18 - node           - INFO     - Starting task 2 - flhub-r1
+2026-10-14 07:57:02 - task (2)       - INFO     - [Task 2]: info > Writing output to /mnt/data/task-000000002/output
+2026-10-14 07:57:57 - common         - ERROR    - Connection error... Retrying
+2026-10-14 07:58:07 - common         - ERROR    - Connection error... Retrying
+2026-10-14 07:58:42 - engineio.client - WARNING  - Server has stopped communicating, aborting
+2026-10-14 07:58:58 - common         - ERROR    - Connection error... Retrying
+2026-10-14 07:59:08 - common         - ERROR    - Connection error... Retrying
+2026-10-14 07:59:59 - common         - ERROR    - Connection error... Retrying
+2026-10-14 08:00:09 - common         - ERROR    - Connection error... Retrying
+2026-10-14 08:01:00 - common         - ERROR    - Connection error... Retrying
+2026-10-14 08:01:10 - common         - ERROR    - Connection error... Retrying
+2026-10-14 08:01:49 - node           - ERROR    - Speaking thread had an exception
+socketio.exceptions.BadNamespaceError: /tasks is not a connected namespace.
+2026-10-14 08:01:51 - socket         - INFO     - Websocket connection established
+2026-10-14 08:02:24 - node           - INFO     - Received 1 tasks
+2026-10-14 08:02:24 - node           - INFO     - Starting task 2 - flhub-r1
+2026-10-14 08:03:01 - task (2)       - INFO     - [Task 2]: info > Writing output to /mnt/data/task-000000002/output
+2026-10-14 08:03:55 - common         - ERROR    - Connection error... Retrying
+2026-10-14 08:04:05 - common         - ERROR    - Connection error... Retrying
+2026-10-14 08:04:25 - engineio.client - WARNING  - Server has stopped communicating, aborting
+2026-10-14 08:04:56 - common         - ERROR    - Connection error... Retrying
+2026-10-14 08:05:06 - common         - ERROR    - Connection error... Retrying
+2026-10-14 08:05:57 - common         - ERROR    - Connection error... Retrying
+2026-10-14 08:06:07 - common         - ERROR    - Connection error... Retrying
+2026-10-14 08:06:55 - node           - ERROR    - Speaking thread had an exception
+socketio.exceptions.BadNamespaceError: /tasks is not a connected namespace.
+2026-10-14 08:06:57 - socket         - INFO     - Websocket connection established
+2026-10-14 08:07:29 - node           - INFO     - Received 1 tasks
+2026-10-14 08:07:29 - node           - INFO     - Starting task 2 - flhub-r1
+2026-10-14 08:08:08 - task (2)       - INFO     - [Task 2]: info > Writing output to /mnt/data/task-000000002/output
+2026-10-14 08:09:03 - common         - ERROR    - Connection error... Retrying
+2026-10-14 08:09:13 - common         - ERROR    - Connection error... Retrying
+2026-10-14 08:09:32 - engineio.client - WARNING  - Server has stopped communicating, aborting
+2026-10-14 08:10:04 - common         - ERROR    - Connection error... Retrying
+2026-10-14 08:10:14 - common         - ERROR    - Connection error... Retrying
+2026-10-14 08:11:05 - common         - ERROR    - Connection error... Retrying
+2026-10-14 08:11:15 - common         - ERROR    - Connection error... Retrying
+2026-10-14 08:12:03 - node           - ERROR    - Speaking thread had an exception
+socketio.exceptions.BadNamespaceError: /tasks is not a connected namespace.
+2026-10-14 08:12:22 - socket         - INFO     - Websocket connection established
+2026-10-14 08:12:23 - node           - INFO     - Received 0 tasks
+2026-10-14 08:13:30 - socket         - INFO     - Websocket connection established
+2026-10-14 08:13:30 - node           - INFO     - Received 0 tasks
+2026-10-14 08:13:45 - socket         - INFO     - Websocket connection established
+2026-10-14 08:13:45 - node           - INFO     - Received 0 tasks
+2026-10-14 08:14:11 - node           - INFO     - Starting task 1 - flhub-r1
+2026-10-14 08:14:21 - task (1)       - INFO     - [Task 1]: info > Writing output to /mnt/data/task-000000001/output
 ## v6-h4
 2026-10-14 07:39:05 - socket         - INFO     - Websocket connection established
 2026-10-14 07:39:05 - node           - INFO     - Received 0 tasks
 2026-10-14 07:40:10 - node           - INFO     - Starting task 1 - flhub-r1
 2026-10-14 07:40:58 - task (1)       - INFO     - [Task 1]: info > Writing output to /mnt/data/task-000000001/output
 2026-10-14 07:41:52 - common         - ERROR    - Connection error... Retrying
-2026-10-14 07:41:52 - common         - INFO     - ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))
 2026-10-14 07:42:03 - common         - ERROR    - Connection error... Retrying
-2026-10-14 07:42:03 - common         - INFO     - ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))
 2026-10-14 07:42:31 - engineio.client - WARNING  - Server has stopped communicating, aborting
 2026-10-14 07:42:53 - common         - ERROR    - Connection error... Retrying
-2026-10-14 07:42:53 - common         - INFO     - ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))
 2026-10-14 07:43:04 - common         - ERROR    - Connection error... Retrying
-2026-10-14 07:43:04 - common         - INFO     - ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))
 2026-10-14 07:43:54 - common         - ERROR    - Connection error... Retrying
-2026-10-14 07:43:54 - common         - INFO     - ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))
 2026-10-14 07:44:05 - common         - ERROR    - Connection error... Retrying
-2026-10-14 07:44:05 - common         - INFO     - ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))
 2026-10-14 07:44:55 - common         - ERROR    - Connection error... Retrying
-2026-10-14 07:44:55 - common         - INFO     - ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))
 2026-10-14 07:45:06 - common         - ERROR    - Connection error... Retrying
-2026-10-14 07:45:06 - common         - INFO     - ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))
 2026-10-14 07:45:28 - node           - ERROR    - Speaking thread had an exception
-    raise exceptions.BadNamespaceError(
 socketio.exceptions.BadNamespaceError: /tasks is not a connected namespace.
 2026-10-14 07:45:35 - socket         - INFO     - Websocket connection established
 2026-10-14 07:46:01 - node           - INFO     - Received 1 tasks
 2026-10-14 07:46:01 - node           - INFO     - Starting task 1 - flhub-r1
 2026-10-14 07:46:42 - task (1)       - INFO     - [Task 1]: info > Writing output to /mnt/data/task-000000001/output
 2026-10-14 07:47:36 - common         - ERROR    - Connection error... Retrying
-2026-10-14 07:47:36 - common         - INFO     - ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))
 2026-10-14 07:47:46 - common         - ERROR    - Connection error... Retrying
-2026-10-14 07:47:46 - common         - INFO     - ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))
 2026-10-14 07:48:07 - engineio.client - WARNING  - Server has stopped communicating, aborting
 2026-10-14 07:48:37 - common         - ERROR    - Connection error... Retrying
-2026-10-14 07:48:37 - common         - INFO     - ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))
 2026-10-14 07:48:47 - common         - ERROR    - Connection error... Retrying
-2026-10-14 07:48:47 - common         - INFO     - ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))
 2026-10-14 07:49:38 - common         - ERROR    - Connection error... Retrying
-2026-10-14 07:49:38 - common         - INFO     - ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))
 2026-10-14 07:49:48 - common         - ERROR    - Connection error... Retrying
-2026-10-14 07:49:48 - common         - INFO     - ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))
 2026-10-14 07:50:35 - node           - ERROR    - Speaking thread had an exception
-    raise exceptions.BadNamespaceError(
 socketio.exceptions.BadNamespaceError: /tasks is not a connected namespace.
 2026-10-14 07:50:38 - socket         - INFO     - Websocket connection established
 2026-10-14 07:51:30 - node           - INFO     - Received 1 tasks
 2026-10-14 07:51:30 - node           - INFO     - Starting task 1 - flhub-r1
 2026-10-14 07:51:54 - task (1)       - INFO     - [Task 1]: info > Writing output to /mnt/data/task-000000001/output
 2026-10-14 07:52:48 - common         - ERROR    - Connection error... Retrying
-2026-10-14 07:52:48 - common         - INFO     - ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))
 2026-10-14 07:52:58 - common         - ERROR    - Connection error... Retrying
-2026-10-14 07:52:58 - common         - INFO     - ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))
 2026-10-14 07:53:18 - engineio.client - WARNING  - Server has stopped communicating, aborting
 2026-10-14 07:53:49 - common         - ERROR    - Connection error... Retrying
-2026-10-14 07:53:49 - common         - INFO     - ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))
 2026-10-14 07:53:59 - common         - ERROR    - Connection error... Retrying
-2026-10-14 07:53:59 - common         - INFO     - ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))
+2026-10-14 07:54:50 - common         - ERROR    - Connection error... Retrying
+2026-10-14 07:55:00 - common         - ERROR    - Connection error... Retrying
+2026-10-14 07:55:48 - node           - ERROR    - Speaking thread had an exception
+socketio.exceptions.BadNamespaceError: /tasks is not a connected namespace.
+2026-10-14 07:55:50 - socket         - INFO     - Websocket connection established
+2026-10-14 07:56:19 - node           - INFO     - Received 1 tasks
+2026-10-14 07:56:20 - node           - INFO     - Starting task 1 - flhub-r1
+2026-10-14 07:57:03 - task (1)       - INFO     - [Task 1]: info > Writing output to /mnt/data/task-000000001/output
+2026-10-14 07:57:57 - common         - ERROR    - Connection error... Retrying
+2026-10-14 07:58:07 - common         - ERROR    - Connection error... Retrying
+2026-10-14 07:58:42 - engineio.client - WARNING  - Server has stopped communicating, aborting
+2026-10-14 07:58:58 - common         - ERROR    - Connection error... Retrying
+2026-10-14 07:59:08 - common         - ERROR    - Connection error... Retrying
+2026-10-14 07:59:59 - common         - ERROR    - Connection error... Retrying
+2026-10-14 08:00:09 - common         - ERROR    - Connection error... Retrying
+2026-10-14 08:01:00 - common         - ERROR    - Connection error... Retrying
+2026-10-14 08:01:10 - common         - ERROR    - Connection error... Retrying
+2026-10-14 08:01:50 - node           - ERROR    - Speaking thread had an exception
+socketio.exceptions.BadNamespaceError: /tasks is not a connected namespace.
+2026-10-14 08:01:59 - socket         - INFO     - Websocket connection established
+2026-10-14 08:02:24 - node           - INFO     - Received 1 tasks
+2026-10-14 08:02:24 - node           - INFO     - Starting task 1 - flhub-r1
+2026-10-14 08:03:00 - task (1)       - INFO     - [Task 1]: info > Writing output to /mnt/data/task-000000001/output
+2026-10-14 08:04:00 - node           - ERROR    - ('Connection broken: IncompleteRead(2708306 bytes read, 474520758 more expected)', IncompleteRead(2708306 bytes read, 474520758 more expected))
+2026-10-14 08:04:04 - common         - ERROR    - Connection error... Retrying
+2026-10-14 08:04:25 - engineio.client - WARNING  - Server has stopped communicating, aborting
+2026-10-14 08:05:05 - common         - ERROR    - Connection error... Retrying
+2026-10-14 08:06:06 - common         - ERROR    - Connection error... Retrying
+2026-10-14 08:06:54 - node           - ERROR    - Speaking thread had an exception
+socketio.exceptions.BadNamespaceError: /tasks is not a connected namespace.
+2026-10-14 08:06:57 - socket         - INFO     - Websocket connection established
+2026-10-14 08:07:26 - node           - INFO     - Received 1 tasks
+2026-10-14 08:07:26 - node           - INFO     - Starting task 1 - flhub-r1
+2026-10-14 08:08:08 - task (1)       - INFO     - [Task 1]: info > Writing output to /mnt/data/task-000000001/output
+2026-10-14 08:09:07 - node           - ERROR    - ('Connection broken: IncompleteRead(2708306 bytes read, 474520758 more expected)', IncompleteRead(2708306 bytes read, 474520758 more expected))
+2026-10-14 08:09:12 - common         - ERROR    - Connection error... Retrying
+2026-10-14 08:09:32 - engineio.client - WARNING  - Server has stopped communicating, aborting
+2026-10-14 08:10:13 - common         - ERROR    - Connection error... Retrying
+2026-10-14 08:11:14 - common         - ERROR    - Connection error... Retrying
+2026-10-14 08:12:02 - node           - ERROR    - Speaking thread had an exception
+socketio.exceptions.BadNamespaceError: /tasks is not a connected namespace.
+2026-10-14 08:12:22 - socket         - INFO     - Websocket connection established
+2026-10-14 08:12:23 - node           - INFO     - Received 0 tasks
+2026-10-14 08:13:30 - socket         - INFO     - Websocket connection established
+2026-10-14 08:13:30 - node           - INFO     - Received 0 tasks
+2026-10-14 08:13:45 - socket         - INFO     - Websocket connection established
+2026-10-14 08:13:45 - node           - INFO     - Received 0 tasks
+2026-10-14 08:14:11 - node           - INFO     - Starting task 2 - flhub-r1
+2026-10-14 08:14:21 - task (2)       - INFO     - [Task 2]: info > Writing output to /mnt/data/task-000000002/output
