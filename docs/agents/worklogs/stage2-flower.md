@@ -101,3 +101,9 @@ Newest entries at the bottom. Format: `### <UTC timestamp> — S<n> — <title>`
 - Follower crashed 06:18:20Z on a 2-s run (s2-e7-nvflare-native-cnn, sysmon summary without samples: KeyError 'system'); fixed (post_perf tolerant, never stops the loop) and restarted 06:25Z; it re-processed the missed RUN messages.
 - E7 flower (central runs 06:49-06:59Z, data bus #220): native == hub hash-equal in every round for C1 (20 rounds) and C2 (5 rounds); medians native/hub 9.48/7.55 s (C1; Flower send_and_receive 3 s polling) and 7.45/8.19 s (C2; hub-core round trip +0.73 s). Flower's own run accounting 17.2 MB (C1) / 943.9 MB (C2). Report section updated.
 - Next: E4a 512 MB extension, E4b (NETEM APPLY/CLEAR handshakes), then S5.
+
+### 2026-10-14T09:15Z — S5 — final-call: section final, VM clean, report-ready
+- S4-done #959 (122 final runs); final-call #961. E4a 512 MB extension: flower ok (45.78 s, VM 7.5 GiB, 1.002x bytes). E4b: NETEM APPLY/CLEAR wan1g/wan100/wan20 done (RTT 10.9/40.9/81.0 ms on :9092, cleared each time); Flower efficiency 0.17/0.67/0.89 (#958). E7 compare on central's checkpoints: max diff 0.0 every round (#228/#229).
+- docs/report/stage2/flower.md final (1aea1aa); ledger: 7 flower rows incl. the S4 actions row. REPORT_STAGE2.md flower parts checked: no corrections, 3 optional notes (#975). pytest at 16ec325: no failures.
+- End state: sysmon and run follower stopped; island runtime data and temp analysis files removed; `deploy/flower-vm/endstate.sh` -> CLEAN (tc fq_codel, no flhub-netem timers, no straggler scopes, nothing armed, no experiment processes, E5 extras stopped, flw-h5/flw-h6 HEALTHY, 14 GB free).
+- Next: report-ready to central; on 'S2 all-done' final worklog entry and ~/.flhub/stage2/DONE.
