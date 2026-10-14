@@ -8,7 +8,7 @@ This guide covers the NVFlare adapter, the hospital-side NVFlare client, and wha
 |---|---|
 | Tested version | NVFlare **2.9.0** with Python 3.11.17, torch 2.14.1+cpu, numpy 2.4.4, safetensors 0.8.0 ([`deploy/versions.env`](../../deploy/versions.env)) |
 | Protocol | `flhub/0.2` (also serves `flhub/0.1` callers) |
-| Status | Tested in stage 1 (2 hospitals, `flhub/0.1`) and stage 2 (2 hospitals, plus 2 extra hospitals for the 12-site run). Conformance suite v2 against the reference deployment: 13 of 13 tests pass, and every returned weight equals local training bit for bit (max abs diff 0.0). Every real run with NVFlare sites in both stages produced the same global weights as the framework-free simulation. |
+| Status | Tested in stage 1 (2 hospitals, `flhub/0.1`) and stage 2 (2 hospitals, plus 2 extra hospitals for the 12-site run). Conformance suite v2 against the reference deployment: 13 of 13 tests pass, and every returned weight equals local training bit for bit (max abs diff 0.0). In stage 1, the mixed 6-site final run (2 NVFlare sites) is bit-identical to the framework-free simulation; in stage 2, all 69 real runs, including every run with NVFlare sites, matched their framework-free reference bit for bit. |
 | Hospital code | [`clients/nvflare/client.py`](../../clients/nvflare/client.py), 48 lines, the standard NVFlare Client API loop. 0 lines changed since stage 1. |
 | Rollout channel | The job's custom code (`custom/client.py` and `custom/flhub_core/`), deployed by the NVFlare server like any other job. |
 
@@ -183,15 +183,16 @@ The relay rejects a reply that is not `FULL` or has no positive `num_examples` (
 
 **Data and data variants.** Hospitals hold sha256-verified CSV files (`label,x0..x783`), written by `python -m flhub_core.data materialize`. A data variant is a file `<variant>-<site>.csv` next to `<site>.csv`. The hub selects it per run with `train_config["data_variant"]`, so a new variant needs a new file at the hospital, never a configuration change. Each reply carries `data_fp` (the first 32 bits of the data fingerprint), which the hub checks against the partition manifest.
 
-**Packaging and rollout.** `client.py` and the `.py` files of `flhub_core` travel in the job's `custom/` folder. NVFlare 2.9.0 **appends** `custom/` to the job process's `sys.path` (`utils/job_launcher_utils.py:486-490`), so a `flhub_core` installed in the hospital's Python environment shadows the job's copy. Hence the hospital must not install `flhub_core`. The stage-2 rollout of `flhub_core` 0.2 showed both sides of this:
+**Packaging and rollout.** `client.py` and the `.py` files of `flhub_core` travel in the job's `custom/` folder. NVFlare 2.9.0 **appends** `custom/` to the job process's `sys.path` (`utils/job_launcher_utils.py:486-490`), so a `flhub_core` installed in the hospital's Python environment shadows the job's copy. Hence the hospital must not install `flhub_core`. Stage 2 changed the hospital side in four ways; this is the NVFlare column:
 
-| Step | Who | What | Wall time | Downtime |
-|---|---|---|---|---|
-| 1 | hospital | provision the stage-2 data files next to `<site>.csv` (manifest-checked) | 12.9 s | none |
-| 2 | operator | export a relay job that carries `custom/flhub_core` (`install.sh`), restart the adapter and server so that the keeper submits it | – | relay-job restart |
-| 3 | hospital, once | remove `flhub_core` from the client's Python environment and restart the client ([`switch_s2.sh`](../../deploy/nvflare-vm/switch_s2.sh)) | 82.6 s for both sites | 50.3 s per site |
+| Hospital-side change in stage 2 | NVFlare | Wall time | Downtime |
+|---|---|---|---|
+| (a) code rollout of `flhub_core` 0.2 | once: remove `flhub_core` from the client's Python environment and restart the client ([`switch_s2.sh`](../../deploy/nvflare-vm/switch_s2.sh)); the operator deploys a relay job that ships `custom/flhub_core` | 82.6 s for both sites, including a 12 s data check | 50.3 s per site |
+| (b) data for the stage-2 data variants | data only: the variant files next to `<site>.csv`, checked against the manifests | 12.9 s | none |
+| (c) configuration for data variants | none: `flhub_core` finds `<variant>-<site>.csv` next to the configured file | – | – |
+| (d) later code updates | none: they arrive with the next relay job | – | – |
 
-Before step 3, both hospitals ran the job with their installed `flhub_core` 0.1.0 instead of the shipped 0.2.0. After it, `client_code_version` reported `0.2.0+fe357a1dbec1` at both sites and the selfcheck digest in the hospital runtime matched the hub's. Every later `flhub_core` version reaches the hospitals with the next relay job, with no hospital step. Rollback means submitting an older job. Sources: [hospital ledger](../results/evidence/hospital-ledger.md), ADR-018 in [`design/decisions.md`](../design/decisions.md).
+Before the switch, both hospitals ran the job with their installed `flhub_core` 0.1.0 instead of the shipped 0.2.0. After it, `client_code_version` reported `0.2.0+fe357a1dbec1` at both sites and the selfcheck digest in the hospital runtime matched the hub's. Every later `flhub_core` version reaches the hospitals with the next relay job, with no hospital step. Rollback means submitting an older job. Sources: [hospital ledger](../results/evidence/hospital-ledger.md), ADR-018 in [`design/decisions.md`](../design/decisions.md).
 
 **Hospital-side footprint** (NVFlare rows of the [hospital ledger](../results/evidence/hospital-ledger.md)):
 
@@ -247,8 +248,8 @@ All numbers are from the reference testbed (4 vCPU AMD EPYC-Rome VMs in one data
 |---|---|---|
 | Adapter code | TODO(verify): `scripts/docs/loc.py` for `adapters/nvflare/` (without `native.py`, which is only for E7) | `scripts/docs/loc.py` |
 | Hospital code | 48 lines (`client.py`), 0 changed since stage 1 | [ledger](../results/evidence/hospital-ledger.md) |
-| One-time hospital steps (rollout of `flhub_core` 0.2) | 3 steps, 50.3 s downtime per site | [ledger](../results/evidence/hospital-ledger.md) |
-| Hospital steps per later code version | 0 | ADR-018 |
+| Hospital steps for the `flhub_core` 0.2 rollout | once: remove the installed copy and restart the client (50.3 s offline per site) | [ledger](../results/evidence/hospital-ledger.md) |
+| Hospital steps per later code version | 0: the next relay job carries it | ADR-018 |
 | Hub overhead against NVFlare's own FedAvg (E7) | −0.23 s (−6.5 %) per round with `cnn-small`; +0.10 s (+4.1 %) with a 45 MiB payload | [e7-native-vs-hub.md](../results/evidence/stage2/nvflare/e7-native-vs-hub.md) |
 | Fixed cost per round, cost per MiB | a = 2.23 s, b = 0.0212 s/MiB (R² 0.972, 1–512 MiB) | [cost_model.md](../results/evidence/stage2/cost_model.md) |
 | Bytes on the wire ÷ payload (E4a) | 1.005–1.064 | [e4_bytes.md](../results/evidence/stage2/e4_bytes.md) |
@@ -305,7 +306,7 @@ Source: [e7-native-vs-hub.md](../results/evidence/stage2/nvflare/e7-native-vs-hu
 | 256 | 10.29 | 6.29 | 1.69 | 3.48 | 1.35 |
 | 512 | 15.49 | – | – | 5.01 | 2.11 |
 
-Source: [e4a-breakdown.md](../results/evidence/stage2/nvflare/e4a-breakdown.md) (timings), [stage-2 NVFlare section](https://github.com/Zare2001/AgnosticFL/blob/stage2-final/docs/report/stage2/nvflare.md) §4 (memory); figure [e4a_round_time_vs_payload.png](../results/figures/e4a_round_time_vs_payload.png).
+Source: [e4a-breakdown.md](../results/evidence/stage2/nvflare/e4a-breakdown.md) (timings), [e4a-memory.md](../results/evidence/stage2/nvflare/e4a-memory.md) (memory); figure [e4a_round_time_vs_payload.png](../results/figures/e4a_round_time_vs_payload.png).
 
 In the mixed scope (six sites, three frameworks) NVFlare's fan-out was 1.8–3.8 s from 1 to 64 MiB and 5.5 s at 128 MiB; vantage6 set those round times ([tables.md](../results/evidence/stage2/tables.md)).
 
@@ -332,7 +333,7 @@ Source: [cost_model.md](../results/evidence/stage2/cost_model.md); figure [e4b_m
 ### 5.5 Memory and payload size
 
 - **Hospital VM** (memory in use at peak, two clients and the operating system): 1.68 GiB at 1 MiB up to 5.01 GiB at 512 MiB, 16 % of the VM's 31.3 GiB; one client's job process 0.43 GiB up to 2.11 GiB; the NVFlare client process itself 89–96 MiB (table in §5.3).
-- **Central host:** the relay's server job process peaked at 3.8 GiB at 512 MiB; at 45 MiB (E7 C2) it took 585 MiB, the adapter 163 MiB and the hub core 44 MiB. Sources: [stage-2 report §6.1](https://github.com/Zare2001/AgnosticFL/blob/stage2-final/REPORT_STAGE2.md), [stage-2 NVFlare section](https://github.com/Zare2001/AgnosticFL/blob/stage2-final/docs/report/stage2/nvflare.md) §5.
+- **Central host:** the relay's server job process peaked at 3.8 GiB at 512 MiB; at 45 MiB (E7 C2) it took 585 MiB, the adapter 163 MiB and the hub core 44 MiB. Sources: `REPORT_STAGE2.md` §6.1 at [tag `stage2-final`](https://github.com/Zare2001/AgnosticFL/blob/stage2-final/REPORT_STAGE2.md) (relay job), [stage-2 NVFlare section](https://github.com/Zare2001/AgnosticFL/blob/stage2-final/docs/report/stage2/nvflare.md) §5 (E7 processes).
 - **Largest payload:** 512 MiB per site and direction on the testbed (15.5 s per round, every round hash-equal to the simulation). On a single-host test with NVFlare's default settings: 128 MiB 5–6 s, 256 MiB 9–10 s, 512 MiB 16–17 s and 1024 MiB 32.8 s per round. No NVFlare limit was reached; the stops were the testbed's disk.
 
 ### 5.6 Scaling and robustness
