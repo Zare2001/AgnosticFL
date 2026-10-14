@@ -8,8 +8,9 @@ with P the payload in MiB. vantage6 grows superlinearly beyond 64 MiB (its serve
 its predictions use the linear fit on 1-64 MiB (the learning models are <= 43 MiB); a quadratic fit
 a + b·P + c·P² over all sizes is reported for every framework. The fits then predict the fan-out of every learning run
 with real training (E3; E1 and E2 dir0.3 for cnn-small) as fit(P_model) + max over the framework's
-sites of train_time_s, and of the E4b runs (payload-45 under netem) as fit(P) + 4·P/rate (each VM link
-carries two sites: download 2P before training, upload 2P after it). Reported: coefficients, R², and
+sites of train_time_s, and of the E4b runs (payload-45 under netem) as fit(P) + V·P/rate, V = the payloads
+a framework moves per VM link and round (4 for NVFlare and Flower: two sites, download before training and
+upload after it; 17.8 for vantage6, which sends each input four times, double base64). Reported: coefficients, R², and
 the prediction error per run (median over rounds >= 2).
 """
 
@@ -30,6 +31,7 @@ SIZES = [1, 8, 32, 64, 128, 256, 512]
 PREFIX = {"nvflare": "nvf-", "vantage6": "v6-", "flower": "flw-"}
 MODEL_MB = {"cnn-small": 52203 * 4 / 2**20, "cnn-medium": 1676779 * 4 / 2**20, "resnet18-gn": 11173323 * 4 / 2**20}
 RATE_MBPS = {"wan1g": 1000, "wan100": 100, "wan20": 20}  # Mbit/s
+VOLUME = {"nvflare": 4.0, "flower": 4.0, "vantage6": 17.8}  # payloads per VM link and round (see the E4b note)
 LEARNING = ["s2-e1-dir0.3-fedavg", "s2-e2-dir0.3-fedavgm", "s2-e3-cnn-medium-fedavg", "s2-e3-cnn-medium-fedavgm",
             "s2-e3-resnet18-gn-fedavg", "s2-e3-resnet18-gn-fedavgm"]
 
@@ -114,9 +116,12 @@ def main(argv: list[str] | None = None) -> int:
             pred = predict(fw, p) + tr
             lines.append(f"| {name} | {fw} | {p:.1f} | {tr:.1f} | {pred:.1f} | {meas:.1f} | "
                          f"{(pred - meas) / meas * 100:+.0f} % |")
-    lines += ["", "E4b (payload-45, mixed scope, netem on both ends): fan-out ≈ fit(45) + 4·P/rate.", "",
-              "| profile | framework | lower bound 4·P/rate (s) | predicted (s) | measured (s) | error |",
-              "|---|---|---|---|---|---|"]
+    lines += ["", "E4b (payload-45, mixed scope, netem on both ends): fan-out ≈ fit(45) + V·P/rate, with V the bytes a "
+              "framework moves per VM link and round in units of P: 4 for NVFlare and Flower (2 sites, each P down and P "
+              "up), 17.8 for vantage6 (2 sites x (4 input copies down + 1 result up) x 1.78 for double base64; "
+              "vantage6 section §4). Efficiency = plan lower bound 4·P/rate ÷ measured.", "",
+              "| profile | framework | lower bound 4·P/rate (s) | V·P/rate (s) | predicted (s) | measured (s) | error | "
+              "efficiency |", "|---|---|---|---|---|---|---|---|"]
     for prof in ["none", "wan1g", "wan100", "wan20"]:
         name = f"s2-e4b-{prof}"
         if not (RUNS / f"{name}-latest").exists():
@@ -129,8 +134,10 @@ def main(argv: list[str] | None = None) -> int:
             if meas is None:
                 continue
             lb = 4 * p * 8 * 2**20 / (RATE_MBPS[prof] * 1e6) if prof in RATE_MBPS else 0.0
-            pred = predict(fw, p) + lb
-            lines.append(f"| {prof} | {fw} | {lb:.1f} | {pred:.1f} | {meas:.1f} | {(pred - meas) / meas * 100:+.0f} % |")
+            vol = VOLUME[fw] * p * 8 * 2**20 / (RATE_MBPS[prof] * 1e6) if prof in RATE_MBPS else 0.0
+            pred = predict(fw, p) + vol
+            lines.append(f"| {prof} | {fw} | {lb:.1f} | {vol:.1f} | {pred:.1f} | {meas:.1f} | "
+                         f"{(pred - meas) / meas * 100:+.0f} % | {lb / meas:.2f} |")
     Path(args.out).write_text("\n".join(lines) + "\n")
     print("\n".join(lines))
     return 0

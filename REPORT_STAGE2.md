@@ -104,8 +104,8 @@ So switching the aggregator (E2), the data (E1), the model (E3), partial partici
 |---|---|---|---|
 | channel | job custom code (`custom/flhub_core` in the relay job) | new algorithm image tag `v6-train:a43cef3f75c0` in the operator's registry | FAB (`flhub_core` packed next to the ClientApp) |
 | central side | rebuild + resubmit relay job (`install.sh`, `start.sh`) | build + push image (98 s), adapter restart (2 s) | `restart.sh adapter`: new FAB + relay run (29.6 s) |
-| one-time hospital steps | 3: data provisioning; remove the venv's `flhub_core` (NVFlare appends `custom/` to `sys.path`, so a venv copy would shadow the job's); 1 client restart | 2: data provisioning; node config with one CSV database per data variant + 1 node restart (~20 s) | 1: data provisioning |
-| hospital downtime | 50.3 s per site (82.6 s switch) | ~20 s (config switch) | 0 |
+| one-time hospital steps | 3: data provisioning; remove the venv's `flhub_core` (NVFlare appends `custom/` to `sys.path`, so a venv copy would shadow the job's); 1 client restart | 2: data provisioning; node config with one CSV database per data variant + 1 node restart (14.7 s) | 1: data provisioning |
+| hospital downtime | 50.3 s per site (82.6 s switch) | 14.7 s (config switch, both nodes together) | 0 |
 | client restarts | 1 | 1 (config, not code) | 0 |
 | later `flhub_core` updates | 0 hospital steps (next job) | 0 (next image tag; nodes pull on the first task) | 0 (next FAB) |
 | lines changed in hospital code | 0 | 0 | 0 |
@@ -197,14 +197,27 @@ Hyperparameters from S3 (tuned on `dir0.3`, validation split): fedavgm η 1.0 (�
 | 512 | 15.5 (ext.) | 45.8 (ext.) | *(disk)* | — |
 
 - **No framework limit was hit.** Every stop is a *testbed disk limit* of the 19 GB central VM (PLAN.md §7 rule: free ≥ 3 GB + 4 × payload × sites; for vantage6 a measured projection of its database growth). At the owner's request (#410) the sweep was extended at the end of S4 ("ext." in the table), after freeing disk on central (the owner removed the stage-1 image; central removed its local copies of the stage-2 algorithm images, the docker build cache and vantage6 run rows orphaned by subtask deletion): NVFlare and Flower carry 512 MB per site and direction, and the mixed scope 128 MB. Mixed 256 MB (needs 9 GB free) and 1024 MB (11 GB) remain testbed disk limits.
-- **vantage6 has a real limit at 256 MB** (vantage6 4.15.2, server with its default SQLite database). Training finished every time, but the result never arrived. The server's single worker spent minutes rewriting the ~0.9 GB run rows for every streamed algorithm log line, so the nodes' websocket timed out. The node then emits a status event on the disconnected socket before it sends the result, the emit fails, and the result is dropped (`node/__init__.py:579`). After reconnecting, the server hands the still-open run back, and the node trains round 1 again. Three identical cycles of about 5 min followed (vantage6 #884, #885). Central cancelled the round after 33 min instead of waiting for the 3600 s deadline. Knobs: none usable on the server in 4.15.2 (the large-result store is broken, ADR-020). A PostgreSQL server database (server side) or `share_algorithm_logs: false` on the nodes (hospital side) would remove the row rewrites. Neither was applied, because a limit is a result (PLAN.md §10). 128 MB passed (468 s per round).
+- **vantage6 has a real limit at 256 MB** (vantage6 4.15.2, server with its default SQLite database). Training finished every time, but the result never arrived. The server's single worker spent minutes rewriting the ~0.9 GB run rows for every streamed algorithm log line, so the nodes' websocket timed out. The node then emits a status event on the disconnected socket before it sends the result, the emit fails, and the result is dropped (`node/__init__.py:579`). After reconnecting, the server hands the still-open run back, and the node trains round 1 again. Each node trained round 1 six times in 32 min (every ~5 min), and every result was dropped (vantage6 #884, #885; `docs/report/stage2/evidence/vantage6/e4a-256mb-node-logs.txt`). Central cancelled the round at 08:12Z instead of waiting for the 3600 s deadline. Knobs: none usable on the server in 4.15.2 (the large-result store is broken, ADR-020). A PostgreSQL server database (server side) or `share_algorithm_logs: false` on the nodes (hospital side) would remove the row rewrites. Neither was applied, because a limit is a result (PLAN.md §10). 128 MB passed (468 s per round).
 - **Bytes on wire** (interface deltas on the framework VMs ÷ payload moved): NVFlare 1.005–1.06, Flower 1.002–1.005, vantage6 5.4 (64 MB) to 9.1 (128 MB). vantage6 4.15.2 sends the run input (base64 JSON, 1.78× the payload) four times per site and round by design (run list, PATCH response, GET before the result, result PATCH response), and more under load, when its single uwsgi worker drops connections while it rewrites the run row for every algorithm log line (vantage6 section §4).
 - **Scaling.** NVFlare's round time stays near its 2–2.5 s task-polling floor up to 32 MB and grows about linearly beyond (10.3 s at 256 MB). Flower has about 5.5 s of fixed cost per round (relay and SuperNode message handling, a ClientApp process per message; breakdown in the flower section) and grows linearly. vantage6 grows superlinearly (doubling 64 → 128 MB costs 4×) because the server is CPU-bound in one process; the mixed scope inherits vantage6's time.
 - **Memory on central** (sysmon peak RSS): the hub core stays at 42–46 MB at every size (blobs are streamed); the orchestrator needs about 8× the payload (2.0 GB at 256 MB, 2 sites), NVFlare's relay job about 10×, Flower's relay ServerApp about 7.6×, vantage6's server and adapter 15–18× (2.3 / 1.9 GB at 128 MB). Central used at most 7.9 GB of 31 GB up to 256 MB; at 512 MB the orchestrator peaked at 4.1–4.3 GB, NVFlare's relay job at 3.8 GB, Flower's ServerApp at 3.6 GB, and central at 12.1 GB in total (39 %). The framework VMs stayed below 16 % of RAM up to 256 MB; at 512 MB the Flower VM peaked at 7.7 GB (24 %) and the NVFlare VM at 5.1 GB (16 %). Bytes on wire at 512 MB: NVFlare 1.007, Flower 1.002 (`e4_bytes.md`).
 
 ### 6.2 E4b — bandwidth sensitivity
 
-*(pending)*
+`payload-45` (about the size of `resnet18-gn`), mixed scope, 3 rounds per profile; `netem` rate and delay on every hospital link in both directions (central shaped its egress to all three VMs in one call, each framework agent its own egress; revert timers first, cleared and verified after every profile). Fan-out per framework (dispatch to its last result), median of rounds 2–3; lower bound = 4·P/rate (each VM link carries two sites: 2P down before training, 2P up after it). INV-1 hash-equal for all four runs.
+
+![e4b](docs/report/stage2/figures/e4b_measured_vs_bound.png)
+
+| profile | lower bound (s) | NVFlare (s) | efficiency | Flower (s) | efficiency | vantage6 (s) | efficiency | round (s) |
+|---|---|---|---|---|---|---|---|---|
+| none | — | 3.3 | — | 7.5 | — | 81.8 | — | 82.2 |
+| wan1g (1 Gbit/s, 5 ms) | 1.5 | 4.3 | 0.35 | 8.9 | 0.17 | 83.3 | 0.02 | 83.7 |
+| wan100 (100 Mbit/s, 20 ms) | 15.1 | 17.0 | 0.89 | 22.7 | 0.67 | 129.5 | 0.12 | 130.0 |
+| wan20 (20 Mbit/s, 40 ms) | 75.5 | 80.3 | 0.94 | 85.1 | 0.89 | 463.8 | 0.16 | 464.3 |
+
+- **NVFlare and Flower move each update once and use the link well**: at 20 Mbit/s they reach 94 % and 89 % of the bandwidth bound, consistent with their 1.002–1.06× bytes on wire (E4a). Their remaining time is the fixed cost per round seen in E4a.
+- **vantage6 moves 17.8× the payload per link and round by design**: two sites × (four copies of the input down, one result up) × 1.78 for the double base64 encoding (vantage6 section §4). Against that volume it reaches about 0.7 at 20 Mbit/s; the rest is server time. Against the plan's 4·P bound its efficiency is 0.16. Under realistic hospital bandwidth vantage6 dominates a mixed round: 464 s, against 80–85 s for the other two frameworks.
+- With 1 Gbit/s and 5 ms nothing changes measurably. The emulation adds rate and delay only, without loss or jitter (§8).
 
 ### 6.3 E3 — round time and model size
 
@@ -234,7 +247,7 @@ Median over rounds ≥ 2 (seconds; train and overhead are the mean of the framew
 | Flower | 5.67 | 0.054 | 1.00 | −8 to −7 % | −3 to −1 % | −1 % |
 | vantage6 (fit on 1–64 MiB) | 4.13 | 1.49 | 0.96 | −38 to −31 % | −4 to −3 % | +9 % |
 
-*(pending: E4b rows, resnet18-gn FedAvgM)*
+Under netem (E4b), adding the transfer time V·P/rate with the bytes each framework moves per link and round (V = 4 for NVFlare and Flower, 17.8 for vantage6) predicts the measured fan-out of all twelve framework-profile pairs within ±13 % (`cost_model.md`). `resnet18-gn` with FedAvgM has the same timing as with FedAvg (prediction errors 0, +10 and −1 %).
 
 The model explains NVFlare and Flower within 8 % across a 200× range of model sizes: a fixed cost per round plus a small per-MiB cost plus the slowest site's training. vantage6's per-MiB cost is 30–70× higher, and its growth beyond 64 MiB is superlinear (E4a). Its small-model error has two parts (vantage6 #705): the straight line underestimates vantage6's fixed cost per task, which is 6.3 s measured at 1 MiB (container start, task and result round trips), and real training adds about 0.8 s per task that the echo runs do not have (reading the site's CSV database into a DataFrame, a slower container exit after a torch run).
 

@@ -265,7 +265,10 @@ def e4a_limits(scope: str) -> list[tuple[int, str]]:
     p = RUNS / f"e4a-{scope}.json"
     if not p.exists():
         return []
-    return [(r["size_mb"], r["result"]) for r in json.loads(p.read_text())["runs"] if r["result"] not in ("ok",)]
+    final: dict[int, str] = {}
+    for r in json.loads(p.read_text())["runs"]:  # the last attempt per size counts (the E4a extension re-ran sizes)
+        final[r["size_mb"]] = r["result"]
+    return sorted((size, res) for size, res in final.items() if not res.startswith("ok"))
 
 
 def fig_e4a_time(out: Path) -> None:
@@ -283,15 +286,15 @@ def fig_e4a_time(out: Path) -> None:
         ax.annotate(scope, good[-1], xytext=(-5, 8), textcoords="offset points", ha="right", va="bottom",
                     fontsize=8, color=TEXT)
         for size, result in e4a_limits(scope):
-            ax.plot([size], [good[-1][1]], marker="v" if "disk" in result else "x", color=FW_COLOR[scope],
-                    ms=8, mfc="none", mew=1.5)
+            ax.plot([size], [good[-1][1]], marker="v" if "disk" in result else "X", color=FW_COLOR[scope],
+                    ms=8 if "disk" in result else 10, mfc="none" if "disk" in result else FW_COLOR[scope], mew=1.5)
     ax.set_xscale("log", base=2)
     ax.set_yscale("log")
-    ax.set_xticks([1, 8, 32, 64, 128, 256, 512], ["1", "8", "32", "64", "128", "256", "512"])
+    ax.set_xticks([1, 8, 32, 64, 128, 256, 512, 1024], ["1", "8", "32", "64", "128", "256", "512", "1024"])
     ax.set_xlabel("payload per site and direction (MiB)")
     ax.set_ylabel("round time, median of rounds 2-3 (s)")
-    ax.set_title("E4a: round time vs payload (open triangle = next size stopped by the testbed disk rule)",
-                 loc="left", fontsize=9)
+    ax.set_title("E4a: round time vs payload (open triangle: next size stopped by the testbed disk rule; "
+                 "X: framework limit)", loc="left", fontsize=9)
     save(fig, "e4a_round_time_vs_payload", out)
 
 
