@@ -53,6 +53,8 @@ python examples/nvflare/server/relay_job.py export --out /tmp/nvf-jobs  # the jo
 python examples/nvflare/server/run_local.py [--rounds 3] [--keep]       # end to end with NVFlare's simulator
 ```
 
+`run_local.py` stops everything it started on every exit. After a failure or Ctrl-C it first asks the relay to end the job, the normal way out, and then stops whatever still runs together with its children: NVFlare's simulator runs its server and one worker per client as separate processes in new sessions, so a process-group kill would miss them.
+
 With a real NVFlare server: export the job, then `python examples/nvflare/server/adapter.py --admin-kit <admin kit dir> --job-dir /tmp/nvf-jobs/flhub-relay --sites <client names>`, and list the adapter's URL and sites in the orchestrator's configuration. The steps for an existing federation are in the guide's [§4](../../docs/frameworks/nvflare.md#4-deploying-next-to-an-existing-nvflare-federation).
 
 ## 4. Tested
@@ -74,6 +76,7 @@ python examples/nvflare/server/run_local.py
 - `adapter.py --check`: `health {'ok': True, 'name': 'nvflare-adapter'}`; `discover` answers `adapter=nvflare framework 2.9.0 protocol flhub/0.2` with `nvf-h1` and `nvf-h2` offline (no relay, no client); the keeper submits no job; `check: PASS`.
 - `relay_job.py export`: the folder `flhub-relay/` holds `app/config/config_fed_server.json` (`HubRelayController`), `app/config/config_fed_client.json` (`ClientAPIExecutor`, `in_process`, `task_script_path: client.py`, numpy), `app/custom/client.py` (byte-identical to `client/client.py`), `app/custom/flhub_core/` and `meta.json` (the app on `@ALL`).
 - `run_local.py`: `"status": "finished"`, 3 rounds in 9.6 s, median round 2.39 s (NVFlare's task-request interval, [guide §5.3](../../docs/frameworks/nvflare.md#53-runtime-overhead)), final test accuracy 0.625 (still the majority class after 3 rounds, as in stage 1); the simulator exited with 0; `INV-1 full sim vs …/nvflare-example-latest: hashes_equal=True max_abs_diff=0.000e+00 -> PASS`. 77 s in total, including the 4 MB data download and the simulator start. The round-1 training losses, 0.6005 (`nvf-h1`) and 0.6182 (`nvf-h2`), equal those of the conformance run against the reference deployment ([evidence](../../docs/results/evidence/stage1/conformance-nvflare-central.json)).
+- Interrupted run (failure path): Ctrl-C (SIGINT) to `run_local.py` 1 s and 5 s after the simulator started: the script exited after 12 s and 11 s, and no process of the run was left (`ps`).
 
 ## 5. Links
 

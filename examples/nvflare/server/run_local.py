@@ -21,6 +21,7 @@ Everything it starts is stopped at the end; --keep keeps the work directory with
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import os
 import shutil
@@ -32,6 +33,7 @@ import urllib.request
 from pathlib import Path
 
 import nvflare
+import psutil  # an NVFlare dependency
 
 from adapters.common.hubclient import HubClient
 from adapters.common.relay import RelayAdapter
@@ -68,6 +70,23 @@ def wait_healthy(url: str, timeout_s: float = 60.0) -> None:
     raise RuntimeError(f"{url} did not become healthy within {timeout_s:.0f} s")
 
 
+def stop_tree(proc: subprocess.Popen) -> None:
+    """Stops a process and everything it started. NVFlare's simulator runs its server and one worker
+    per client as separate processes in new sessions, so they are found by their parent links."""
+    try:
+        tree = psutil.Process(proc.pid).children(recursive=True) + [psutil.Process(proc.pid)]
+    except psutil.NoSuchProcess:
+        return
+    for p in tree:
+        with contextlib.suppress(psutil.NoSuchProcess):
+            p.terminate()
+    _, alive = psutil.wait_procs(tree, timeout=30)
+    for p in alive:
+        with contextlib.suppress(psutil.NoSuchProcess):
+            p.kill()
+    psutil.wait_procs(alive, timeout=10)
+
+
 def write_config(path: Path, rounds: int, hub_url: str, adapter_url: str) -> None:
     """A run configuration in the format of configs/mock-3r.yaml, with this run's ports."""
     path.write_text(
@@ -98,7 +117,7 @@ def main() -> int:
         print(f"data: {materialize(site)}", flush=True)
 
     hub_url, adapter_url = f"http://127.0.0.1:{free_port()}", f"http://127.0.0.1:{free_port()}"
-    py, procs, adapter_server = sys.executable, [], None
+    py, procs, adapter, adapter_server, sim = sys.executable, [], None, None, None
     try:
         procs.append(subprocess.Popen([py, "-m", "hub.core", "--port", hub_url.rsplit(":", 1)[1],
                                        "--root", str(work / "hubcore")], cwd=REPO,
@@ -134,13 +153,12 @@ def main() -> int:
         print("\n".join(line for line in check.stdout.splitlines() + check.stderr.splitlines() if "INV-1" in line))
         return check.returncode
     finally:
-        for p in reversed(procs):
-            if p.poll() is None:
-                p.terminate()
-                try:
-                    p.wait(timeout=30)
-                except subprocess.TimeoutExpired:
-                    p.kill()
+        if sim is not None and sim.poll() is None and adapter is not None:  # e.g. after a failure or Ctrl-C:
+            adapter.request_relay_shutdown()  # the normal way out, as on success: the relay ends the job
+            with contextlib.suppress(subprocess.TimeoutExpired):
+                sim.wait(timeout=60)
+        for p in reversed(procs):  # whatever still runs, with all its children
+            stop_tree(p)
         if adapter_server is not None:
             adapter_server.stop()
         if not args.keep:
