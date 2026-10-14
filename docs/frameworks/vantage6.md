@@ -398,7 +398,7 @@ Disk: a 4.15.2 node never deletes its per-run folders `task-<run id>` (input and
 
 ### 5.6 Scaling and robustness
 
-**Scaling (E5).** Six sites against twelve (four per framework; the extra sites hold half as much data each): vantage6 fan-out 9.1 → 10.4 s ([tables](../results/evidence/stage2/tables.md)), overhead per site 6.7 → 8.2 s, hospital-VM CPU mean 26.7 → 42.0 % with four training containers on 4 vCPUs (stage-2 report §6.4). The two extra nodes were online 16 s after the request; registered but offline, they never blocked a run.
+**Scaling (E5).** Six sites against twelve (four per framework; in `iid12` every site holds half as much data as in `iid`, 2,880 instead of 5,760 examples, so the total stays the same; `configs/stage2/partitions/`): vantage6 fan-out 9.1 → 10.4 s ([tables](../results/evidence/stage2/tables.md)), overhead per site 6.7 → 8.2 s, hospital-VM CPU mean 26.7 → 42.0 % with four training containers on 4 vCPUs (stage-2 report §6.4). The two extra nodes were online 16 s after the request; registered but offline, they never blocked a run.
 
 ![E5: scaling](../results/figures/e5_scaling.png)
 
