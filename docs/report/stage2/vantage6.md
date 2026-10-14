@@ -60,7 +60,7 @@ Evidence: vantage6 4.15.2 source (server/node wheels, client, algorithm tools) a
   | 32 MB | 60.1 s | — | — |
   | 64 MB | 115.3 s | 3.3 GB | training containers 1.4 GB, node 1.0 GB |
   | 128 MB | 468.2 s (r1 536 s) | 5.3 GB | training containers 2.1 GB, node 1.6 GB |
-  | 256 MB | testbed disk limit on central (measured projection: sqlite 1.14 GB + 0.20 GB journal at 128 MB -> ~4 GB at 256 MB, below the 3 GB floor) | | |
+  | 256 MB | **vantage6 limit (DB mode)**: run in the E4a extension (central freed disk); round 1 never completes: each node finishes training in ~50 s, then the server is busy for minutes rewriting ~0.9 GB run rows per streamed log line, the node's websocket times out, and the node's result sender fails on its socket emit before the PATCH (`BadNamespaceError`) -> result dropped -> after the reconnect the server's sync hands the open run back -> the node re-runs it; 5+ cycles of ~5 min (evidence/vantage6/e4a-256mb-node-logs.txt) | 1.4 GB (nodes) | — |
   | 512 MB | testbed disk limit on central | | |
   | 1024 MB | not storable: sqlite value limit 1e9 bytes < 1.78 x 1024 MiB | | |
 
