@@ -61,3 +61,12 @@ Newest entry at the bottom. Format: `## <UTC> — <what>` then facts (commands, 
 - Not Flower's simulation engine: simulated nodes get only partition-id/num-partitions as node config (flwr/server/superlink/fleet/vce/vce_api.py:91-93) and it needs Ray (flwr/simulation/__init__.py:35); the relay needs a SuperNode's site-id.
 - Fresh clone + fresh venv (versions.env pins + flwr 1.39.0, env -i): at 5dab095 and again at 9939747: --check health ok, sites unknown; run_local relay up after 32 s, rounds 7.5-7.8 s, INV-1 hashes_equal=True max_abs_diff 0.0, PASS; both runs end at global model sha256:54c4f093…. Temporary processes and directories removed; testbed SuperNodes kept their R0 pids. Sent `examples-ready flower 9939747` (#1179).
 - Next: review central's examples/README.md and new-framework example where they touch Flower; on `S3 examples-done`: confirm main, recreate DONE.
+
+## 2026-10-14T19:20Z — S3 examples merged: confirm main af31058; final state
+
+- Reviews for central: new-framework relay skeleton correct against the relay protocol (#1183; `TaskRegistry.start()` marks sites running before `run_round()`); Flower statements in examples/README.md, CHANGELOG [0.2.1] and the new doc links correct (#1189).
+- Owner merged PR #4 at 19:05:24Z: main = af31058 (parents 642d0b4, cc6c28a), tag v0.2.1 -> af31058, release 0.2.1 (central #1196).
+- Confirm from a fresh clone of main + fresh venv (versions.env pins + flwr 1.39.0, env -i, FLHUB_DATA_DIR under /tmp), 19:14:20-19:18:44Z: tags stage1-final 250157a, stage2-final b40390b, v0.1.0 250157a, v0.2.0 642d0b4, v0.2.1 af31058; no agent material; check_links 884 links, 0 problems, 23/23 figures; pytest 90 passed / 15 skipped; selfcheck ac074a0b…; examples/flower `--check` ok; `run_local.py` relay up after 32 s, 3 rounds, INV-1 hashes_equal=True, final global sha256:54c4f093… as on the branch. Sent `confirm main af31058` (#1204).
+- #1199 (pytest without FLHUB_DATA_DIR writes into ~/flhub-data): on this VM nothing in ~/flhub-data is newer than 10:00Z; nvf-h1.csv/v6-h3.csv date from 2026-10-13T15:43Z (stage-2 baseline) and stay (#1203).
+- Testbed end state (read-only `bash deploy/flower-vm/status.sh`, 19:19:08Z, exit 0): flw-h5 pid 457389 node 1904685626967891070, flw-h6 pid 474920 node 16440330416478537649, connected, watchdog enabled, HEALTHY: unchanged since R0. All temporary clones, venvs and example directories under /tmp removed except the dev venv /tmp/flwex (removed at close).
+- Next: after central's `S3 examples-done`, recreate ~/.flhub/stage3/DONE.
