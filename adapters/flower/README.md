@@ -1,0 +1,5 @@
+# Flower adapter
+
+Server-side adapter between the hub and a Flower 1.39 SuperLink. `service.py` serves flhub (JSON-RPC and relay routes) on `127.0.0.1:8813`, packs `clients/flower` and `flhub_core` into one FAB, and keeps one long-lived Flower run alive with `flwr run`. That run's `ServerApp`, the relay ([`clients/flower/flhub_flower/server_app.py`](../../clients/flower/flhub_flower/server_app.py)), sends every hub round to the hospitals' SuperNodes as one standard TRAIN message per site and returns each reply as a per-site result. When the relay disappears, for example with a SuperLink restart, the adapter fails its rounds at once and starts a new run.
+
+Start it next to the SuperLink with `python -m adapters.flower.service --sites <site ids> --hub http://127.0.0.1:8800 --flwr-home <dir>`, where `<dir>/config.toml` holds a connection named `flhub` to the SuperLink's HTTP API. The reference testbed uses `deploy/central/flower/{install,start,status,stop,restart,purge}.sh`. Full guide: [docs/frameworks/flower.md](../../docs/frameworks/flower.md).
