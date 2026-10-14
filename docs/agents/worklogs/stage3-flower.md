@@ -78,3 +78,10 @@ Newest entry at the bottom. Format: `## <UTC> — <what>` then facts (commands, 
 - Mistake noted: my first re-test started the script with `cd ... && python ... &`, so SIGTERM hit a subshell (the bug of #1208); repeated with the command started directly.
 - Verified from a fresh clone of f649b4f + fresh venv, 21:28:58-21:31:21Z: --check ok; run_local PASS (INV-1 hashes_equal=True); SIGTERM -> exit 143, no example process left (right after exit and 5 s later), working directory removed (#1226). An apparent '2 left' was my checking shell's own command line matching the pgrep pattern.
 - Next: central's PR for the fix branch, owner merge, confirm main, `S3 examples-done`, then recreate DONE.
+
+## 2026-10-14T21:52Z — fix branch: SIGHUP too (5e55561); all interrupt cases clean; SIGINT test pitfall
+
+- Central #1230: handle SIGHUP as well. 5e55561 on fix/examples-check-cleanup: `for sig in (SIGTERM, SIGHUP): signal.signal(sig, lambda signum, _frame: sys.exit(128 + signum))`.
+- Fresh clones at 5e55561 + fresh venvs, interrupt after 'relay run started' (10 processes alive): success exit 0 / INV-1 PASS; SIGTERM pid 143; SIGHUP pid 129; SIGINT group (terminal Ctrl-C) 130; SIGINT pid 130; every case: 0 processes left, working directory removed (#1237).
+- Pitfall found: in a non-interactive bash script, background jobs (also via setsid) start with SIGINT = SIG_IGN, so Python installs no KeyboardInterrupt handler and `kill -INT` does nothing (my first group-SIGINT run just finished, exit 0). Probe: getsignal(SIGINT) = 1 without job control, default_int_handler with `set -m`. Valid SIGINT tests need `set -m` (or a Python parent). Told central (#1237) and nvflare (#1238), since #1217's command has the same flaw.
+- Next: central's PR, owner merge, confirm main, `S3 examples-done`, recreate DONE.
