@@ -90,3 +90,10 @@ Newest entry at the bottom. Format: `## <UTC> — <what>` then facts (commands, 
 - Test harness lessons: background jobs of a non-interactive bash ignore SIGINT unless `set -m` (vantage6 #1235, flower #1238 found the same); a 3-round run fits into `timeout 30`, so interrupted cases need `--rounds 20`; `setsid` may fork, so read the pgid from ps; a broad `nvf-h` grep pattern also matches the hospital clients.
 - Final evidence, fresh clone at cf7eb5a + pinned venv, harness with set -m and --rounds 20 (#1250): success exit 0 (INV-1 hashes_equal=True); SIGTERM pid 143; SIGHUP pid 129; SIGINT pid 130; SIGINT group (Ctrl-C) 130; timeout 30 124; every case: no process of the run and no work dir left. README section 4 line updated (27120bc); CHANGELOG line text sent (#1253), applied by central in d4065ad.
 - Hospital clients untouched throughout (nvf-h1 485009, nvf-h2 938623). /tmp test clones removed.
+
+## 2026-10-15T07:40Z — PR #5 merged (v0.2.2): confirm main 91a167d (#1282)
+
+- PR #5 (fix/examples-check-cleanup: check.sh + the three run_local.py) merged by the owner at 07:32:53Z after the 0.2.2 metadata (#1276/#1277): main = 91a167d, tag v0.2.2, release 'AgnosticFL 0.2.2' (#1280).
+- Fresh clone of main 91a167d + fresh pinned venv: check_links 884/0, 23/23 figures; selfcheck sha256:ac074a0b…; pytest 91 passed / 15 skipped; test_nvflare_adapter.py 12 passed; examples/nvflare adapter.py --check PASS; run_local.py: success exit 0 with INV-1 hashes_equal=True, SIGTERM pid 143, SIGHUP pid 129, Ctrl-C to the group 130, timeout 30 124; in every case no process of the run, no work dir and no /tmp job dirs left.
+- Overnight the owner was offline (PR #5 open 22:22Z-07:32Z); nothing else was pending. Testbed: status.sh HEALTHY, nvf-h1 pid 485009, nvf-h2 pid 938623 (R0, unchanged through stage 3). /tmp test dirs removed.
+- Next: recreate ~/.flhub/stage3/DONE after central's "S3 examples-done".
