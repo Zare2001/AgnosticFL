@@ -113,3 +113,8 @@ Newest entry at the bottom. Format: `## <UTC> — <what>` then facts (commands, 
 - Testbed (read-only, 07:39Z): status.sh exit 0, v6-h3/v6-h4 OK connected; containers 7a8af5ffe077 / 93dda6bf2aad started 2026-10-13T15:36Z, restarts 0 = R0 baseline. ~/flhub-data: no file newer than STAGE3-START.
 - Clean-up: /tmp/v6sig and /tmp/v6main removed (clones, venvs, data, runs, logs); torch removed from the uv cache again (712.1 MiB); 6.2 GB free. /tmp/v6-endstate.txt and /tmp/v6-evidence.sh (2026-10-14T09:04Z), the empty /tmp/v6keys and /tmp/torchinductor_zpalanciya (2026-10-13) predate stage 3 and stay.
 - Next: S3 examples-done from central, then `touch ~/.flhub/stage3/DONE`.
+
+## 2026-10-15T07:53Z — S3 examples-done, DONE
+
+- All three confirm main 91a167d in (vantage6 #1281, nvflare #1282, flower #1285); central's S3 examples-done #1288: main = 91a167d (v0.2.2, release 'AgnosticFL 0.2.2'), CI on main green, archive with worklogs and transcript #996-#1286 at 804a711 (contains this worklog up to 1c7b2c3); stage1-final -> 250157a and stage2-final -> b40390b unchanged.
+- `touch ~/.flhub/stage3/DONE` (07:52:46Z). Stage 3 and its examples extension are complete for vantage6.
