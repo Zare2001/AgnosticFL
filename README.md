@@ -129,7 +129,7 @@ All pages: [docs/README.md](docs/README.md).
 
 ## Project status
 
-Research prototype, version 0.2.1 ([changelog](CHANGELOG.md)). Tested with NVFlare 2.9.0, vantage6 4.15.2 and Flower 1.39.0 on Python 3.11.17 with torch 2.14.1 (CPU) on Ubuntu 24.04 ([`deploy/versions.env`](deploy/versions.env)). The hub sees every model update in plaintext and has no secure aggregation or differential privacy; see the [trust and security model](docs/architecture.md#trust-and-security-model) before you use it with real patient data. Contributions: [CONTRIBUTING.md](CONTRIBUTING.md).
+Research prototype, version 0.2.2 ([changelog](CHANGELOG.md)). Tested with NVFlare 2.9.0, vantage6 4.15.2 and Flower 1.39.0 on Python 3.11.17 with torch 2.14.1 (CPU) on Ubuntu 24.04 ([`deploy/versions.env`](deploy/versions.env)). The hub sees every model update in plaintext and has no secure aggregation or differential privacy; see the [trust and security model](docs/architecture.md#trust-and-security-model) before you use it with real patient data. Contributions: [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Citation
 

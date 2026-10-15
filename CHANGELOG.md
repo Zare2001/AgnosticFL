@@ -2,7 +2,9 @@
 
 All notable changes to this project. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/). The protocol has its own version (`flhub/0.1`, `flhub/0.2`, see [docs/protocol.md](docs/protocol.md)).
 
-## [Unreleased]
+## [0.2.2] - 2026-10-15
+
+Clean-up fixes for the example scripts. The hub, the adapters, `flhub_core` and the clients are unchanged.
 
 ### Fixed
 
@@ -63,7 +65,7 @@ The first test stage: one FedAvg hub across NVFlare, vantage6 and Flower.
 - The adapter conformance suite (7 tests) and unit tests.
 - Install, start, stop and status scripts for a four-machine testbed.
 
-[Unreleased]: https://github.com/Zare2001/AgnosticFL/compare/v0.2.1...HEAD
+[0.2.2]: https://github.com/Zare2001/AgnosticFL/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/Zare2001/AgnosticFL/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/Zare2001/AgnosticFL/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Zare2001/AgnosticFL/releases/tag/v0.1.0
