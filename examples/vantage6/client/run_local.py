@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import base64
 import os
+import signal
 import sys
 import tempfile
 from pathlib import Path
@@ -51,6 +52,10 @@ def node_environment(run_dir: Path, org_id: int) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
+    # SIGTERM (for example from `timeout`) and SIGHUP (a closed terminal) end Python without its clean-up;
+    # exit normally instead, so that the temporary directory with the dataset, the site CSV and the run token
+    # is removed
+    for sig in (signal.SIGTERM, signal.SIGHUP): signal.signal(sig, lambda s, _: sys.exit(128 + s))
     ap = argparse.ArgumentParser(prog="run_local.py", description="Run the vantage6 example algorithm locally.")
     ap.add_argument("--site", default="v6-h3", help="benchmark site whose partition is used (flhub_core.data.SITES)")
     ap.add_argument("--data-dir", help="where the dataset and the site CSV are kept (default: a temporary directory)")

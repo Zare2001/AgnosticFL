@@ -25,16 +25,19 @@ start() {  # start <name> <command...>: run in the background, keep the pid
   echo $! > "$W/$1.pid"
 }
 stop() { kill "$(cat "$W/$1.pid")" 2> /dev/null || true; rm -f "$W/$1.pid"; }
-cleanup() {
+HUB=http://127.0.0.1:$(port)
+cleanup() {  # the services by pid, then whatever of this run still runs (a test or a restart in progress)
+  trap '' INT TERM HUP  # a second signal must not cut the cleanup short (timeout(1) sends SIGTERM twice)
   for p in "$W"/*.pid; do [ -e "$p" ] && { kill "$(cat "$p")" 2> /dev/null || true; }; done
+  pkill -f -- "$W|--hub $HUB " 2> /dev/null || true
   rm -rf "$W"
 }
 trap cleanup EXIT
+trap 'exit 130' INT  # Ctrl-C ends the script, and so runs cleanup, not only the step that is running
 
 if [ -n "$VARIANT" ]; then  # build that partition for the sites first (downloads the dataset once)
   python -m flhub_core.data materialize --sites "${SITES[@]}" --variants "$VARIANT"
 fi
-HUB=http://127.0.0.1:$(port)
 start hubcore python -m hub.core --port "${HUB##*:}" --root "$W/hubcore"
 up "$HUB"
 
@@ -47,9 +50,12 @@ conformance() {  # conformance <name> <adapter url> <restart script>
 # direct pattern: one process, the adapter calls the framework
 D=http://127.0.0.1:$(port)
 DIRECT=(python "$EX/adapter.py" --port "${D##*:}" --hub "$HUB" --sites "${SITES[@]}" --offline "${OFFLINE[@]}")
+# restart command for the suite; the adapter starts as a simple command, so $! is its own pid
+# ("cd ... && python ... &" would give the pid of a subshell, and stop/cleanup would miss the adapter)
 cat > "$W/restart-direct.sh" << EOF
 kill \$(cat $W/direct.pid); while kill -0 \$(cat $W/direct.pid) 2> /dev/null; do sleep 0.2; done
-cd $REPO && ${DIRECT[*]} > $W/direct.log 2>&1 & echo \$! > $W/direct.pid
+cd $REPO
+${DIRECT[*]} > $W/direct.log 2>&1 & echo \$! > $W/direct.pid
 until curl -sf $D/health > /dev/null; do sleep 0.5; done
 EOF
 start direct "${DIRECT[@]}"
@@ -73,7 +79,8 @@ R=http://127.0.0.1:$(port)
 ADAPTER=(python "$EX/relay.py" adapter --port "${R##*:}" --hub "$HUB" --sites "${SITES[@]}" --offline "${OFFLINE[@]}")
 cat > "$W/restart-relay.sh" << EOF
 kill \$(cat $W/relay-adapter.pid); while kill -0 \$(cat $W/relay-adapter.pid) 2> /dev/null; do sleep 0.2; done
-cd $REPO && ${ADAPTER[*]} > $W/relay-adapter.log 2>&1 & echo \$! > $W/relay-adapter.pid
+cd $REPO
+${ADAPTER[*]} > $W/relay-adapter.log 2>&1 & echo \$! > $W/relay-adapter.pid
 until curl -sf $R/health > /dev/null; do sleep 0.5; done
 EOF
 start relay-adapter "${ADAPTER[@]}"

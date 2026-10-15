@@ -71,6 +71,13 @@ def wait_until(what: str, ready, timeout: float) -> None:
     raise TimeoutError(f"no {what} after {timeout:.0f} s")
 
 
+def ignore_signals() -> None:
+    """Keep the clean-up from being cut short: timeout(1) sends SIGTERM to the script and then to its
+    process group, and Ctrl-C may be pressed twice."""
+    for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
+        signal.signal(sig, signal.SIG_IGN)
+
+
 class Processes:
     """Background processes, each in its own session, so that it stops together with its children."""
 
@@ -180,6 +187,7 @@ def run(rounds: int, work: Path) -> bool:
         procs.tails()
         raise
     finally:
+        ignore_signals()
         for name in ["adapter", *SITES, "superlink", "hubcore"]:  # the adapter first: its relay ends cleanly
             procs.stop(name)
 
@@ -189,6 +197,15 @@ def main() -> int:
     ap.add_argument("--rounds", type=int, default=3)
     ap.add_argument("--keep", action="store_true", help="keep the working directory (logs, run directories)")
     args = ap.parse_args()
+    # SIGTERM (from `timeout` or a cancelled CI job) and SIGHUP (a closed terminal or SSH session) would end
+    # Python without running the clean-up below; as SystemExit they stop the started processes and remove
+    # the working directory. Later signals are ignored, so they cannot cut that clean-up short.
+    def on_signal(signum: int, _frame) -> None:
+        ignore_signals()
+        sys.exit(128 + signum)
+
+    for sig in (signal.SIGTERM, signal.SIGHUP):
+        signal.signal(sig, on_signal)
     work = Path(tempfile.mkdtemp(prefix="flhub-flower-example-"))
     print(f"working directory {work}", flush=True)
     try:

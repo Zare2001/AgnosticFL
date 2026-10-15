@@ -2,6 +2,19 @@
 
 All notable changes to this project. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/). The protocol has its own version (`flhub/0.1`, `flhub/0.2`, see [docs/protocol.md](docs/protocol.md)).
 
+## [0.2.2] - 2026-10-15
+
+Clean-up fixes for the example scripts. The hub, the adapters, `flhub_core` and the clients are unchanged.
+
+### Fixed
+
+`examples/new-framework/check.sh` and the three `run_local.py` scripts now stop everything they started and remove their temporary files when they end, also when they are interrupted with Ctrl-C, `timeout`, `kill` (SIGTERM) or a closed terminal (SIGHUP); a SIGKILL cannot be caught, so nothing can clean up after it.
+
+- `examples/new-framework/check.sh`: the restart command it writes for the conformance suite's restart test recorded the pid of a subshell instead of the restarted adapter's, so every run left the two restarted adapters running. Its cleanup now also stops a test or a restart in progress and is not cut short by a repeated signal, and Ctrl-C ends the whole script instead of only the running step.
+- `examples/nvflare/server/run_local.py`: after a failure, Ctrl-C, `timeout`, SIGTERM or SIGHUP, the processes of NVFlare's simulator no longer outlive the script and its working directory is removed: it ends the relay job, then stops the remaining process tree, and a repeated signal (`timeout` signals the process and then its process group) no longer cuts that clean-up short.
+- `examples/flower/run_local.py` stops the processes it started and removes its working directory also when it is ended with SIGTERM or SIGHUP (for example by `timeout` or a closed terminal), and a repeated signal (a second Ctrl-C, or `timeout` signalling the process and then its process group) no longer cuts that clean-up short; before, the processes kept running.
+- `examples/vantage6/client/run_local.py` removes its temporary directory (dataset, site CSV, run token) also when it is ended with SIGTERM or SIGHUP; before, the directory stayed behind.
+
 ## [0.2.1] - 2026-10-14
 
 Examples for using the hub with each framework and for adding a framework. The hub, the adapters, `flhub_core` and the clients are unchanged.
@@ -52,6 +65,7 @@ The first test stage: one FedAvg hub across NVFlare, vantage6 and Flower.
 - The adapter conformance suite (7 tests) and unit tests.
 - Install, start, stop and status scripts for a four-machine testbed.
 
+[0.2.2]: https://github.com/Zare2001/AgnosticFL/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/Zare2001/AgnosticFL/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/Zare2001/AgnosticFL/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Zare2001/AgnosticFL/releases/tag/v0.1.0

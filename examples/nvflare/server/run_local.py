@@ -21,9 +21,11 @@ Everything it starts is stopped at the end; --keep keeps the work directory with
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import os
 import shutil
+import signal
 import socket
 import subprocess
 import sys
@@ -32,6 +34,7 @@ import urllib.request
 from pathlib import Path
 
 import nvflare
+import psutil  # an NVFlare dependency
 
 from adapters.common.hubclient import HubClient
 from adapters.common.relay import RelayAdapter
@@ -68,6 +71,35 @@ def wait_healthy(url: str, timeout_s: float = 60.0) -> None:
     raise RuntimeError(f"{url} did not become healthy within {timeout_s:.0f} s")
 
 
+def stop_tree(proc: subprocess.Popen) -> None:
+    """Stops a process and everything it started. NVFlare's simulator runs its server and one worker
+    per client as separate processes in new sessions, so they are found by their parent links."""
+    try:
+        tree = psutil.Process(proc.pid).children(recursive=True) + [psutil.Process(proc.pid)]
+    except psutil.NoSuchProcess:
+        return
+    for p in tree:
+        with contextlib.suppress(psutil.NoSuchProcess):
+            p.terminate()
+    _, alive = psutil.wait_procs(tree, timeout=30)
+    for p in alive:
+        with contextlib.suppress(psutil.NoSuchProcess):
+            p.kill()
+    psutil.wait_procs(alive, timeout=10)
+
+
+def ignore_signals() -> None:
+    """From here on the clean-up must run to its end. timeout(1), for example, signals the process and
+    then its whole process group, so a second SIGTERM follows the first at once."""
+    for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
+        signal.signal(sig, signal.SIG_IGN)
+
+
+def on_signal(sig: int, _frame) -> None:
+    ignore_signals()
+    sys.exit(128 + sig)  # as SystemExit, the finally block of main() stops everything
+
+
 def write_config(path: Path, rounds: int, hub_url: str, adapter_url: str) -> None:
     """A run configuration in the format of configs/mock-3r.yaml, with this run's ports."""
     path.write_text(
@@ -89,6 +121,11 @@ def main() -> int:
     ap.add_argument("--workdir", default="/tmp/flhub-nvflare-example")
     ap.add_argument("--keep", action="store_true", help="keep the work directory (logs, runs) afterwards")
     args = ap.parse_args()
+    # SIGTERM (from `timeout` or a cancelled CI job, for example) and SIGHUP (a closed terminal or SSH
+    # session) would end Python without running the clean-up below; as SystemExit they stop the started
+    # processes and remove the working directory.
+    for sig in (signal.SIGTERM, signal.SIGHUP):
+        signal.signal(sig, on_signal)
 
     work = Path(args.workdir).resolve()
     shutil.rmtree(work, ignore_errors=True)
@@ -98,10 +135,10 @@ def main() -> int:
         print(f"data: {materialize(site)}", flush=True)
 
     hub_url, adapter_url = f"http://127.0.0.1:{free_port()}", f"http://127.0.0.1:{free_port()}"
-    py, procs, adapter_server = sys.executable, [], None
+    py, procs, adapter, adapter_server, sim = sys.executable, [], None, None, None
     try:
         procs.append(subprocess.Popen([py, "-m", "hub.core", "--port", hub_url.rsplit(":", 1)[1],
-                                       "--root", str(work / "hubcore")], cwd=REPO,
+                                       "--root", str(work / "hubcore")], cwd=REPO, start_new_session=True,
                                       stdout=open(work / "hubcore.log", "w"), stderr=subprocess.STDOUT))
         wait_healthy(hub_url)
         adapter = SimulatorRelayAdapter(SITES, HubClient(hub_url))
@@ -111,7 +148,8 @@ def main() -> int:
 
         sim = subprocess.Popen([py, str(HERE / "relay_job.py"), "simulate", "--workspace", str(work / "simulator"),
                                 "--adapter-url", adapter_url, "--hub-url", hub_url, "--clients", *SITES],
-                               cwd=REPO, stdout=open(work / "simulator.log", "w"), stderr=subprocess.STDOUT)
+                               cwd=REPO, start_new_session=True,  # own session: Ctrl-C reaches only this script,
+                               stdout=open(work / "simulator.log", "w"), stderr=subprocess.STDOUT)  # whose finally stops all
         procs.append(sim)
         print("NVFlare simulator started (log: simulator.log)", flush=True)
 
@@ -134,13 +172,13 @@ def main() -> int:
         print("\n".join(line for line in check.stdout.splitlines() + check.stderr.splitlines() if "INV-1" in line))
         return check.returncode
     finally:
-        for p in reversed(procs):
-            if p.poll() is None:
-                p.terminate()
-                try:
-                    p.wait(timeout=30)
-                except subprocess.TimeoutExpired:
-                    p.kill()
+        ignore_signals()  # a further Ctrl-C or SIGTERM must not cut the clean-up short
+        if sim is not None and sim.poll() is None and adapter is not None:  # e.g. after a failure or Ctrl-C:
+            adapter.request_relay_shutdown()  # the normal way out, as on success: the relay ends the job
+            with contextlib.suppress(subprocess.TimeoutExpired):
+                sim.wait(timeout=60)
+        for p in reversed(procs):  # whatever still runs, with all its children
+            stop_tree(p)
         if adapter_server is not None:
             adapter_server.stop()
         if not args.keep:
