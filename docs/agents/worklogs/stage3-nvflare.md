@@ -97,3 +97,10 @@ Newest entry at the bottom. Format: `## <UTC> — <what>` then facts (commands, 
 - Fresh clone of main 91a167d + fresh pinned venv: check_links 884/0, 23/23 figures; selfcheck sha256:ac074a0b…; pytest 91 passed / 15 skipped; test_nvflare_adapter.py 12 passed; examples/nvflare adapter.py --check PASS; run_local.py: success exit 0 with INV-1 hashes_equal=True, SIGTERM pid 143, SIGHUP pid 129, Ctrl-C to the group 130, timeout 30 124; in every case no process of the run, no work dir and no /tmp job dirs left.
 - Overnight the owner was offline (PR #5 open 22:22Z-07:32Z); nothing else was pending. Testbed: status.sh HEALTHY, nvf-h1 pid 485009, nvf-h2 pid 938623 (R0, unchanged through stage 3). /tmp test dirs removed.
 - Next: recreate ~/.flhub/stage3/DONE after central's "S3 examples-done".
+
+## 2026-10-15T07:55Z — S3 examples-done (#1288): DONE recreated
+
+- Central broadcast "S3 examples-done" (#1288, all-done) at 07:52:40Z: main = 91a167d (v0.2.2), v0.2.1 af31058, confirms #1281/#1282/#1285, archive 804a711.
+- ~/.flhub/stage3/DONE recreated at 07:54:33Z. status.sh HEALTHY: nvf-h1 pid 485009, nvf-h2 pid 938623 (R0, unchanged through stage 3).
+- Remote check (git ls-remote): main 91a167d; tags stage1-final -> 250157a and stage2-final -> b40390b unchanged; v0.1.0 -> 250157a, v0.2.0 -> 642d0b4, v0.2.1 -> af31058, v0.2.2 -> 91a167d. Every commit on main is authored by Zare2001; committer GitHub only for the three web-UI commits accepted in #1159 and the owner's PR merges af31058 (#4) and 91a167d (#5); the only attribution line is the self Co-authored-by of c04fd18 (#1159).
+- Stage 3 done for nvflare.
