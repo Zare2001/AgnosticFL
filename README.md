@@ -96,6 +96,8 @@ Implementation cost, hospital-side cost, memory, network, scaling and robustness
 | [Protocol](docs/protocol.md) | `flhub/0.1` and `flhub/0.2` |
 | [Client contract](docs/client-contract.md) | what every hospital-side client must do |
 | [Examples](examples/README.md) | per framework a client and a server example to copy; a skeleton for a new framework |
+| [Guide](docs/guide.md) | deploy the testbed, develop your own model, data or training and roll it out to every hospital, hospital kits, troubleshooting |
+| [hello-pt on every framework](docs/hello-pt.md) | NVFlare's hello-pt (CIFAR-10) across NVFlare, vantage6 and Flower hospitals, with a kit per hospital |
 | Framework guides: [NVFlare](docs/frameworks/nvflare.md), [vantage6](docs/frameworks/vantage6.md), [Flower](docs/frameworks/flower.md) | adapter, hospital code, deployment, cost, limits, troubleshooting |
 | [Adding a framework](docs/adding-a-framework.md) | write an adapter, pass the conformance suite |
 | [Aggregators](docs/aggregators.md) | the six server aggregators and how to add one |
@@ -129,7 +131,7 @@ All pages: [docs/README.md](docs/README.md).
 
 ## Project status
 
-Research prototype, version 0.2.2 ([changelog](CHANGELOG.md)). Tested with NVFlare 2.9.0, vantage6 4.15.2 and Flower 1.39.0 on Python 3.11.17 with torch 2.14.1 (CPU) on Ubuntu 24.04 ([`deploy/versions.env`](deploy/versions.env)). The hub sees every model update in plaintext and has no secure aggregation or differential privacy; see the [trust and security model](docs/architecture.md#trust-and-security-model) before you use it with real patient data. Contributions: [CONTRIBUTING.md](CONTRIBUTING.md).
+Research prototype, version 0.3.0 ([changelog](CHANGELOG.md)). Tested with NVFlare 2.9.0, vantage6 4.15.2 and Flower 1.39.0 on Python 3.11.17 with torch 2.14.1 (CPU) on Ubuntu 24.04 ([`deploy/versions.env`](deploy/versions.env)). The hub sees every model update in plaintext and has no secure aggregation or differential privacy; see the [trust and security model](docs/architecture.md#trust-and-security-model) before you use it with real patient data. Contributions: [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Citation
 

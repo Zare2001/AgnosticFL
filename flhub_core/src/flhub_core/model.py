@@ -1,10 +1,14 @@
-"""Model zoo for 1x28x28 inputs. No BatchNorm anywhere, so weights are float32 parameters only.
+"""Model zoo. No BatchNorm anywhere, so weights are float32 parameters only.
 
-    cnn-small     the stage-1 CNN (same parameter names and init; Net)
-    cnn-medium    wider CNN, ~1.7 M parameters
+    cnn-small     the stage-1 CNN (same parameter names and init; Net), 1x28x28
+    cnn-medium    wider CNN, ~1.7 M parameters, 1x28x28
     resnet18-gn   ResNet-18, CIFAR-style stem (3x3, stride 1, no max-pool), GroupNorm(32), ~11.2 M
+    hello-pt      the SimpleNetwork of NVFlare's hello-pt example (CIFAR-10, 3x32x32), ~62 k
     payload-<MB>  synthetic float32 tensors of <MB> MiB in total (4 MiB each); no torch module,
                   "trained" by flhub_core.train's deterministic echo (transport tests)
+
+A model with a fixed input shape declares it as `input_shape`; the run configuration checks it
+against the dataset (flhub_core.data.DatasetInfo.image_shape).
 
 The stage-1 API (Net, make_model(seed), init_weights(seed), param_names(), num_parameters())
 keeps its meaning: cnn-small with the stage-1 dataset's 2 classes.
@@ -22,13 +26,15 @@ from torch import nn
 from .data import NUM_CLASSES
 
 DEFAULT_MODEL = "cnn-small"
-MODELS = ("cnn-small", "cnn-medium", "resnet18-gn")
+MODELS = ("cnn-small", "cnn-medium", "resnet18-gn", "hello-pt")
 PAYLOAD_TENSOR_FLOATS = 2**20  # 4 MiB per payload tensor
 _PAYLOAD = re.compile(r"payload-(\d+(?:\.\d+)?)")
 
 
 class Net(nn.Module):
     """cnn-small: conv(1->8)-pool-conv(8->16)-pool-fc(784->64)-fc(64->classes)."""
+
+    input_shape = (1, 28, 28)
 
     def __init__(self, num_classes: int = NUM_CLASSES, in_channels: int = 1) -> None:
         super().__init__()
@@ -46,6 +52,8 @@ class Net(nn.Module):
 
 class CNNMedium(nn.Module):
     """cnn-medium: 2x conv(32) - pool - 2x conv(64) - pool - fc(3136->512) - fc(512->classes)."""
+
+    input_shape = (1, 28, 28)
 
     def __init__(self, num_classes: int = NUM_CLASSES, in_channels: int = 1) -> None:
         super().__init__()
@@ -104,7 +112,43 @@ class ResNet18GN(nn.Module):
         return self.fc(torch.flatten(F.adaptive_avg_pool2d(x, 1), 1))
 
 
-_ZOO = {"cnn-small": Net, "cnn-medium": CNNMedium, "resnet18-gn": ResNet18GN}
+class HelloPtNet(nn.Module):
+    """hello-pt: the SimpleNetwork of NVFlare's examples/hello-world/hello-pt, for 3x32x32 CIFAR-10.
+
+    conv(3->6, 5)-pool-conv(6->16, 5)-pool-fc(400->120)-fc(120->84)-fc(84->classes). Same layers,
+    creation order and parameter names (conv1, conv2, fc1, fc2, fc3) as NVFlare's model.py, so the
+    initial weights for a seed and every state dict carry over in both directions. hello-pt
+    normalizes its inputs in the data loader (Normalize(0.5, 0.5) on [0, 1] pixels); here the same
+    two operations run at the start of forward(), because flhub_core feeds pixel / 255.
+    """
+
+    input_shape = (3, 32, 32)
+
+    def __init__(self, num_classes: int = 10, in_channels: int = 3) -> None:
+        super().__init__()
+        self.conv1 = nn.Conv2d(in_channels, 6, 5)
+        self.pool = nn.MaxPool2d(2, 2)
+        self.conv2 = nn.Conv2d(6, 16, 5)
+        self.fc1 = nn.Linear(16 * 5 * 5, 120)
+        self.fc2 = nn.Linear(120, 84)
+        self.fc3 = nn.Linear(84, num_classes)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = (x - 0.5) / 0.5
+        x = self.pool(F.relu(self.conv1(x)))
+        x = self.pool(F.relu(self.conv2(x)))
+        x = torch.flatten(x, 1)
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
+        return self.fc3(x)
+
+
+_ZOO = {"cnn-small": Net, "cnn-medium": CNNMedium, "resnet18-gn": ResNet18GN, "hello-pt": HelloPtNet}
+
+
+def input_shape(model: str) -> tuple[int, int, int] | None:
+    """The (C, H, W) input a zoo model is built for; None if it adapts (resnet18-gn) or has no module."""
+    return None if is_payload(model) else getattr(_ZOO[check_model(model)], "input_shape", None)
 
 
 def is_payload(model: str) -> bool:
@@ -135,10 +179,13 @@ def check_model(model: str) -> str:
     return model
 
 
-def build_model(model: str = DEFAULT_MODEL, num_classes: int = NUM_CLASSES, in_channels: int = 1) -> nn.Module:
+def build_model(model: str = DEFAULT_MODEL, num_classes: int = NUM_CLASSES,
+                in_channels: int | None = None) -> nn.Module:
+    """A zoo model; in_channels defaults to the model's own (1 for the MedMNIST models, 3 for hello-pt)."""
     if is_payload(model):
         raise ValueError(f"{model} has no torch module (echo model)")
-    return _ZOO[check_model(model)](num_classes=num_classes, in_channels=in_channels)
+    extra = {} if in_channels is None else {"in_channels": in_channels}
+    return _ZOO[check_model(model)](num_classes=num_classes, **extra)
 
 
 def make_model(seed: int | None = None, model: str = DEFAULT_MODEL, num_classes: int = NUM_CLASSES) -> nn.Module:

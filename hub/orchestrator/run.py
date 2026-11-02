@@ -59,6 +59,11 @@ def manifest(cfg: RunConfig) -> tuple[dict | None, str | None]:
     if not cfg.data_variant:
         return None, None
     path = MANIFEST_DIR / f"{cfg.data_variant}.json"
+    if not path.exists():
+        if not dataset_info(cfg.dataset).url:  # hospital-owned data (no public copy): nothing to pin
+            return None, None
+        raise FileNotFoundError(f"no partition manifest {path}; write it with: python -m flhub_core.data "
+                                f"manifests --variants {cfg.data_variant} --out {MANIFEST_DIR}")
     raw = path.read_bytes()
     import hashlib
 

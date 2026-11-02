@@ -8,6 +8,8 @@ Install, start, stop and status scripts of the reference testbed: one central ma
 | `topology.env` | hosts and ports of the reference testbed (a few other scripts here and in `scripts/stage2/` also name its hosts) |
 | `central/` | `install.sh` (hub venv, dataset, Docker registry, hub-core systemd unit), `start.sh`, `stop.sh`, `status.sh` (exit 0 only when every service is up and every base site online) |
 | `central/nvflare/`, `central/vantage6/`, `central/flower/` | the framework server and its adapter on the central machine: `install.sh`, `start.sh`, `stop.sh`, `status.sh`, restart and purge scripts, provisioning (NVFlare), site registration (vantage6), and the native FedAvg baselines (`native/`) |
+| `central/hospital_kits.sh`, `central/rollout.sh` | one self-contained kit per hospital (credentials, install/start/stop/status of the framework's standard client); shipping a new `flhub_core` to all three frameworks ([hello-pt](../docs/hello-pt.md)) |
+| `hospital-kit/` | the scripts inside a kit, per framework (`nvflare.sh`, `vantage6.sh`, `flower.sh`) |
 | `nvflare-vm/`, `vantage6-vm/`, `flower-vm/` | the hospital machines: `install.sh`, `start.sh`, `stop.sh`, `status.sh`, the extra sites of the 12-site test (`extra.sh`), and experiment tooling (fault injection, CPU throttling, link shaping, monitoring, end-state checks) |
 
 **Order of a full deployment:**

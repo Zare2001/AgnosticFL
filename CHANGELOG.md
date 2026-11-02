@@ -2,6 +2,25 @@
 
 All notable changes to this project. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/). The protocol has its own version (`flhub/0.1`, `flhub/0.2`, see [docs/protocol.md](docs/protocol.md)).
 
+## [0.3.0] - 2026-11-02
+
+NVFlare's hello-pt example on every framework, and a self-contained kit per hospital.
+
+### Added
+
+- `flhub_core`: dataset `cifar10` (the official python tarball, sha256-pinned; data variants `cifar10-iid` and `cifar10-dir0.3` over the six sites; CSV rows of 3072 pixels, channel-first) and model `hello-pt` (NVFlare's hello-pt `SimpleNetwork`, same parameter names and initial weights). Site files, DataFrames and `from_arrays` take 1x28x28 or 3x32x32 images by their width; `build_model` uses each model's own input channels; `input_shape(model)`.
+- `configs/hello-pt.yaml`: hello-pt's settings (batch 32, SGD lr 0.01, momentum 0.9) on six sites across NVFlare, vantage6 and Flower, with `strict_code_version`.
+- `deploy/central/hospital_kits.sh` and `deploy/hospital-kit/`: one archive per hospital with its credentials and install/start/stop/status/prepare_data scripts for the framework's standard client.
+- `deploy/central/rollout.sh`: ships the checkout's `flhub_core` to all three frameworks (NVFlare job, vantage6 image, Flower FAB).
+- `python -m flhub_core.data manifests --variants ...`; `$FLHUB_<DATASET>_URL` names a mirror for a dataset download.
+- Run configurations are checked for a model whose input shape does not fit the dataset, and for a dataset other than PneumoniaMNIST without a partition; a missing partition manifest names the command that writes it.
+- [docs/hello-pt.md](docs/hello-pt.md) and [docs/guide.md](docs/guide.md): deploying the testbed (firewall, credentials, pitfalls), developing and rolling out a model, dataset or training method, hospital kits, troubleshooting.
+- A dataset without a public copy (`url` empty: hospital-owned data) runs without a partition manifest; its run configuration must set `eval: {every: 0}`.
+
+### Unchanged
+
+The MedMNIST data, models and training are bit-identical (site CSVs, fingerprints, `selfcheck` digest); `--variants all` and `manifests` without `--variants` cover the stage-2 variants only.
+
 ## [0.2.2] - 2026-10-15
 
 Clean-up fixes for the example scripts. The hub, the adapters, `flhub_core` and the clients are unchanged.
