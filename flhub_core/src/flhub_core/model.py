@@ -175,8 +175,19 @@ def payload_spec(model: str) -> list[tuple[str, tuple[int]]]:
 
 def check_model(model: str) -> str:
     if model not in _ZOO and not is_payload(model):
-        raise KeyError(f"unknown model {model!r}; known: {list(MODELS)} and payload-<MB>")
+        hint = f"; plugins not loaded: {_plugins.failed}" if _plugins.failed else ""
+        raise KeyError(f"unknown model {model!r}; known: {sorted(_ZOO)} and payload-<MB>{hint}")
     return model
+
+
+def register_model(name: str, cls: type) -> None:
+    """Adds a model class to the zoo under `name` (for plugins, flhub_core.plugins). The class takes
+    (num_classes, in_channels) keyword arguments and should declare `input_shape`."""
+    if is_payload(name) or not name:
+        raise ValueError(f"invalid model name {name!r}")
+    if _ZOO.get(name, cls) is not cls:
+        raise ValueError(f"model {name!r} is already registered")
+    _ZOO[name] = cls
 
 
 def build_model(model: str = DEFAULT_MODEL, num_classes: int = NUM_CLASSES,
@@ -239,3 +250,9 @@ def num_parameters(model: str = DEFAULT_MODEL, num_classes: int = NUM_CLASSES) -
     if is_payload(model):
         return sum(s[0] for _, s in payload_spec(model))
     return sum(p.numel() for p in build_model(model, num_classes).parameters())
+
+
+# Plugins (flhub_core/plugins/*.py) register their models into the zoo above, so they load last.
+from . import plugins as _plugins  # noqa: E402
+
+_plugins.load()

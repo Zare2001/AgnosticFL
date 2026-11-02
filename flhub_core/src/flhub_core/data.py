@@ -42,7 +42,7 @@ import tempfile
 import time
 import urllib.request
 from collections import OrderedDict
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 import numpy as np
@@ -115,8 +115,38 @@ def columns(num_features: int = NUM_FEATURES) -> list[str]:
     return ["label"] + [f"x{i}" for i in range(num_features)]
 
 
-def image_shape(num_features: int) -> tuple[int, int, int]:
+def _load_plugins() -> None:
+    """Datasets of flhub_core/plugins, loaded on first need (plugins are imported after this module)."""
+    from . import plugins
+
+    plugins.load()
+
+
+def register_dataset(info: DatasetInfo) -> None:
+    """Adds a dataset (for plugins, flhub_core.plugins). Its name may not contain '-', and its row
+    width C*H*W must differ from the other datasets' (the width of a site file tells its shape).
+    A plugin dataset is never part of `--variants all` (the stage-2 variants)."""
+    width = int(np.prod(info.image_shape))
+    if not info.name or "-" in info.name:
+        raise ValueError(f"invalid dataset name {info.name!r} (no '-': variants are <dataset>-<partition>)")
+    if SHAPE_BY_FEATURES.get(width, tuple(info.image_shape)) != tuple(info.image_shape):
+        raise ValueError(f"{info.name}: {width} pixel columns already mean {SHAPE_BY_FEATURES[width]}")
+    info = replace(info, in_all=False, image_shape=tuple(info.image_shape))
+    if DATASETS.get(info.name, info) != info:
+        raise ValueError(f"dataset {info.name!r} is already registered")
+    DATASETS[info.name] = info
+    SHAPE_BY_FEATURES[width] = info.image_shape
+
+
+def known_width(num_features: int) -> bool:
+    """True if a dataset (built in, or from a plugin) has rows of this many pixel columns."""
     if num_features not in SHAPE_BY_FEATURES:
+        _load_plugins()
+    return num_features in SHAPE_BY_FEATURES
+
+
+def image_shape(num_features: int) -> tuple[int, int, int]:
+    if not known_width(num_features):
         raise ValueError(f"{num_features} pixel columns match no dataset; known: "
                          + ", ".join(f"{n} ({'x'.join(map(str, s))})" for n, s in SHAPE_BY_FEATURES.items()))
     return SHAPE_BY_FEATURES[num_features]
@@ -140,6 +170,8 @@ def _sha256_file(path: str | Path) -> str:
 
 
 def dataset_info(name: str) -> DatasetInfo:
+    if name not in DATASETS:
+        _load_plugins()
     if name not in DATASETS:
         raise KeyError(f"unknown dataset {name!r}; known: {sorted(DATASETS)}")
     return DATASETS[name]
@@ -304,7 +336,7 @@ def from_arrays(pixels: np.ndarray, labels: np.ndarray, num_classes: int | None 
     """
     pixels = np.asarray(pixels)
     labels = np.asarray(labels).reshape(-1)
-    if pixels.ndim != 2 or pixels.shape[1] not in SHAPE_BY_FEATURES or pixels.shape[0] != labels.shape[0]:
+    if pixels.ndim != 2 or not known_width(pixels.shape[1]) or pixels.shape[0] != labels.shape[0]:
         widths = " or ".join(str(n) for n in SHAPE_BY_FEATURES)
         raise ValueError(f"expected pixels (n, {widths}) and labels (n,), got {pixels.shape} {labels.shape}")
     if pixels.size and (pixels.min() < 0 or pixels.max() > 255):
@@ -324,7 +356,7 @@ def read_csv(path: str | Path) -> SiteData:
     path = Path(path).expanduser()
     with open(path, encoding="ascii") as f:
         header = f.readline().strip().split(",")
-    if len(header) - 1 not in SHAPE_BY_FEATURES or header != columns(len(header) - 1):
+    if not known_width(len(header) - 1) or header != columns(len(header) - 1):
         widths = " or ".join(f"x{n - 1}" for n in SHAPE_BY_FEATURES)
         raise ValueError(f"{path}: header must be label,x0..{widths}")
     arr = np.loadtxt(path, delimiter=",", skiprows=1, dtype=np.int64, ndmin=2)
@@ -414,7 +446,7 @@ def load_site(source) -> SiteData | SiteSource:
     """A pandas DataFrame (same columns) -> SiteData; a CSV file or a directory -> lazy SiteSource."""
     if hasattr(source, "columns"):  # DataFrame, e.g. handed over by a vantage6 node
         width = sum(1 for c in source.columns if re.fullmatch(r"x\d+", str(c)))
-        cols = columns(width if width in SHAPE_BY_FEATURES else NUM_FEATURES)
+        cols = columns(width if known_width(width) else NUM_FEATURES)
         missing = [c for c in cols if c not in source.columns]
         if missing:
             raise ValueError(f"DataFrame lacks columns {missing[:5]}...")

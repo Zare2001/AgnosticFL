@@ -99,6 +99,11 @@ curl -sf "http://127.0.0.1:$REGISTRY_PORT/v2/" >/dev/null || { echo "no Docker r
 
 TAG="$(git -C "$REPO" rev-parse --short=12 HEAD)"
 if [ -n "$(git -C "$REPO" status --porcelain -- flhub_core clients/vantage6)" ]; then TAG="$TAG-dirty"; fi
+# plugins (flhub_core/plugins/*.py, not in git) are part of the image: their content names the tag too
+PLUGINS="$REPO/flhub_core/src/flhub_core/plugins"
+if compgen -G "$PLUGINS/[!_]*.py" >/dev/null; then
+  TAG="$TAG-p$(cd "$PLUGINS" && for f in [!_]*.py; do printf '%s\0' "$f"; cat "$f"; done | sha256sum | cut -c1-8)"
+fi
 if [ "$SKIP_IMAGE" = 1 ] && [ -f "$RT/adapter.env" ]; then   # keep the image that was pushed before
   TAG="$(grep '^V6_ALGO_IMAGE=' "$RT/adapter.env" | sed 's/.*://')"
 fi

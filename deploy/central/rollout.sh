@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 # Operator, central machine: ship this checkout's flhub_core (models, data loading, training) to every
 # hospital through each framework's own code channel. Nothing happens at the hospitals.
-#   bash deploy/central/rollout.sh [nvflare] [vantage6] [flower]     (default: all three)
-# Commit first (git am / git pull): the vantage6 image tag is the commit, and an uncommitted
-# flhub_core gives a "-dirty" tag. Afterwards every site reports the new code_version, which a run
-# with `strict_code_version: true` (configs/hello-pt.yaml) checks.
+#   bash deploy/central/rollout.sh [--plugins DIR] [nvflare] [vantage6] [flower]   (default: all three)
+# --plugins DIR first installs your own models/datasets from DIR/*.py (deploy/central/plugins.sh).
+# Changes to the repository's own code: commit first (git am / git pull); the vantage6 image tag is the
+# commit, and an uncommitted flhub_core gives a "-dirty" tag. Plugins need no commit: their content is
+# part of the image tag. Afterwards every site reports the new code_version, which a run with
+# `strict_code_version: true` (configs/hello-pt.yaml) checks.
 #   NVFlare   the relay job is exported again with this flhub_core as custom code and resubmitted
 #             (the adapter is restarted; the NVFlare server and the clients keep running)
 #   vantage6  a new algorithm image, tagged with the commit, is built and pushed to the registry; the
@@ -12,7 +14,14 @@
 #   Flower    the adapter is restarted: it packs a new FAB and starts a new relay run
 set -euo pipefail
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
-parts=("$@"); [ ${#parts[@]} -gt 0 ] || parts=(nvflare vantage6 flower)
+parts=()
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --plugins) bash "$REPO/deploy/central/plugins.sh" "$2"; shift 2 ;;
+    *) parts+=("$1"); shift ;;
+  esac
+done
+[ ${#parts[@]} -gt 0 ] || parts=(nvflare vantage6 flower)
 core="$(PYTHONPATH="$REPO/flhub_core/src" python3 -c 'import flhub_core; print(flhub_core.code_version())')"
 echo "rollout: flhub_core $core (commit $(git -C "$REPO" rev-parse --short=12 HEAD))"
 if [ -n "$(git -C "$REPO" status --porcelain -- flhub_core clients)" ]; then

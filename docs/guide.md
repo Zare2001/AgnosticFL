@@ -44,6 +44,8 @@ uv pip install --python .venv/bin/python numpy==2.4.4 safetensors==0.8.0 pyyaml=
 python -m flhub_core.selfcheck        # the digest must be the same on every machine of a federation
 ```
 
+On macOS install `torch==2.14.1` from PyPI instead (the `+cpu` build exists for Linux only); results on a Mac then differ from the Linux machines in the last digits, which is fine for development.
+
 | Example | Extra packages | Command |
 |---|---|---|
 | NVFlare (its simulator) | `nvflare==2.9.0` | `python examples/nvflare/server/run_local.py` |
@@ -198,20 +200,53 @@ EOF
 
 ## 6. Develop your own algorithm
 
-### 6.1 The rules
+### 6.1 As a user of the repository: your own project folder
+
+You do not need to change the repository's code to train your own model with hospitals. Keep your work in a folder of your own; the repository loads it as **plugins**: Python files that `deploy/central/plugins.sh` copies into `flhub_core/plugins/` (a folder git ignores). From there they travel with `flhub_core` to every hospital, through NVFlare's job, the vantage6 image and the Flower FAB, and they are part of the code version the hub checks at every site.
+
+```
+~/my-project/
+  my_net.py        # your model, from flhub_core/src/flhub_core/plugins/_example_my_net.py
+  my_data.py       # optional: your dataset (numpy only, no torch), see 6.5
+  my-net.yaml      # your run configuration (it can live anywhere)
+```
+
+`my_net.py` defines the model class and registers it under the name the run configuration uses:
+
+```python
+from flhub_core.model import register_model
+class MyNet(nn.Module): ...            # see the example file and the rules in 6.2
+register_model("my-net", MyNet)
+```
+
+The whole collaboration, with the hospitals on kits ([3.5](#35-hospitals)):
+
+| Step | Where | Command |
+|---|---|---|
+| 1. try it, without any framework | your laptop, in a clone of the repository ([section 2](#2-try-everything-on-one-machine)) | `bash deploy/central/plugins.sh ~/my-project`, once `python -m flhub_core.data manifests --variants cifar10-iid --out configs/stage2/partitions`, then `python -m hub.sim --config ~/my-project/my-net.yaml --rounds 3 --runs-dir /tmp/runs` |
+| 2. bring your folder to the operator's machine | laptop | `scp -r ~/my-project zpalanciya@145.38.205.58:` |
+| 3. install it and ship it to every hospital | central | `bash deploy/central/rollout.sh --plugins ~/my-project` |
+| 4. once: a kit per hospital, sent over a secure channel | central, then laptop | `bash deploy/central/hospital_kits.sh`, then `scp -3 ...` ([3.5](#35-hospitals)) |
+| 5. once: each hospital installs and starts its kit | each hospital | `./install.sh && ./prepare_data.sh && ./start.sh` |
+| 6. train together | central | `python -m hub.orchestrator run --config ~/my-project/my-net.yaml` |
+| 7. change the model and train again | laptop, central | edit `my_net.py`, steps 2, 3 and 6 again; **the hospitals do nothing** |
+
+Kits contain no model, so they stay valid when your model changes; make new ones only for new hospitals, or when a plugin adds a public dataset the hospitals should prepare with `./prepare_data.sh`. `bash deploy/central/plugins.sh` without arguments lists the installed plugins, the models and datasets they add, and the code version; `--clear` removes them (then `rollout.sh` again). No commit is needed: the vantage6 image tag includes a hash of the plugins.
+
+### 6.2 The rules
 
 - All training code lives in `flhub_core` ([`flhub_core/src/flhub_core/`](../flhub_core/src/flhub_core/)). The per-framework clients (`clients/`) only call `flhub_core.train(weights, flhub_core.data.load_site(data), train_config)`; do not put training code there.
 - The model's weights are its `state_dict`, all float32 (no BatchNorm: its counter is an integer buffer; use GroupNorm or LayerNorm).
 - Training must be deterministic (`flhub_core.train` sets one CPU thread, deterministic algorithms and seeded data order); then a real run equals the simulation bit for bit, which is how you prove that every framework ran the same algorithm.
 - Hospitals install nothing of the hub. Code reaches them as NVFlare job code, a vantage6 algorithm image tag, or the Flower FAB, when the operator rolls it out.
-- Who changes `flhub_core`: anyone may propose (a pull request); the operator reviews it, commits it and rolls it out. Every site then reports the new `client_code_version`, and a run with `strict_code_version: true` accepts nothing else.
+- Who changes `flhub_core`: users add models and datasets as plugins (6.1), with no change to the repository; changes to the library itself (training loop, partitions) go through a pull request that the operator reviews, commits and rolls out. Every site then reports the new `client_code_version`, and a run with `strict_code_version: true` accepts nothing else.
 
-### 6.2 Where things go
+### 6.3 Where things go
 
 | You want | Change | Selected in the run config by |
 |---|---|---|
-| a model | a class in [`model.py`](../flhub_core/src/flhub_core/model.py), registered in `_ZOO` and `MODELS` | `model: <name>` |
-| a dataset (shape, classes, public copy) | a `DatasetInfo` in `DATASETS` of [`data.py`](../flhub_core/src/flhub_core/data.py) | `dataset: <name>` |
+| a model | a plugin file with `register_model` (6.1), or a class in [`model.py`](../flhub_core/src/flhub_core/model.py) registered in `_ZOO` and `MODELS` | `model: <name>` |
+| a dataset (shape, classes, public copy) | a plugin file with `register_dataset(DatasetInfo(...))`, or a `DatasetInfo` in `DATASETS` of [`data.py`](../flhub_core/src/flhub_core/data.py) | `dataset: <name>` |
 | a split of the data over the sites | a partition in [`partition.py`](../flhub_core/src/flhub_core/partition.py) (`iid`, `dir0.3`, `qty`, ... exist) and in the dataset's `pids` | `partition: <pid>` |
 | a training setting (epochs, batch, lr, momentum, weight decay, FedProx μ) | nothing: `train_config` keys are passed through | `train_config: {...}` |
 | a different loss, optimizer or task | `_sgd()` in [`train.py`](../flhub_core/src/flhub_core/train.py) (keep it deterministic; branch on `cfg.model` or on a new `TrainConfig` key) | `model:` or the new key |
@@ -236,7 +271,9 @@ strict_code_version: true
 
 The configuration is checked when loaded: the model's `input_shape` must match the dataset's `image_shape`, a dataset other than PneumoniaMNIST needs a partition, and a dataset without a public copy needs `eval: {every: 0}`.
 
-### 6.3 Add a model
+### 6.4 Add a model
+
+As a plugin (6.1) the class is the same and the file ends with `register_model("my-net", MyNet)` instead of the two zoo lines; [`plugins/_example_my_net.py`](../flhub_core/src/flhub_core/plugins/_example_my_net.py) is this model as a plugin. In the library itself:
 
 ```python
 # flhub_core/src/flhub_core/model.py
@@ -262,9 +299,11 @@ _ZOO = {..., "my-net": MyNet}
 
 Port an existing PyTorch model the way `hello-pt` ports NVFlare's `SimpleNetwork`: keep its layer names and creation order (then state dicts and seeded initial weights carry over), and move input normalization from the data loader into `forward()`.
 
-### 6.4 Data: public datasets and hospital-owned data
+### 6.5 Data: public datasets and hospital-owned data
 
 A site file is a CSV per data variant: `~/flhub-data/<dataset>-<partition>-<site>.csv`, header `label,x0..x<F-1>`, integer pixels 0-255, integer class labels from 0. The width F gives the image shape: 784 = 1x28x28, 3072 = 3x32x32 (the R, G and B planes one after another, each row by row). A new dataset adds its shape; its width must differ from the other datasets'.
+
+A dataset can be a plugin too: a file of its own that imports only numpy and calls `register_dataset(DatasetInfo(...))` with the arguments below (the hospitals' data tool runs without torch).
 
 **A public dataset** (the hub keeps the test split and checks every site's file):
 
@@ -286,7 +325,7 @@ The npz holds `train_images`, `train_labels`, `test_images`, `test_labels` (and 
 
 Each hospital converts its own images into `~/flhub-data/wards-own-<site>.csv` (any tool; the format above), and the run configuration uses `dataset: wards`, `partition: own`, `eval: {every: 0}`. The hub then has no test set: judge the model by the sites' training metrics in the round records, or evaluate the final model (`~/flhub-runtime/runs/<run>/rounds/`) where a test set is allowed. A vantage6 node offers only the files that exist when it starts: after adding a file, `./stop.sh && ./start.sh` (kit) or `bash deploy/vantage6-vm/install.sh && bash deploy/vantage6-vm/stop.sh && bash deploy/vantage6-vm/start.sh`.
 
-### 6.5 Test before anything runs at a hospital
+### 6.6 Test before anything runs at a hospital
 
 1. **Unit test** next to [`tests/unit/test_hello_pt.py`](../tests/unit/test_hello_pt.py): shapes, parameter count, deterministic training. `python -m pytest`; `python -m flhub_core.selfcheck` must keep its digest unless you changed what it checks.
 2. **Your data, one site, no federation** (a hospital can do this on its own machine):
@@ -305,9 +344,9 @@ Each hospital converts its own images into `~/flhub-data/wards-own-<site>.csv` (
 3. **The federation without frameworks**: `python -m hub.sim --config my-run.yaml --runs-dir /tmp/runs` (all sites in one process; it downloads the public dataset and splits it in memory, so public datasets only).
 4. **Each framework on one machine**: the three `run_local.py` examples of [section 2](#2-try-everything-on-one-machine) run the library's framework code paths with the default configuration.
 
-### 6.6 Ship it
+### 6.7 Ship it
 
-On central, after the change is committed (`git pull`, or `git am` of a patch):
+Plugins (6.1): `bash deploy/central/rollout.sh --plugins ~/my-project`, then the runs below with `--config ~/my-project/<run>.yaml`. A change to the library itself, after it is committed on central (`git pull`, or `git am` of a patch):
 
 ```bash
 cd ~/AgnosticFL
@@ -321,7 +360,7 @@ python -m hub.sim --config my-run.yaml --compare ~/flhub-runtime/runs/my-run-lat
 
 Commit before `rollout.sh`: the vantage6 image tag is the commit (uncommitted changes give a `-dirty` tag). Nothing is needed at the hospitals, except the data file of a new variant. The per-round records show each site's `client_code_version`; with `strict_code_version: true` a site still on old code is rejected rather than averaged in.
 
-### 6.7 Worked example: NVFlare's hello-pt
+### 6.8 Worked example: NVFlare's hello-pt
 
 [hello-pt](hello-pt.md) is this whole procedure done once: NVFlare's `SimpleNetwork` became model `hello-pt` (same weights), CIFAR-10 became dataset `cifar10` with variants `cifar10-iid` and `cifar10-dir0.3`, hello-pt's optimizer settings became `train_config`, and its FedAvg job became `configs/hello-pt.yaml`. The same model then trained through NVFlare, vantage6 and Flower in one federation, equal to the simulation hash for hash.
 
@@ -362,6 +401,7 @@ Requirements: Linux x86_64, bash, curl, outbound TCP to the operator on your fra
 | `model X takes 3x32x32 images, dataset Y has 1x28x28` | model and dataset do not fit | choose a matching model or dataset |
 | a site's update rejected: `data_fp ... != manifest` | the site trained on other data than the manifest pins | rewrite the file (`prepare_data.sh` / `materialize --manifests`) |
 | a site rejected for its code version | the site runs older `flhub_core` | `bash deploy/central/rollout.sh` (vantage6: the node pulls the new tag at its next task) |
+| `unknown model 'my-net' ... plugins not loaded: ...` | a plugin file failed to import, or was not installed | `bash deploy/central/plugins.sh` shows the error; install with `plugins.sh ~/my-project` |
 | `flower-superexec` / `flwr-clientapp` not found | the Flower venv's `bin` is not on PATH | use the start scripts (they set PATH) |
 
 ## 9. Reference

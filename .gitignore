@@ -37,3 +37,8 @@ build/
 .DS_Store
 *.log
 nohup.out
+
+# your own plugins (models, datasets) live on the operator's machine, not in git (flhub_core/plugins/__init__.py)
+flhub_core/src/flhub_core/plugins/*
+!flhub_core/src/flhub_core/plugins/__init__.py
+!flhub_core/src/flhub_core/plugins/_example_*.py

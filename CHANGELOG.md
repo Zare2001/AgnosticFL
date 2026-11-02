@@ -16,6 +16,7 @@ NVFlare's hello-pt example on every framework, and a self-contained kit per hosp
 - Run configurations are checked for a model whose input shape does not fit the dataset, and for a dataset other than PneumoniaMNIST without a partition; a missing partition manifest names the command that writes it.
 - [docs/hello-pt.md](docs/hello-pt.md) and [docs/guide.md](docs/guide.md): deploying the testbed (firewall, credentials, pitfalls), developing and rolling out a model, dataset or training method, hospital kits, troubleshooting.
 - A dataset without a public copy (`url` empty: hospital-owned data) runs without a partition manifest; its run configuration must set `eval: {every: 0}`.
+- Plugins: own models and datasets as Python files in `flhub_core/plugins/` (ignored by git), registered with `register_model` / `register_dataset`, shipped with `flhub_core` by all three frameworks and part of its code version; `deploy/central/plugins.sh DIR` installs them, `rollout.sh --plugins DIR` installs and ships them; the vantage6 image tag includes a hash of the plugins. Users train their own model with hospitals without changing the repository ([guide](docs/guide.md) 6.1).
 
 ### Unchanged
 
