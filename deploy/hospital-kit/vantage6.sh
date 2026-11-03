@@ -1,6 +1,8 @@
 # shellcheck shell=bash
-# vantage6 hospital (sourced as framework.sh): the standard vantage6 node (Docker), with the API key
-# the operator issued for this site (credentials/api_key). Hub-specific are only the server address,
+# vantage6 hospital (sourced as framework.sh): the standard vantage6 node (Docker), with a node API key
+# the hospital makes itself (credentials/api_key, made by ./install.sh, never in the kit). The
+# hospital sends that key once to the operator over a secure channel; the operator registers it
+# (deploy/central/vantage6/register_node.sh). Hub-specific are only the server address,
 # the key and the one algorithm image the node may run; the training code (flhub_core) is inside
 # that image, which the node pulls from the operator's registry.
 NODE_CFG="$HOME/.config/vantage6/node/$SITE.yaml"
@@ -38,8 +40,13 @@ render_config() {  # ~/.config/vantage6/node/<site>.yaml (mode 600) from node.te
 fw_install() {
   command -v docker >/dev/null || die "Docker is needed: sudo apt-get install -y docker.io && sudo usermod -aG docker \$USER, then log in again"
   docker info >/dev/null 2>&1 || die "this user cannot use Docker: sudo usermod -aG docker \$USER, then log out and in again"
-  [ -s "$KIT/credentials/api_key" ] || die "no node API key in $KIT/credentials/api_key"
-  chmod 700 "$KIT/credentials" && chmod 600 "$KIT/credentials/api_key"
+  mkdir -p "$KIT/credentials" && chmod 700 "$KIT/credentials"
+  if [ ! -s "$KIT/credentials/api_key" ]; then   # made here, by the hospital; the operator never makes it
+    (umask 077; python3 -c 'import uuid; print(uuid.uuid4())' > "$KIT/credentials/api_key")
+    log "made this site's node API key: $KIT/credentials/api_key (fingerprint $(tr -d '[:space:]' < "$KIT/credentials/api_key" | sha256sum | cut -c1-12))"
+    log "send this file ONCE to the operator over a secure channel, with the fingerprint; the node connects after the operator has registered it"
+  fi
+  chmod 600 "$KIT/credentials/api_key"
   make_venv
   uv pip install -q --python "$VENV/bin/python" "vantage6==$VANTAGE6_VERSION"
   docker pull -q "$V6_NODE_IMAGE" >/dev/null

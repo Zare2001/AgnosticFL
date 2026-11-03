@@ -2,7 +2,7 @@
 # E5 extra hospitals v6-h9/v6-h10 on the vantage6 VM: standard vantage6 nodes like v6-h3/v6-h4,
 # with only their organamnist-iid12 data. Keys: make_key.sh v6-h9 / v6-h10 (the hospital's own). They run only during E5; registered but offline they
 # block nothing (flhub/0.2 readiness per run).
-#   install [--keys FILE]  node configs from the operator's API keys (central add_sites.sh, bus --secret)
+#   install                node configs from the hospitals' own keys (make_key.sh v6-h9 / v6-h10)
 #   start                  start both nodes, wait until connected, add their watchdog cron entry
 #   stop                   stop both nodes and remove their watchdog cron entry
 #   status                 exit 0 = both running and connected
