@@ -4,13 +4,16 @@
 # Default: the six base sites of deploy/topology.env, demo data variant cifar10-iid, output
 # ~/flhub-runtime/hospital-kits/<site>.tgz (mode 600; it holds the site's credentials).
 #
-# A kit contains the hospital's credentials for its framework (NVFlare: the startup kit from
-# provisioning; vantage6: the node API key; Flower: none), install/start/stop/status scripts for
+# A kit contains no hospital private key: NVFlare: the hospital makes its own key and certificate
+# request with the kit and gets back a certificate; vantage6: the hospital's ./install.sh makes the
+# node API key; Flower: none. It also holds install/start/stop/status scripts for
 # the framework's STANDARD client with the pinned versions, the operator's address, and a demo data
 # tool (a copy of flhub_core, used with numpy only) with the partition manifests to verify it.
-# Run the framework's central install.sh first (NVFlare provisioning); extra sites:
-# deploy/central/nvflare/provision_extra.sh. vantage6 kits hold no key: the hospital's ./install.sh
-# makes it, the hospital sends it, central registers it (deploy/central/vantage6/register_node.sh).
+# Run the framework's central install.sh first (NVFlare root CA). NVFlare: the kit carries the
+# project name and the root CA fingerprint (both public); ./install.sh at the hospital makes the key
+# and <site>.request.zip, the operator signs it with deploy/central/nvflare/approve.sh, ./install.sh
+# again builds the startup kit. vantage6: the hospital sends its key, central registers it
+# (deploy/central/vantage6/register_node.sh).
 set -euo pipefail
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 . "$REPO/deploy/central/nvflare/common.sh"   # NVF_WS, NVF_PROJECT (+ topology.env, versions.env)
@@ -36,7 +39,6 @@ framework_of() {  # topology SITES entry, or the site name's prefix for the extr
   for s in $SITES; do IFS=: read -r id fw _ <<<"$s"; [ "$id" = "$1" ] && { echo "$fw"; return; }; done
   case "$1" in nvf-*) echo nvflare ;; v6-*) echo vantage6 ;; flw-*) echo flower ;; *) echo "" ;; esac
 }
-nvf_kit_of() { ls -d "$NVF_WS/$NVF_PROJECT"/prod_*/"$1"/startup 2>/dev/null | sort -V | tail -1 | xargs -r dirname; }
 flower_port_of() {  # the SuperNode's local port, as on the testbed's Flower machine (flw-h5 9094, flw-h6 9095, ...)
   case "$1" in flw-h5) echo 9094 ;; flw-h6) echo 9095 ;; flw-h11) echo 9096 ;; flw-h12) echo 9097 ;; *) echo 9094 ;; esac
 }
@@ -55,10 +57,8 @@ for site in "${sites[@]}"; do
   cp "$REPO/deploy/hospital-kit/$fw.sh" "$kit/framework.sh"
   case "$fw" in
     nvflare)
-      nk="$(nvf_kit_of "$site")"
-      [ -n "$nk" ] || { echo "kits: $site: no NVFlare startup kit in $NVF_WS (run deploy/central/nvflare/install.sh)" >&2; exit 1; }
-      mkdir -p "$kit/nvflare" && cp -a "$nk" "$kit/nvflare/$site"
-      rm -f "$kit/nvflare/$site"/{daemon_pid.fl,pid.fl,log.txt,shutdown.fl} ;;
+      [ -s "$NVF_RUNTIME/rootCA.fingerprint" ] || { echo "kits: $site: no NVFlare root CA (run deploy/central/nvflare/install.sh)" >&2; exit 1; }
+      mkdir -p "$kit/nvflare" ;;
     vantage6)
       cp "$REPO/deploy/vantage6-vm/node.template.yaml" "$kit/" ;;
     flower)
@@ -82,6 +82,8 @@ KIT_SOURCE=$src
 DEMO_VARIANTS="$VARIANTS"
 # operator's ports (only the one of this framework is used)
 NVFLARE_FL_PORT=$NVFLARE_FL_PORT
+NVFLARE_PROJECT=$NVF_PROJECT
+NVFLARE_CA_FINGERPRINT=$(cat "$NVF_RUNTIME/rootCA.fingerprint" 2>/dev/null)
 V6_SERVER_PORT=$V6_SERVER_PORT
 REGISTRY_PORT=$REGISTRY_PORT
 FLOWER_FLEET_PORT=$FLOWER_FLEET_PORT
@@ -100,7 +102,7 @@ EOF
   req=""; data_note=""; logs="\`run/\`"
   case "$fw" in
     nvflare)
-      creds="nvflare/$site/ (NVFlare startup kit: this hospital's certificate and private key)"; port="$NVFLARE_FL_PORT"
+      creds="none in the kit. \`./install.sh\` makes this hospital's private key here (it never leaves this machine) and \`nvflare/$site.request.zip\`. Send the operator that zip and the public key hash that install.sh prints; put the \`$site.signed.zip\` you get back into \`nvflare/\` and run \`./install.sh\` again: it builds the startup kit \`nvflare/$site/\` and checks the operator's root CA fingerprint ($(cat "$NVF_RUNTIME/rootCA.fingerprint" 2>/dev/null))"; port="$NVFLARE_FL_PORT"
       req="sudo once, to add the server name of the startup kit to /etc/hosts if it does not resolve."
       logs="\`run/\` and \`nvflare/$site/log.txt\`" ;;
     vantage6)
