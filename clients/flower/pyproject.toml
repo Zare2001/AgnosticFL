@@ -33,3 +33,6 @@ poll-timeout-s = 5.0
 query-timeout-s = 60.0
 # Content id of the staged FAB source (set by the adapter, echoed in the relay heartbeat).
 fab-id = ""
+# Registered SuperNodes, "site node_id pubkey_sha256" per line (deploy/central/flower/register_node.sh).
+# Set: a node serves a site only with that site's registered node id. Empty: no check (no node auth).
+node-map = ""

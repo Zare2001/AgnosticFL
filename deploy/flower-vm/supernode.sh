@@ -10,7 +10,8 @@ mkdir -p "$RUNTIME/$site" && cd "$RUNTIME/$site"   # neutral cwd: nothing from t
 trap 'stopping=1; [ -n "$child" ] && kill "$child" 2>/dev/null' TERM INT
 
 while [ "$stopping" = 0 ]; do
-  FLWR_HOME="$RUNTIME/$site" flower-supernode --insecure --superlink "$SUPERLINK" --port "$port" \
+  supernode_tls_args "$site"
+  FLWR_HOME="$RUNTIME/$site" flower-supernode "${CONN_ARGS[@]}" --superlink "$SUPERLINK" --port "$port" \
       --node-config "site-id='$site' data-path='$DATA_DIR/$site.csv'" &
   child=$!
   wait "$child"; rc=$?

@@ -206,6 +206,9 @@ def main(argv: list[str] | None = None) -> int:
                     help="flhub_core package dir shipped inside the FAB")
     ap.add_argument("--flwr-home", default=str(Path.home() / "flhub-runtime/flower/flwr-home"))
     ap.add_argument("--connection", default="flhub", help="SuperLink connection in $FLWR_HOME/config.toml")
+    ap.add_argument("--node-map", default="",
+                    help="site -> node id file of registered SuperNodes (register_node.sh); the relay "
+                         "accepts a node for a site only if they match. Empty: no check (no node auth)")
     ap.add_argument("--no-launch", action="store_true", help="never start a relay run (tests)")
     args = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -220,7 +223,7 @@ def main(argv: list[str] | None = None) -> int:
     signal.signal(signal.SIGINT, lambda *_: stop.set())
     launcher = None
     if not args.no_launch:
-        run_config = f"adapter-url='{server.url}' hub-url='{args.hub}' fab-id='{fab_id}'"
+        run_config = f"adapter-url='{server.url}' hub-url='{args.hub}' fab-id='{fab_id}' node-map='{args.node_map}'"
         launcher = RelayLauncher(adapter, str(Path(sys.executable).with_name("flwr")), str(fab_dir),
                                  args.flwr_home, args.connection, run_config)
         threading.Thread(target=launcher.loop, args=(stop,), name="relay-launcher", daemon=True).start()

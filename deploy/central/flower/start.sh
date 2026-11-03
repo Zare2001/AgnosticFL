@@ -2,10 +2,27 @@
 # Start the Flower server side on the central VM (idempotent):
 #   1. SuperLink: Fleet API $FLEET_BIND (hospital SuperNodes), HTTP API 127.0.0.1:9093
 #   2. Flower adapter on 127.0.0.1:8813; it starts the relay run (flwr run) within ~20 s.
+# FLOWER_TLS=1: TLS on all SuperLink APIs ($TLS_DIR from tls.sh) and SuperNode authentication
+# (only keys registered with register_node.sh connect; the relay checks site -> node id in $NODES_MAP).
 set -euo pipefail
 . "$(dirname "$0")/common.sh"
 mkdir -p "$RUNTIME/logs" "$RUNTIME/run"
 [ -f "$FLWR_HOME_DIR/config.toml" ] || { echo "run install.sh first" >&2; exit 1; }
+if [ "$FLOWER_TLS" = 1 ]; then
+  for f in ca.crt server.crt server.key; do
+    [ -f "$TLS_DIR/$f" ] || { echo "FLOWER_TLS=1: $TLS_DIR/$f missing (run tls.sh)" >&2; exit 1; }
+  done
+  link_args=(--ssl-ca-certfile "$TLS_DIR/ca.crt" --ssl-certfile "$TLS_DIR/server.crt"
+             --ssl-keyfile "$TLS_DIR/server.key" --enable-supernode-auth)
+  adapter_args=(--node-map "$NODES_MAP")
+else
+  if [ -f "$TLS_DIR/server.crt" ] && [ "${FLOWER_ROLLBACK:-0}" != 1 ]; then
+    echo "FLOWER_TLS=0 but $TLS_DIR/server.crt exists: refusing an insecure SuperLink (rollback: FLOWER_ROLLBACK=1)" >&2
+    exit 1
+  fi
+  link_args=(--insecure); adapter_args=()
+fi
+write_flwr_config   # the adapter's flwr run/stop connection matches the SuperLink's TLS mode
 
 wait_for() {  # wait_for <seconds> <description> <command...>
   local secs="$1" what="$2"; shift 2
@@ -18,23 +35,31 @@ if pid_alive "$RUNTIME/run/superlink.pid"; then
 else
   # FAB dependencies are preinstalled in $VENV, so runtime dependency installation is off.
   # Persistent state: SuperNodes keep their node ids across a SuperLink restart (ADR).
-  FLWR_HOME="$FLWR_HOME_DIR" setsid nohup flower-superlink --insecure \
+  FLWR_HOME="$FLWR_HOME_DIR" setsid nohup flower-superlink "${link_args[@]}" \
       --fleet-api-address "$FLEET_BIND" --host 127.0.0.1 --port "$CONTROL_PORT" \
       --database "$RUNTIME/superlink.db" --disable-runtime-dependency-installation \
       >> "$RUNTIME/logs/superlink.log" 2>&1 < /dev/null &
   echo $! > "$RUNTIME/run/superlink.pid"
   wait_for 30 "SuperLink HTTP API :$CONTROL_PORT" port_open "$CONTROL_PORT"
   wait_for 30 "SuperLink Fleet API :${FLEET_BIND##*:}" port_open "${FLEET_BIND##*:}"
-  echo "superlink: started (pid $!, fleet $FLEET_BIND, http 127.0.0.1:$CONTROL_PORT)"
+  echo "superlink: started (pid $(cat "$RUNTIME/run/superlink.pid"), fleet $FLEET_BIND, http 127.0.0.1:$CONTROL_PORT, tls=$FLOWER_TLS)"
 fi
 
+if [ "$FLOWER_TLS" = 1 ] && pid_alive "$RUNTIME/run/adapter.pid" \
+   && ! tr '\0' ' ' < "/proc/$(cat "$RUNTIME/run/adapter.pid")/cmdline" | grep -q -- "--node-map $NODES_MAP"; then
+  # an adapter from before TLS would run its relay without the site binding: replace it
+  echo "adapter: running without --node-map $NODES_MAP, restarting it"
+  kill "$(cat "$RUNTIME/run/adapter.pid")"
+  for _ in $(seq 60); do pid_alive "$RUNTIME/run/adapter.pid" || break; sleep 0.5; done
+  pid_alive "$RUNTIME/run/adapter.pid" && { echo "adapter did not stop" >&2; exit 1; }
+fi
 if pid_alive "$RUNTIME/run/adapter.pid"; then
   echo "adapter: already running (pid $(cat "$RUNTIME/run/adapter.pid"))"
 else
   cd "$REPO"   # adapters.flower is imported from the repo checkout
   setsid nohup "$VENV/bin/python" -m adapters.flower.service \
       --port "$ADAPTER_PORT" --sites $SITES_FLOWER --hub "$HUB_URL" \
-      --app-dir "$REPO/clients/flower" --flwr-home "$FLWR_HOME_DIR" --connection flhub \
+      --app-dir "$REPO/clients/flower" --flwr-home "$FLWR_HOME_DIR" --connection flhub "${adapter_args[@]}" \
       >> "$RUNTIME/logs/adapter.log" 2>&1 < /dev/null &
   echo $! > "$RUNTIME/run/adapter.pid"
   wait_for 20 "adapter :$ADAPTER_PORT" curl -sf "http://127.0.0.1:$ADAPTER_PORT/health" -o /dev/null

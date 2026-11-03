@@ -10,15 +10,7 @@ uv pip install --python "$VENV/bin/python" "torch==${TORCH_VERSION}+cpu" --index
 uv pip install --python "$VENV/bin/python" "flwr==$FLWR_VERSION" "numpy==$NUMPY_VERSION" \
     "safetensors==$SAFETENSORS_VERSION" -e "$REPO/flhub_core" -e "$REPO"
 mkdir -p "$RUNTIME/logs" "$RUNTIME/run" "$FLWR_HOME_DIR"
-cat > "$FLWR_HOME_DIR/config.toml" <<EOF
-# flwr CLI connection used by the Flower adapter to start the relay run (written by install.sh)
-[superlink]
-default = "flhub"
-
-[superlink.flhub]
-address = "127.0.0.1:$CONTROL_PORT"
-insecure = true
-EOF
+write_flwr_config
 "$VENV/bin/python" -c "import flwr, flhub_core; print('flwr', flwr.__version__, 'flhub_core', \
 flhub_core.code_version())"
 echo "install OK (venv $VENV, FLWR_HOME $FLWR_HOME_DIR)"

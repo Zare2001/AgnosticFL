@@ -6,6 +6,10 @@
 #   FLHUB_FLOWER_RUNTIME runtime dir for pids, logs, FLWR_HOME (default ~/flhub-runtime/flower)
 #   FLHUB_DATA_DIR       site CSVs (default ~/flhub-data)
 #   FLHUB_FLOWER_NODES   "site:port ..." (default flw-h5:9094 flw-h6:9095; island tests use other ports)
+#   FLOWER_TLS           1: TLS to the SuperLink (root certificate $FLOWER_CA) and SuperNode authentication
+#                        with the site's own key $KEY_DIR/<site> (keygen.sh); 0: --insecure, no key.
+#                        Default: 1 once the CA certificate $FLOWER_CA is installed, else 0
+#   FLOWER_CA            the Flower CA certificate from central (default $RUNTIME/ca.crt)
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 . "$REPO/deploy/versions.env"
 . "$REPO/deploy/topology.env"
@@ -14,6 +18,11 @@ RUNTIME="${FLHUB_FLOWER_RUNTIME:-$HOME/flhub-runtime/flower}"
 DATA_DIR="${FLHUB_DATA_DIR:-$HOME/flhub-data}"
 SUPERLINK="${FLHUB_SUPERLINK:-$FLHUB_CENTRAL_IP:$FLOWER_FLEET_PORT}"
 NODES="${FLHUB_FLOWER_NODES:-flw-h5:9094 flw-h6:9095}"   # site_id:local SuperNode runtime API port
+FLOWER_CA="${FLOWER_CA:-$RUNTIME/ca.crt}"
+if [ -z "${FLOWER_TLS:-}" ]; then
+  if [ -f "$FLOWER_CA" ]; then FLOWER_TLS=1; else FLOWER_TLS=0; fi
+fi
+KEY_DIR="$RUNTIME/keys"           # <site> (private, never leaves this machine) and <site>.pub
 export PATH="$VENV/bin:$PATH"     # flower-superexec / flwr-clientapp are found via PATH
 
 pid_alive() { [ -f "$1" ] && kill -0 "$(cat "$1")" 2>/dev/null; }
@@ -34,4 +43,11 @@ stop_site() {  # stop_site <site>: stop one SuperNode with its supervisor and ch
   for k in $kids; do kill "$k" 2>/dev/null || true; done
   rm -f "$pidf"
   echo "$site: stopped (pid $pid)"
+}
+supernode_tls_args() {  # sets the array CONN_ARGS: flower-supernode connection arguments for site $1
+  if [ "$FLOWER_TLS" = 1 ]; then
+    CONN_ARGS=(--root-certificates "$FLOWER_CA" --auth-supernode-private-key "$KEY_DIR/$1")
+  else
+    CONN_ARGS=(--insecure)
+  fi
 }

@@ -12,7 +12,7 @@ This guide explains how the hub drives a [Flower](https://flower.ai) federation:
 | Server side | the Flower adapter [`adapters/flower/service.py`](../../adapters/flower/service.py) (flhub on `127.0.0.1:8813`) and the relay ServerApp [`clients/flower/flhub_flower/server_app.py`](../../clients/flower/flhub_flower/server_app.py), which runs inside one long-lived Flower run on the SuperLink |
 | Hospital side | the standard `flower-supernode` with the standard ClientApp [`clients/flower/flhub_flower/client_app.py`](../../clients/flower/flhub_flower/client_app.py), which calls `flhub_core.train` |
 | Rollout channel | the FAB (Flower App Bundle). The adapter packs `flhub_core` into the FAB of the relay run; connected SuperNodes fetch it with the next run. A new `flhub_core` version needs no hospital action and no restart. |
-| Transport security in the testbed | none (`--insecure`), restricted by the cloud firewall. TLS and SuperNode authentication are future work (§8). |
+| Transport security in the testbed | `FLOWER_TLS=1`: TLS on all SuperLink APIs with a Flower CA of the operator's own, and SuperNode authentication: each hospital makes its own P-384 key pair and sends only the public key, which the operator registers (§4.4). `FLOWER_TLS=0` (`--insecure`, no authentication) is the fallback. |
 
 What the adapter does: it keeps one Flower run alive on the SuperLink. That run's ServerApp, the *relay*, takes each round from the adapter and sends one standard TRAIN message per site through Flower's `Grid`; the hospitals answer through Flower's Message API, and the relay hands every reply back to the adapter as a per-site result.
 
@@ -120,10 +120,15 @@ The adapter declares `max_payload_mb` 2048 in its capabilities. The relay's run 
 SuperLink command in the testbed ([`deploy/central/flower/start.sh`](../../deploy/central/flower/start.sh)):
 
 ```bash
-FLWR_HOME=~/flhub-runtime/flower/flwr-home flower-superlink --insecure \
+T=~/flhub-runtime/flower/tls   # tls.sh
+FLWR_HOME=~/flhub-runtime/flower/flwr-home flower-superlink \
+    --ssl-ca-certfile $T/ca.crt --ssl-certfile $T/server.crt --ssl-keyfile $T/server.key \
+    --enable-supernode-auth \
     --fleet-api-address 0.0.0.0:9092 --host 127.0.0.1 --port 9093 \
     --database ~/flhub-runtime/flower/superlink.db --disable-runtime-dependency-installation
 ```
+
+- The certificate covers all three APIs: the Fleet API for the hospitals and, on 127.0.0.1, the HTTP API that `flwr run` and the ServerApp use. The SuperLink passes its CA file to the `flower-superexec` it starts, so the relay needs no extra setting. `FLOWER_TLS` defaults to 1 once `tls.sh` has made the certificate (and to 0 before); with a certificate present, `start.sh` refuses `FLOWER_TLS=0` unless `FLOWER_ROLLBACK=1`, so no restart falls back to `--insecure` by accident. With TLS, `start.sh` also replaces a running adapter that lacks `--node-map`.
 
 - `--database` keeps node ids and runs across a SuperLink restart, so connected SuperNodes stay registered.
 - `--disable-runtime-dependency-installation`: the dependencies are preinstalled; the SuperLink never installs FAB dependencies at run time.
@@ -142,6 +147,11 @@ The reference scripts in [`deploy/central/flower/`](../../deploy/central/flower/
 | `bash deploy/central/flower/restart.sh adapter` | rollout of a new `flhub_core`: new FAB, new relay run; SuperLink and hospitals stay connected |
 | `bash deploy/central/flower/restart.sh superlink [--kill]` | restarts the SuperLink; the adapter relaunches the relay |
 | `bash deploy/central/flower/purge.sh [--online]` | reclaims SuperLink database space (§5.5); `--online` only checkpoints the WAL |
+| `bash deploy/central/flower/tls.sh [--renew]` | once: the Flower CA and the SuperLink certificate in `~/flhub-runtime/flower/tls` (mode 700); prints the `ca.crt` sha256 for the hospitals (§4.4) |
+| `bash deploy/central/flower/register_node.sh add <site> <site.pub> --expect-sha256 <hex> [--replace]`, `remove <site>`, `list` | registers a hospital's public key with the SuperLink and records site → node id in `nodes.map` (§4.4) |
+| `FLHUB_FLOWER_RUNTIME=<test runtime> bash deploy/central/flower/remove_test.sh` | stops a test SuperLink next to the live one and deletes its runtime; refuses the live runtime |
+
+A second SuperLink next to the live one (a test) takes its own `FLHUB_FLOWER_RUNTIME`, `FLOWER_FLEET_BIND`, `FLHUB_FLOWER_CONTROL_PORT`, `FLHUB_ADAPTER_FLOWER_PORT` and `FLHUB_FLOWER_SITES` (header of [`common.sh`](../../deploy/central/flower/common.sh)).
 
 ## 3. Client side: what the hospital code must contain
 
@@ -154,7 +164,8 @@ A Flower hospital runs only standard Flower software plus the shared training li
 - the standard `flower-supernode` process, started with the SuperLink address and a node config that names the site and its data file:
 
   ```bash
-  flower-supernode --insecure --superlink <central-host>:9092 --port 9094 \
+  flower-supernode --root-certificates ca.crt --auth-supernode-private-key keys/flw-h5 \
+      --superlink <central-host>:9092 --port 9094 \
       --node-config "site-id='flw-h5' data-path='/home/<user>/flhub-data/flw-h5.csv'"
   ```
 
@@ -318,7 +329,7 @@ Apart from the site's data and the Python packages for training, a running Flowe
    insecure = true
    ```
 
-   For a SuperLink with TLS, replace `insecure = true` by `root-certificates = "<CA certificate file>"`. Flower 1.39 reads the keys `address`, `root-certificates`, `insecure`, `federation` and `options` (`flwr/cli/constant.py`). Not tested.
+   For a SuperLink with TLS, replace `insecure = true` by `root-certificates = "<CA certificate file>"` (tested; [`common.sh`](../../deploy/central/flower/common.sh) `write_flwr_config` writes the right one for `FLOWER_TLS`). Flower 1.39 reads the keys `address`, `root-certificates`, `insecure`, `federation` and `options` (`flwr/cli/constant.py`).
 3. Decide how the SuperLink treats the FAB's dependencies (`flwr`, numpy, safetensors in [`clients/flower/pyproject.toml`](../../clients/flower/pyproject.toml)). The testbed runs the SuperLink with `--disable-runtime-dependency-installation` and preinstalls them; the SuperLink's default (install at run time) was not tested. SuperNodes do not install dependencies unless started with `--allow-runtime-dependency-installation`.
 4. Start the hub core and the adapter from the repository checkout:
 
@@ -340,7 +351,25 @@ If the SuperNodes accept only signed FABs (`--trusted-entities`), the hub's FAB 
 
 ### 4.4 Credentials
 
-The testbed exchanges no credentials: Flower runs with `--insecure`, and the cloud firewall admits the Fleet API port only from the hospital hosts ([ADR-007](../design/decisions.md); [stage-1 report](https://github.com/Zare2001/AgnosticFL/blob/stage1-final/REPORT.md) §11, [stage-2 report](https://github.com/Zare2001/AgnosticFL/blob/stage2-final/REPORT_STAGE2.md) §9). The adapter needs only access to the SuperLink's HTTP API. It needs no hospital credentials, and the hospitals need none from the hub. A federation with TLS or SuperNode authentication keeps its own certificates and keys; the adapter's connection then needs the CA certificate (§4.2 step 2).
+With `FLOWER_TLS=1` the hospitals own their keys; nothing secret travels.
+
+| Who | Does | Command |
+|---|---|---|
+| operator, once | makes a Flower CA and the SuperLink certificate (P-384; SAN the central IP, 127.0.0.1, `flhub-central`). The CA and server keys stay on central, mode 600 in a mode-700 directory, never in git | `bash deploy/central/flower/tls.sh` |
+| hospital, once | makes its SuperNode key pair; the private key never leaves the hospital | `ssh-keygen -t ecdsa -b 384 -N "" -f <site>` ([`keygen.sh`](../../deploy/flower-vm/keygen.sh); a hospital kit's `./install.sh`) |
+| hospital | sends `<site>.pub` and its sha256 (`sha256sum <site>.pub`) to the operator | testbed: `tools/bus put <site>.pub --to central`, sha256 in the bus message |
+| operator | checks site, sha256 and key type, registers the key; the SuperLink gives it a node id | `bash deploy/central/flower/register_node.sh add <site> <site.pub> --expect-sha256 <hex>` (runs `flwr supernode register`) |
+| operator | sends `ca.crt` (public) and its sha256; the hospital compares the sha256 with one received on a second channel (the hash inside the kit proves only that the file is intact) | in the hospital kit: `credentials/ca.crt`, `FLOWER_CA_SHA256` in `kit.env` |
+
+What it enforces, tested side by side with the running federation: a SuperNode with an unregistered key (`[code: 2004] Failed to activate SuperNode`), without a key (`[code: 2001] SuperNode authentication is enabled`), with `--insecure`, or trusting another CA (`CERTIFICATE_VERIFY_FAILED`) is refused. After `register_node.sh add --replace` (key rotation: the new key is registered first, then the old node removed) the old key is refused. Flower never accepts a removed key again (`[code: 23] Public key already in use`): a hospital that rotates makes a new key pair.
+
+**Site binding.** The SuperLink authenticates a key, not a site: the site id is what the SuperNode's node config claims (§2.3). With authentication a node id belongs to one registered key and stays the same across restarts, so `register_node.sh` records `site node_id key_sha256` in `~/flhub-runtime/flower/nodes.map`; the adapter passes the file to the relay (run config `node-map`), and the relay accepts a node for a site only with that site's registered node id (`node … claims site flw-h6, registered node id for flw-h6 is …: refused` in the relay log). Without the file every node is refused. Without authentication (`FLOWER_TLS=0`) there is no map and no check.
+
+**Reply attribution.** A known Flower limitation in reply attribution, reported upstream; mitigations in place.
+
+**Registration order.** A key can be registered while the SuperLink still runs without `--enable-supernode-auth`; the registration is kept in `--database` and holds after a restart with authentication (tested). The switch-over therefore registers the hospitals first and restarts the SuperLink once.
+
+The adapter needs only the SuperLink's HTTP API, over TLS with `root-certificates` (§4.2 step 2); it holds no hospital credentials.
 
 ### 4.5 Verify
 
@@ -613,7 +642,7 @@ At the hospital, the killed SuperNode was restarted by its supervisor after 10 s
 - **Old node ids stay listed for up to 60 s** after a SuperNode restart, because offline detection is heartbeat-based. The relay's site mapping handles this (§2.3).
 - **Late replies are dropped at the hospital.** A message's TTL is the round deadline; a ClientApp that finishes later cannot push its reply, and the SuperNode logs `NoObjectInStoreError` / `Failed to push reply message`. Harmless: the hub has already finished the round without that site.
 - **The SuperLink database does not shrink** (§5.5), and reclaiming the space needs a short SuperLink restart (`purge.sh`). The SuperNodes reconnect with their ids and log a few `Connection attempt failed, retrying` lines.
-- **No transport security in the testbed.** Flower runs with `--insecure` and without SuperNode authentication, restricted by the cloud firewall (§8).
+- **The SuperLink authenticates keys, not site names.** Without the node map a registered key could claim another site's id; the relay's node-map check closes this (§4.4).
 - **The SuperLink logs every HTTP request** of its local API; a long-lived deployment should use `--log-file` with rotation.
 - **The FAB declares a license string.** [`clients/flower/pyproject.toml`](../../clients/flower/pyproject.toml) contains `license = "Apache-2.0"` as FAB metadata, although no license has been chosen for this repository yet. This is a known inconsistency that stays until the author chooses a license ([limitations-and-future-work.md](../limitations-and-future-work.md)).
 
@@ -655,13 +684,18 @@ Problems met during the two test stages, as symptom → cause → fix.
 - **Every round costs about 1.5 s more and the adapter about 1 GiB more memory at 512 MiB.** → The shared adapter base loaded the global model for every task, although a relay adapter never uses it. → Fixed in `adapters/common`: relay adapters set `needs_weights = False`.
 - **Creating a Flower `Message` in a unit test fails.** → Outside a run, Flower has no task identity. → Set one at the start of the test module, as [`tests/flower/test_flower_relay.py`](../../tests/flower/test_flower_relay.py) does: `TaskIdentity.run_id, TaskIdentity.node_id, TaskIdentity.task_id = 1, 1, 1`.
 - **`flwr new` fails on a host without internet access.** → In Flower 1.39 it fetches the app template from the Flower platform. → Write the app's `pyproject.toml` by hand; [`clients/flower/pyproject.toml`](../../clients/flower/pyproject.toml) is a complete example.
+- **A SuperNode exits with `[code: 2004] Failed to activate SuperNode`.** → Its public key is not registered (or was replaced). → `register_node.sh list` on central; register the hospital's `.pub`. The hospital kit's `start.sh` and `status.sh` report this as refused.
+- **`[code: 2001] SuperNode authentication is enabled. All SuperNodes must be registered via the CLI.`** → The SuperNode was started without `--auth-supernode-private-key`. → Start it with its key (`FLOWER_TLS=1`).
+- **`SSL_ERROR_SSL … WRONG_VERSION_NUMBER`.** → TLS client, plaintext SuperLink (or the reverse: `Connection attempt failed` for an `--insecure` SuperNode against a TLS SuperLink). → Same `FLOWER_TLS` on both sides.
+- **`CERTIFICATE_VERIFY_FAILED: unable to get local issuer certificate`.** → The SuperNode's `--root-certificates` is not the CA that signed the SuperLink's certificate. → Use the operator's `ca.crt` and compare its sha256.
+- **A site stays offline although its SuperNode is connected.** → The relay refused it: its node id is not the one registered for that site (relay log: `claims site … refused`), or `nodes.map` is missing. → `register_node.sh list`; re-register the site's key.
 - **Where is the relay's log?** → It is the log of a Flower run. → `FLWR_HOME=<runtime>/flwr-home flwr log <run-id> flhub --show`; the run id is in `/relay/status`.
 
 ## 8. Future work and upstream reports
 
 What would lift the limits or harden a deployment:
 
-- **TLS and SuperNode authentication.** SuperLink `--ssl-certfile`, `--ssl-keyfile`, `--ssl-ca-certfile` and `--enable-supernode-auth`, with each SuperNode's public key registered through the Flower CLI (`flwr supernode register <public-key> [<superlink>]`); SuperNodes `--root-certificates` and `--auth-supernode-private-key`. In Flower 1.39.0, `--auth-list-public-keys` is rejected, `--auth-supernode-public-key` is deprecated (the public key is derived from the private key), and SuperNode authentication requires TLS. The adapter's `flwr` connection then needs `root-certificates`. Not tested.
+- **TLS and SuperNode authentication: done (§4.4).** Notes for Flower 1.39.0: `--auth-list-public-keys` is rejected, `--auth-supernode-public-key` is deprecated (the public key is derived from the private key), and SuperNode authentication requires TLS. Open: certificate renewal without a SuperLink restart; the SuperLink's HTTP API on 127.0.0.1 has no account authentication (any local user on central who can reach 127.0.0.1:9093 and read `ca.crt` can register a node); `flower-superlink --help` of 1.39.0 shows no option for it, so access to central itself is the boundary.
 - **A lower fixed cost per round.** In Flower 1.39.0 every message runs in a fresh `flwr-clientapp` process in both isolation modes (`--isolation process` only moves the SuperExec out of the SuperNode), so removing the per-message start-up (§5.3) needs a change in Flower (upstream idea 6 below).
 - **Large models.** Reclaim SuperLink database space without a restart, or move the object store off SQLite; measure beyond 512 MiB and beyond two sites per VM.
 - **Signed FABs.** SuperNodes that accept only FABs from trusted entities (`--trusted-entities`) need a signed hub FAB; not tested.

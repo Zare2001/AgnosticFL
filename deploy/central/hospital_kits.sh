@@ -20,6 +20,8 @@ REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 OUT="$HOME/flhub-runtime/hospital-kits"
 VARIANTS="cifar10-iid"
 V6_RT="${V6_RT:-$HOME/flhub-runtime/vantage6}"
+FLOWER_TLS="${FLOWER_TLS:-0}"   # 1: Flower kits carry the Flower CA certificate; the hospital makes its own key
+FLOWER_TLS_DIR="${FLOWER_TLS_DIR:-$HOME/flhub-runtime/flower/tls}"   # deploy/central/flower/tls.sh
 while [ $# -gt 0 ]; do
   case "$1" in
     --out) OUT="$2"; shift 2 ;;
@@ -62,7 +64,11 @@ for site in "${sites[@]}"; do
     vantage6)
       cp "$REPO/deploy/vantage6-vm/node.template.yaml" "$kit/" ;;
     flower)
-      cp "$REPO/deploy/hospital-kit/flower_supernode.sh" "$kit/" ;;
+      cp "$REPO/deploy/hospital-kit/flower_supernode.sh" "$kit/"
+      if [ "$FLOWER_TLS" = 1 ]; then   # public only: the CA certificate; no hospital key is made here
+        [ -f "$FLOWER_TLS_DIR/ca.crt" ] || { echo "kits: $site: no $FLOWER_TLS_DIR/ca.crt (run deploy/central/flower/tls.sh)" >&2; exit 1; }
+        mkdir -p "$kit/credentials" && cp "$FLOWER_TLS_DIR/ca.crt" "$kit/credentials/"
+      fi ;;
   esac
   mkdir -p "$kit/data-tool" "$kit/manifests"
   tar -C "$REPO/flhub_core/src" --exclude=__pycache__ -cf - flhub_core | tar -C "$kit/data-tool" -xf -
@@ -88,6 +94,8 @@ V6_SERVER_PORT=$V6_SERVER_PORT
 REGISTRY_PORT=$REGISTRY_PORT
 FLOWER_FLEET_PORT=$FLOWER_FLEET_PORT
 FLOWER_LOCAL_PORT=$(flower_port_of "$site")
+FLOWER_TLS=$FLOWER_TLS
+FLOWER_CA_SHA256=$( [ "$FLOWER_TLS" = 1 ] && sha256sum "$FLOWER_TLS_DIR/ca.crt" | cut -d' ' -f1 )
 # pinned versions (deploy/versions.env): every machine of the federation runs the same numerics
 PYTHON_VERSION=$PYTHON_VERSION
 TORCH_VERSION=$TORCH_VERSION
@@ -111,7 +119,13 @@ EOF
       data_note="The node offers the files that exist when it starts: after adding files run \`./stop.sh && ./start.sh\`."
       logs="\`run/\` and \`docker logs -f vantage6-$site-user\`" ;;
     flower)
-      creds="none (Flower runs without client credentials on this testbed)"; port="$FLOWER_FLEET_PORT"
+      if [ "$FLOWER_TLS" = 1 ]; then
+        creds="credentials/ca.crt (the operator's Flower CA, public; its sha256 is FLOWER_CA_SHA256 in kit.env) and credentials/node_key, this hospital's SuperNode key pair, which \`./install.sh\` makes here. Send only \`credentials/node_key.pub\` and the sha256 that install.sh prints to the operator, who registers it; the SuperNode connects after that. Before install, compare FLOWER_CA_SHA256 with the CA sha256 the operator gives you on a second channel (the copy in this kit proves only that the file is intact). The private key never leaves this machine"
+        req="ssh-keygen (package openssh-client), to make the SuperNode key."
+      else
+        creds="none (Flower runs without client credentials on this testbed)"
+      fi
+      port="$FLOWER_FLEET_PORT"
       logs="\`run/supernode.log\`" ;;
   esac
   cat > "$kit/README.md" <<EOF

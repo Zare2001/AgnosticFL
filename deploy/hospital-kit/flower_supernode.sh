@@ -3,14 +3,20 @@
 # exits by design when the SuperLink no longer knows its node id (e.g. after a SuperLink restart with
 # fresh state); this loop starts it again.
 . "$(dirname "$0")/lib.sh"
+. "$KIT/framework.sh"   # FLOWER_TLS, FLOWER_CA, NODE_KEY
 set +e
 echo $$ > "$RUN/supernode.pid"   # this loop is what stop.sh ends (with its children)
 export PATH="$VENV/bin:$PATH"   # flwr-clientapp is found via PATH
 mkdir -p "$KIT/flwr-home" && cd "$KIT/flwr-home" || exit 1   # neutral cwd: nothing else on sys.path
+if [ "$FLOWER_TLS" = 1 ]; then
+  conn=(--root-certificates "$FLOWER_CA" --auth-supernode-private-key "$NODE_KEY")
+else
+  conn=(--insecure)
+fi
 child=""; stopping=0
 trap 'stopping=1; [ -n "$child" ] && kill "$child" 2>/dev/null' TERM INT
 while [ "$stopping" = 0 ]; do
-  FLWR_HOME="$KIT/flwr-home" flower-supernode --insecure --superlink "$CENTRAL_IP:$FLOWER_FLEET_PORT" \
+  FLWR_HOME="$KIT/flwr-home" flower-supernode "${conn[@]}" --superlink "$CENTRAL_IP:$FLOWER_FLEET_PORT" \
     --port "$FLOWER_LOCAL_PORT" --node-config "site-id='$SITE' data-path='$DATA_DIR/$SITE.csv'" &
   child=$!
   wait "$child"; rc=$?
