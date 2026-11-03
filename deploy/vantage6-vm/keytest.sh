@@ -82,14 +82,19 @@ case "${1:-}" in
     n=v6-h3x
     render_node_config "$n" v6-h3 "$(python3 -c 'import uuid; print(uuid.uuid4())')" "http://$FLHUB_CENTRAL_IP" "$(allowed)"
     (cd "$HOME" && "$VENV/bin/v6" node start -n "$n" --user >/dev/null) || true
-    sleep 45
-    if docker logs "vantage6-$n-user" 2>&1 | grep -qE 'Connected to the /tasks|Websocket connection established'; then
+    # the node container is auto-removed when it exits: follow its log while it runs (max 60 s)
+    nlog="$(mktemp)"
+    timeout 60 docker logs -f "vantage6-$n-user" > "$nlog" 2>&1 || true
+    if grep -qE 'Connected to the /tasks|Websocket connection established' "$nlog"; then
       log "FAIL $n with an unregistered key connected"; rc=1
+    elif [ ! -s "$nlog" ]; then
+      log "FAIL $n: no node log captured (container did not start?)"; rc=1
     else
-      log "PASS $n with an unregistered key did not connect; its log:"
-      docker logs "vantage6-$n-user" 2>&1 | grep -iE 'auth|401|key|fail|error' | grep -v -i 'api_key:' | tail -5 | sed 's/^/    /'
+      log "PASS $n with an unregistered key did not connect ($(wc -l < "$nlog") log lines); the lines that matter:"
+      sed 's/\x1b\[[0-9;]*m//g' "$nlog" | grep -iE 'authenticat|401|unauthor|invalid|exit' | grep -v -i 'api_key:' | tail -5 | sed 's/^/    /'
       rc=0
     fi
+    rm -f "$nlog"
     stop_node "$n"; docker rm -f "vantage6-$n-user" >/dev/null 2>&1 || true
     rm -rf "$HOME/.config/vantage6/node/$n.yaml" "$HOME/.local/share/vantage6/node/$n"
     exit $rc ;;

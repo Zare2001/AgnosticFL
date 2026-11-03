@@ -101,9 +101,9 @@ chmod 600 "$BACKUP"
 log "DB backup: $BACKUP"
 
 # --- 4. the write: the key goes in on stdin ---
-printf '%s\n' "$KEY" | docker exec -i "$CONTAINER" python -c "$(cat "$REPO/deploy/central/vantage6/set_node_key.py")" \
-  "$SITE" "$COLLAB" 2>&1 | grep -v -i 'warning' | sed 's/^/[v6-register] /'
-[ "${PIPESTATUS[1]}" = 0 ] || die "set_node_key.py failed (DB backup: $BACKUP)"
+out="$(printf '%s\n' "$KEY" | docker exec -i "$CONTAINER" python -c "$(cat "$REPO/deploy/central/vantage6/set_node_key.py")" \
+  "$SITE" "$COLLAB" 2>&1)" || { echo "$out" | grep -v -i warning >&2; die "set_node_key.py failed (DB backup: $BACKUP)"; }
+echo "$out" | grep -v -i 'warning' | sed 's/^/[v6-register] /'
 
 # --- 5. checks ---
 node_login() {  # HTTP status of a node login with the key on stdin (never in argv)
