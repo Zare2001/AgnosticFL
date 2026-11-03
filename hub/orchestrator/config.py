@@ -124,8 +124,12 @@ def _schema1(raw: dict, path: str) -> RunConfig:
     train = {**DEFAULT_TRAIN, **(raw.pop("train_config", None) or {})}
     wandb = raw.pop("wandb", None) or {}
     group, tags = raw.pop("group", wandb.get("group")), list(raw.pop("tags", None) or wandb.get("tags") or [])
-    keep = {k: raw[k] for k in ("rounds", "seed", "hub_url", "deadline_s", "online_wait_s", "poll_interval_s",
-                                "round_retries", "runs_dir") if k in raw}
+    fields = ("rounds", "seed", "hub_url", "deadline_s", "online_wait_s", "poll_interval_s", "round_retries",
+              "runs_dir", "strict_code_version", "notes")
+    unknown = sorted(set(raw) - set(fields) - {"name"})
+    if unknown:  # a key the schema-1 loader does not read would be dropped without a word
+        raise ValueError(f"{path}: unknown keys for a schema-1 config: {unknown}")
+    keep = {k: raw[k] for k in fields if k in raw}
     return RunConfig(name=raw.get("name", Path(path).stem), schema=1, adapters=adapters, train_config=train,
                      sites=[s for a in adapters for s in a.sites], wandb={**wandb, "group": group, "tags": tags},
                      eval={"every": 1, "site_shaped": False, "split": "test", "threads": 1}, source=str(path),

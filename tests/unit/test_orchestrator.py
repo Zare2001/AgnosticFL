@@ -51,6 +51,12 @@ def test_load_config(tmp_path):
     assert cfg.rounds == 5 and cfg.sites == ["a", "b", "c"] and cfg.train_config["lr"] == 0.1
     assert cfg.train_config["batch_size"] == 64 and cfg.wandb["project"] == "P" and cfg.wandb["tags"] == ["dev"]
     assert cfg.schema == 1 and set(cfg.train_config) == {"local_epochs", "batch_size", "lr", "momentum", "seed"}
+    assert cfg.strict_code_version is False
+    p.write_text("name: t\nstrict_code_version: true\nadapters:\n  - {name: x, url: u, sites: [a]}\n")
+    assert load_config(p).strict_code_version is True
+    p.write_text("name: t\nstrict_code_versoin: true\nadapters:\n  - {name: x, url: u, sites: [a]}\n")
+    with pytest.raises(ValueError, match="unknown keys"):
+        load_config(p)
     p.write_text("name: t\nadapters:\n  - {name: x, url: u, sites: [a]}\n  - {name: y, url: v, sites: [a]}\n")
     with pytest.raises(ValueError):
         load_config(p)
