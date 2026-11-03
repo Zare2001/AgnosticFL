@@ -64,11 +64,11 @@ On the reference testbed, where `deploy/<framework>-vm/` already runs the six si
 
 ## Hospital kits
 
-`deploy/central/hospital_kits.sh [--variants "cifar10-iid ..."] [site ...]` writes one archive per site (default: the six base sites; extra sites after `nvflare/provision_extra.sh` or `vantage6/add_sites.sh`):
+`deploy/central/hospital_kits.sh [--variants "cifar10-iid ..."] [site ...]` writes one archive per site (default: the six base sites; extra NVFlare sites need no step on central before the kit; extra vantage6 sites after `vantage6/add_sites.sh`):
 
 | In the kit | NVFlare | vantage6 | Flower |
 |---|---|---|---|
-| credentials | `nvflare/<site>/`: the provisioned startup kit (certificate, private key, server name) | `credentials/api_key`: the node's API key | none (`--insecure` on the testbed) |
+| credentials | none: `./install.sh` makes the key and `nvflare/<site>.request.zip`; with the operator's `<site>.signed.zip` a second `./install.sh` builds the startup kit `nvflare/<site>/` (root CA fingerprint from `kit.env`) | `credentials/api_key`: the node's API key | none (`--insecure` on the testbed) |
 | installed by `install.sh` | NVFlare client, torch (CPU), numpy, safetensors in `venv/`; the server name in `/etc/hosts` | vantage6 CLI, the node image, the operator's registry in Docker's `insecure-registries` | Flower, torch (CPU), numpy, safetensors in `venv/` |
 | started by `start.sh` | the kit's `startup/start.sh` with `FLHUB_DATA_PATH` | `v6 node start`, one CSV database per data file | `flower-supernode` under a restart loop, node config `site-id`, `data-path` |
 | training code | arrives with the job (`custom/`) | inside the algorithm image | inside the FAB |
