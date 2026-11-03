@@ -24,10 +24,26 @@ NVF_WS="$NVF_RUNTIME/ws"
 NVF_PROD="$NVF_WS/$NVF_PROJECT/prod_00"
 NVF_SERVER_KIT="$NVF_PROD/$NVF_SERVER_NAME"
 NVF_ADMIN_KIT="$NVF_PROD/$NVF_ADMIN_USER"
-NVF_KITS_OUT="$NVF_RUNTIME/kits"
+NVF_KITS_OUT="$NVF_RUNTIME/kits"   # stage-1 centrally provisioned kits (removed at the switch-over)
+# Distributed provisioning (NVFlare 2.9 `nvflare cert`): central is project admin with its own root CA.
+# Only the CA key, the server key and the adapter's admin key exist on central; hospitals send a
+# request zip (CSR, no key) and get back a signed zip (their certificate + rootCA.pem).
+NVF_CA_DIR="$NVF_RUNTIME/ca"                 # rootCA.pem, rootCA.key, ca.json (mode 700)
+NVF_PROFILE="$NVF_RUNTIME/project_profile.yaml"
+NVF_REQ_DIR="$NVF_RUNTIME/requests"          # the server's and the admin's own requests (their keys)
+NVF_SIGNED_OUT="$NVF_RUNTIME/signed"         # <site>.signed.zip to return to the hospital
+NVF_ISSUED="$NVF_RUNTIME/issued"             # <site>.crt: last certificate issued per hospital
+NVF_ADMIN_ROLE="${NVF_ADMIN_ROLE:-lead}"     # distributed provisioning has no project_admin users
+NVF_SCHEME="${NVF_SCHEME:-http}"
+NVF_CONN_SEC="${NVF_CONN_SEC:-mtls}"
 NVF_JOBS="$NVF_RUNTIME/jobs"
 NVF_LOGS="$NVF_RUNTIME/logs"
 NVF_ADAPTER_PID="$NVF_RUNTIME/adapter.pid"
 
 nvf_port_open() { (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null; }
 nvf_pid_alive() { [ -f "$1" ] && kill -0 "$(cat "$1")" 2>/dev/null; }
+
+# SHA256 fingerprint of the root CA, in the form `nvflare package --fingerprint` takes.
+nvf_ca_fingerprint() { openssl x509 -in "$NVF_CA_DIR/rootCA.pem" -noout -fingerprint -sha256 | cut -d= -f2; }
+# Expected org of a hospital: nvf-h<N>... -> hospital<N> (as the stage-1 provisioning named them).
+nvf_org_of() { local n; n=$(sed -n 's/^nvf-h\([0-9][0-9]*\).*/\1/p' <<<"$1"); [ -n "$n" ] && echo "hospital$n"; }
