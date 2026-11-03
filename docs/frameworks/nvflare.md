@@ -126,7 +126,7 @@ The hospital side of the testbed has its own scripts:
 | Script (`deploy/nvflare-vm/`) | What it does |
 |---|---|
 | `request.sh <site> [--force]` | makes the site's private key and `<site>.request.zip` in `~/flhub-runtime/nvflare/requests/<site>/` (mode 700) and prints the public key hash to send with it; the key never leaves the machine |
-| `install.sh [<site>.signed.zip ...]` | Python environment (`nvflare`, torch, numpy, safetensors; removes an installed `flhub_core`), sha256-verified data files, and each site's kit, built here with `nvflare package` from the operator's signed zip, the site's own key and the root CA fingerprint (`NVF_CA_FINGERPRINT` or `~/flhub-runtime/nvflare/rootCA.fingerprint`); the stage-1 `kit.tgz` archives are still accepted until the switch-over |
+| `install.sh [<site>.signed.zip ...]` | Python environment (`nvflare`, torch, numpy, safetensors; removes an installed `flhub_core`), sha256-verified data files, and each site's kit, built here with `nvflare package` from the operator's signed zip, the site's own key and the root CA fingerprint (`NVF_CA_FINGERPRINT` or `~/flhub-runtime/nvflare/rootCA.fingerprint`) |
 | `start.sh [site ...]` | starts each site with its kit's `startup/start.sh` and `FLHUB_DATA_PATH` set, waits for "Successfully registered client", enables a per-minute cron watchdog |
 | `status.sh [site ...]` | per site: client process alive and connected to the server |
 | `stop.sh [site ...]` | stops sites through the kit's `shutdown.fl` and disables their watchdog |

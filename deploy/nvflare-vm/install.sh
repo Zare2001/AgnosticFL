@@ -6,10 +6,9 @@
 #  2. data, sha256-verified: the stage-1 file <site>.csv and the stage-2 variant files
 #     <variant>-<site>.csv next to it (configs/stage2/partitions manifests), made with this checkout's
 #     flhub_core as a provisioning tool.
-#  3. startup kits: install.sh [<site>.signed.zip | kit.tgz ...]  (default: $NVF_INCOMING/*.signed.zip,
-#     then $NVF_INCOMING/*.tgz). A signed zip is the operator's answer to this site's own request
-#     (request.sh); the kit is built here with `nvflare package`. A kit.tgz is a stage-1 kit made by
-#     the operator (to be removed after the switch-over). A kit replaces the site's previous kit.
+#  3. startup kits: install.sh [<site>.signed.zip ...]  (default: $NVF_INCOMING/*.signed.zip). A signed
+#     zip is the operator's answer to this site's own request (request.sh); the kit is built here with
+#     `nvflare package`. A kit replaces the site's previous kit.
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$HERE/common.sh"
@@ -31,12 +30,12 @@ nvf_data materialize --variants all --sites $NVF_SITES --out "$FLHUB_DATA_DIR" \
 
 kits=("$@")
 if [ ${#kits[@]} -eq 0 ]; then
-  for k in "$NVF_INCOMING"/*.signed.zip "$NVF_INCOMING"/*.tgz; do [ -f "$k" ] && kits+=("$k"); done
+  for k in "$NVF_INCOMING"/*.signed.zip; do [ -f "$k" ] && kits+=("$k"); done
 fi
 for kit in "${kits[@]}"; do
   case "$kit" in
     *.signed.zip) nvf_install_signed "$kit" "$NVF_SITES" ;;
-    *) nvf_install_kit "$kit" "$NVF_SITES" ;;
+    *) echo "install: $kit is not a <site>.signed.zip (operator-made kits are no longer accepted)" >&2; exit 1 ;;
   esac
 done
 for site in $NVF_SITES; do
