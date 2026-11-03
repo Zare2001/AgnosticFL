@@ -24,7 +24,7 @@ started=()
 
 for site in "${sites[@]}"; do
   ws="$NVF_SITES_DIR/$site"
-  [ -d "$ws/startup" ] || { echo "start: no startup kit for $site in $ws (run install.sh <kit.tgz>)" >&2; exit 1; }
+  [ -d "$ws/startup" ] || { echo "start: no startup kit for $site in $ws (request.sh, then install.sh <site>.signed.zip)" >&2; exit 1; }
   [ "$watchdog" = 1 ] || touch "$ws/.enabled"
   if nvf_pid_alive "$ws/daemon_pid.fl"; then
     [ "$watchdog" = 1 ] || echo "start: $site already running"

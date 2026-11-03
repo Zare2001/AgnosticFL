@@ -7,6 +7,11 @@ a site holds it as `<dir>/<variant>-<site>.csv`, in the same CSV layout. Each np
 from Zenodo (no login) and checked against a pinned sha256; test and validation splits stay on the
 central VM.
 
+CIFAR-10 (32x32 RGB, the dataset of NVFlare's hello-pt example) is offered as data variants
+`cifar10-iid` and `cifar10-dir0.3` over the same six sites: the same CSV layout with 3072 pixel
+columns (`label,x0..x3071`, channel-first R, G, B planes as in the official batches). It is
+downloaded from the official python tarball (sha256-pinned) and is not part of `--variants all`.
+
 load_site(path) returns a lazy SiteSource. train() resolves it with train_config["data_variant"]:
 no variant -> the path itself (a `<site>.csv` file) or `pneumoniamnist-iid` (a directory); variant v
 -> `<dir>/<v>-<site>.csv` next to a `<site>.csv` path, or the one `<v>-*.csv` in a directory.
@@ -18,6 +23,7 @@ CLI (deploy scripts, data provisioning):
     python -m flhub_core.data materialize --variants all --sites nvf-h1 nvf-h2 [--out DIR]
            [--manifests configs/stage2/partitions]     (stage 2; verified against the manifests)
     python -m flhub_core.data manifests --out configs/stage2/partitions                      (central)
+    python -m flhub_core.data manifests --variants cifar10-iid --out configs/stage2/partitions
     python -m flhub_core.data info [--variant organamnist-dir0.3]
 """
 
@@ -28,12 +34,15 @@ import glob
 import hashlib
 import json
 import os
+import pickle
+import re
 import shutil
+import tarfile
 import tempfile
 import time
 import urllib.request
 from collections import OrderedDict
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 import numpy as np
@@ -68,11 +77,15 @@ PARTITION_SHA256 = {
 @dataclass(frozen=True)
 class DatasetInfo:
     name: str
-    url: str
+    url: str  # public copy (official splits); "" = hospital-owned data: no manifest, no hub-side evaluation
     sha256: str
     num_classes: int
     class_names: tuple[str, ...]
     pids: tuple[str, ...]  # partitions offered as data variants
+    image_shape: tuple[int, int, int] = IMAGE_SHAPE  # (channels, height, width)
+    file_name: str | None = None  # the downloaded file in the cache (default <name>.npz)
+    splits: tuple[str, ...] = ("train", "val", "test")
+    in_all: bool = True  # part of `materialize --variants all` and `manifests` (the stage-2 variants)
 
 
 DATASETS = {
@@ -83,8 +96,60 @@ DATASETS = {
         "7c8c8b0753e2c0d7f70928817eac02be7cbb09f6beff4346e9d0ea79ecb598bd", 11,
         ("bladder", "femur-left", "femur-right", "heart", "kidney-left", "kidney-right", "liver", "lung-left",
          "lung-right", "pancreas", "spleen"), P.PIDS),
+    # CIFAR-10 (Krizhevsky 2009), the data of NVFlare's hello-pt example: the official python tarball,
+    # sha256 as pinned by Keras (torchvision pins md5 c58f30108f718f92721af3b95e74349a). No val split.
+    "cifar10": DatasetInfo(
+        "cifar10", "https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz",
+        "6d958be074577803d12ecdefd02955f39262c83c16fe9348329d7fe0b5c001ce", 10,
+        ("airplane", "automobile", "bird", "cat", "deer", "dog", "frog", "horse", "ship", "truck"),
+        ("iid", "dir0.3"), image_shape=(3, 32, 32), file_name="cifar-10-python.tar.gz",
+        splits=("train", "test"), in_all=False),
 }
 DEFAULT_VARIANT = "pneumoniamnist-iid"  # = the stage-1 partitions (<site>.csv)
+# pixel columns per row -> image shape; a site file's width tells which kind of image it holds
+SHAPE_BY_FEATURES = {int(np.prod(i.image_shape)): tuple(i.image_shape) for i in DATASETS.values()}
+
+
+def columns(num_features: int = NUM_FEATURES) -> list[str]:
+    """CSV header of a site file with `num_features` pixel columns: label,x0..x<n-1>."""
+    return ["label"] + [f"x{i}" for i in range(num_features)]
+
+
+def _load_plugins() -> None:
+    """Datasets of flhub_core/plugins, loaded on first need (plugins are imported after this module)."""
+    from . import plugins
+
+    plugins.load()
+
+
+def register_dataset(info: DatasetInfo) -> None:
+    """Adds a dataset (for plugins, flhub_core.plugins). Its name may not contain '-', and its row
+    width C*H*W must differ from the other datasets' (the width of a site file tells its shape).
+    A plugin dataset is never part of `--variants all` (the stage-2 variants)."""
+    width = int(np.prod(info.image_shape))
+    if not info.name or "-" in info.name:
+        raise ValueError(f"invalid dataset name {info.name!r} (no '-': variants are <dataset>-<partition>)")
+    if SHAPE_BY_FEATURES.get(width, tuple(info.image_shape)) != tuple(info.image_shape):
+        raise ValueError(f"{info.name}: {width} pixel columns already mean {SHAPE_BY_FEATURES[width]}")
+    info = replace(info, in_all=False, image_shape=tuple(info.image_shape))
+    if DATASETS.get(info.name, info) != info:
+        raise ValueError(f"dataset {info.name!r} is already registered")
+    DATASETS[info.name] = info
+    SHAPE_BY_FEATURES[width] = info.image_shape
+
+
+def known_width(num_features: int) -> bool:
+    """True if a dataset (built in, or from a plugin) has rows of this many pixel columns."""
+    if num_features not in SHAPE_BY_FEATURES:
+        _load_plugins()
+    return num_features in SHAPE_BY_FEATURES
+
+
+def image_shape(num_features: int) -> tuple[int, int, int]:
+    if not known_width(num_features):
+        raise ValueError(f"{num_features} pixel columns match no dataset; known: "
+                         + ", ".join(f"{n} ({'x'.join(map(str, s))})" for n, s in SHAPE_BY_FEATURES.items()))
+    return SHAPE_BY_FEATURES[num_features]
 
 
 def data_dir() -> Path:
@@ -106,19 +171,26 @@ def _sha256_file(path: str | Path) -> str:
 
 def dataset_info(name: str) -> DatasetInfo:
     if name not in DATASETS:
+        _load_plugins()
+    if name not in DATASETS:
         raise KeyError(f"unknown dataset {name!r}; known: {sorted(DATASETS)}")
     return DATASETS[name]
 
 
 def download(cache_dir: str | Path | None = None, url: str | None = None, dataset: str = DATASET) -> Path:
-    """Path of the verified npz; downloads it if missing or corrupt."""
+    """Path of the verified dataset file (npz, or the CIFAR-10 tarball); downloads it if missing or corrupt.
+
+    A mirror can be named with $FLHUB_<DATASET>_URL (e.g. FLHUB_CIFAR10_URL), or the file can be put
+    into the cache by hand: either way it must have the pinned sha256.
+    """
     info = dataset_info(dataset)
     cache = Path(cache_dir).expanduser() if cache_dir else data_dir() / "raw"
-    path = cache / f"{info.name}.npz"
+    path = cache / (info.file_name or f"{info.name}.npz")
     if path.exists() and _sha256_file(path) == info.sha256:
         return path
     cache.mkdir(parents=True, exist_ok=True)
-    url = url or (os.environ.get("FLHUB_DATASET_URL") if dataset == DATASET else None) or info.url
+    url = (url or os.environ.get(f"FLHUB_{info.name.upper()}_URL")
+           or (os.environ.get("FLHUB_DATASET_URL") if dataset == DATASET else None) or info.url)
     last_error: Exception | None = None
     for attempt in range(4):
         tmp = None
@@ -143,11 +215,58 @@ def download(cache_dir: str | Path | None = None, url: str | None = None, datase
 
 def load_split(split: str, cache_dir: str | Path | None = None,
                dataset: str = DATASET) -> tuple[np.ndarray, np.ndarray]:
-    """Official split `train|val|test` as (pixels uint8 (n, 784), labels int64 (n,))."""
-    with np.load(download(cache_dir, dataset=dataset)) as d:
-        x = d[f"{split}_images"]
-        y = d[f"{split}_labels"]
+    """Official split `train|val|test` as (pixels uint8 (n, C*H*W), labels int64 (n,))."""
+    info = dataset_info(dataset)
+    if split not in info.splits:
+        raise KeyError(f"{dataset} has no {split} split; splits: {list(info.splits)}")
+    path = download(cache_dir, dataset=dataset)
+    if path.name.endswith(".tar.gz"):
+        x, y = _cifar_split(path, split)
+    else:
+        with np.load(path) as d:
+            x = d[f"{split}_images"]
+            y = d[f"{split}_labels"]
     return x.reshape(len(x), -1).astype(np.uint8), y.reshape(-1).astype(np.int64)
+
+
+class _BatchUnpickler(pickle.Unpickler):
+    """Loads only what a CIFAR batch file holds: a dict of bytes, lists and numpy arrays."""
+
+    _ALLOWED = {("numpy.core.multiarray", "_reconstruct"), ("numpy._core.multiarray", "_reconstruct"),
+                ("numpy", "ndarray"), ("numpy", "dtype"), ("_codecs", "encode")}  # encode: bytes in protocol 2
+
+    def find_class(self, module: str, name: str):
+        if (module, name) not in self._ALLOWED:
+            raise pickle.UnpicklingError(f"unexpected object {module}.{name} in a CIFAR batch file")
+        if hasattr(np, "_core"):  # numpy 2 moved numpy.core to numpy._core (the old name warns)
+            module = module.replace("numpy.core.", "numpy._core.")
+        return super().find_class(module, name)
+
+
+_CIFAR_CACHE: dict[tuple[str, str], tuple[np.ndarray, np.ndarray]] = {}
+
+
+def _cifar_split(path: Path, split: str) -> tuple[np.ndarray, np.ndarray]:
+    """(pixels uint8 (n, 3072), labels) of the official CIFAR python tarball, batches in file order.
+
+    Each row holds the R, G and B planes of a 32x32 image (channel-first, row-major). The tarball is
+    sha256-verified by download() before it is read; the unpickler admits only numpy arrays.
+    """
+    key = (str(path), split)
+    if key not in _CIFAR_CACHE:
+        names = [f"data_batch_{i}" for i in range(1, 6)] if split == "train" else ["test_batch"]
+        xs, ys = [], []
+        with tarfile.open(path, "r:gz") as tar:
+            members = {Path(m.name).name: m for m in tar.getmembers() if m.isfile()}
+            for name in names:
+                f = tar.extractfile(members[name])
+                batch = _BatchUnpickler(f, encoding="bytes").load()
+                xs.append(np.asarray(batch[b"data"], dtype=np.uint8).reshape(-1, 3 * 32 * 32))
+                ys.append(np.asarray(batch[b"labels"], dtype=np.int64))
+        x, y = np.concatenate(xs), np.concatenate(ys)
+        x.flags.writeable = y.flags.writeable = False
+        _CIFAR_CACHE[key] = (x, y)
+    return _CIFAR_CACHE[key]
 
 
 def partition_indices(n: int, num_partitions: int = NUM_PARTITIONS, seed: int = PARTITION_SEED) -> list[np.ndarray]:
@@ -163,7 +282,7 @@ def partition(index: int, cache_dir: str | Path | None = None) -> tuple[np.ndarr
 
 
 def to_csv_bytes(pixels: np.ndarray, labels: np.ndarray) -> bytes:
-    lines = [",".join(COLUMNS)]
+    lines = [",".join(columns(np.shape(pixels)[1]))]
     for label, row in zip(labels.tolist(), pixels.tolist()):
         lines.append(f"{label}," + ",".join(map(str, row)))
     return ("\n".join(lines) + "\n").encode("ascii")
@@ -195,7 +314,7 @@ def materialize(site_id: str, out_dir: str | Path | None = None, cache_dir: str 
 class SiteData:
     """Training or test data in model format."""
 
-    x: np.ndarray  # float32 (n, 1, 28, 28), pixel / 255
+    x: np.ndarray  # float32 (n, C, H, W), pixel / 255: (n, 1, 28, 28) MedMNIST, (n, 3, 32, 32) CIFAR-10
     y: np.ndarray  # int64 (n,)
     fingerprint: str  # sha256 of the canonical uint8 pixels + int64 labels; seeds the data order
 
@@ -211,11 +330,15 @@ class SiteData:
 
 
 def from_arrays(pixels: np.ndarray, labels: np.ndarray, num_classes: int | None = None) -> SiteData:
-    """SiteData from (n, 784) integer pixels and (n,) labels; labels checked against num_classes if given."""
+    """SiteData from (n, F) integer pixels and (n,) labels; labels checked against num_classes if given.
+
+    F gives the image shape: 784 = 1x28x28 (MedMNIST), 3072 = 3x32x32 (CIFAR-10, channel-first).
+    """
     pixels = np.asarray(pixels)
     labels = np.asarray(labels).reshape(-1)
-    if pixels.ndim != 2 or pixels.shape[1] != NUM_FEATURES or pixels.shape[0] != labels.shape[0]:
-        raise ValueError(f"expected pixels (n, {NUM_FEATURES}) and labels (n,), got {pixels.shape} {labels.shape}")
+    if pixels.ndim != 2 or not known_width(pixels.shape[1]) or pixels.shape[0] != labels.shape[0]:
+        widths = " or ".join(str(n) for n in SHAPE_BY_FEATURES)
+        raise ValueError(f"expected pixels (n, {widths}) and labels (n,), got {pixels.shape} {labels.shape}")
     if pixels.size and (pixels.min() < 0 or pixels.max() > 255):
         raise ValueError("pixel values must be integers in 0..255")
     top = MAX_LABEL if num_classes is None else num_classes - 1
@@ -224,20 +347,21 @@ def from_arrays(pixels: np.ndarray, labels: np.ndarray, num_classes: int | None 
     px = np.ascontiguousarray(pixels, dtype=np.uint8)
     lab = np.ascontiguousarray(labels, dtype="<i8")
     fingerprint = hashlib.sha256(px.tobytes() + lab.tobytes()).hexdigest()
-    x = (px.astype(np.float32) / np.float32(255.0)).reshape((-1,) + IMAGE_SHAPE)
+    x = (px.astype(np.float32) / np.float32(255.0)).reshape((-1,) + image_shape(px.shape[1]))
     return SiteData(x=x, y=lab.astype(np.int64), fingerprint=fingerprint)
 
 
 def read_csv(path: str | Path) -> SiteData:
-    """Parse a site CSV (header label,x0..x783, integer values)."""
+    """Parse a site CSV (header label,x0..x783 or label,x0..x3071, integer values)."""
     path = Path(path).expanduser()
     with open(path, encoding="ascii") as f:
         header = f.readline().strip().split(",")
-    if header != COLUMNS:
-        raise ValueError(f"{path}: header must be label,x0..x{NUM_FEATURES - 1}")
+    if not known_width(len(header) - 1) or header != columns(len(header) - 1):
+        widths = " or ".join(f"x{n - 1}" for n in SHAPE_BY_FEATURES)
+        raise ValueError(f"{path}: header must be label,x0..{widths}")
     arr = np.loadtxt(path, delimiter=",", skiprows=1, dtype=np.int64, ndmin=2)
     if arr.size == 0:
-        arr = np.zeros((0, len(COLUMNS)), np.int64)
+        arr = np.zeros((0, len(header)), np.int64)
     return from_arrays(arr[:, 1:], arr[:, 0])
 
 
@@ -321,10 +445,12 @@ class SiteSource:
 def load_site(source) -> SiteData | SiteSource:
     """A pandas DataFrame (same columns) -> SiteData; a CSV file or a directory -> lazy SiteSource."""
     if hasattr(source, "columns"):  # DataFrame, e.g. handed over by a vantage6 node
-        missing = [c for c in COLUMNS if c not in source.columns]
+        width = sum(1 for c in source.columns if re.fullmatch(r"x\d+", str(c)))
+        cols = columns(width if known_width(width) else NUM_FEATURES)
+        missing = [c for c in cols if c not in source.columns]
         if missing:
             raise ValueError(f"DataFrame lacks columns {missing[:5]}...")
-        arr = source[COLUMNS].to_numpy(dtype=np.int64)
+        arr = source[cols].to_numpy(dtype=np.int64)
         return from_arrays(arr[:, 1:], arr[:, 0])
     return SiteSource(source)
 
@@ -379,7 +505,8 @@ def variant_site_data(variant: str, sites: list[str] | None = None,
 
 
 def all_variants() -> list[str]:
-    return [f"{d}-{p}" for d, info in DATASETS.items() for p in info.pids]
+    """The stage-2 variants (`--variants all`); CIFAR-10's are named explicitly (cifar10-iid, ...)."""
+    return [f"{d}-{p}" for d, info in DATASETS.items() if info.in_all for p in info.pids]
 
 
 def manifest(variant: str, cache_dir: str | Path | None = None) -> dict:
@@ -438,6 +565,7 @@ def _main(argv: list[str] | None = None) -> None:
     m.add_argument("--manifests", default=None, help="verify against <dir>/<variant>.json")
     mf = sub.add_parser("manifests", help="write <out>/<variant>.json for every variant")
     mf.add_argument("--out", required=True)
+    mf.add_argument("--variants", nargs="+", default=None, help="only these variants (default: all)")
     i = sub.add_parser("info", help="print dataset and partition summary")
     i.add_argument("--variant", default=DEFAULT_VARIANT)
     args = ap.parse_args(argv)
@@ -455,7 +583,7 @@ def _main(argv: list[str] | None = None) -> None:
     elif args.cmd == "manifests":
         out = Path(args.out)
         out.mkdir(parents=True, exist_ok=True)
-        for v in all_variants():
+        for v in args.variants or all_variants():
             (out / f"{v}.json").write_text(manifest_json(manifest(v)))
             print(f"{v}\t{out / (v + '.json')}")
     else:

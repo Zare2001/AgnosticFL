@@ -35,8 +35,8 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 import yaml
-from flhub_core.data import dataset_info, parse_variant
-from flhub_core.model import check_model, is_payload
+from flhub_core.data import DATASET, dataset_info, parse_variant
+from flhub_core.model import check_model, input_shape, is_payload
 
 from adapters.common.protocol import TRAIN_CONFIG_KEYS
 from hub.aggregators import make_aggregator
@@ -124,8 +124,12 @@ def _schema1(raw: dict, path: str) -> RunConfig:
     train = {**DEFAULT_TRAIN, **(raw.pop("train_config", None) or {})}
     wandb = raw.pop("wandb", None) or {}
     group, tags = raw.pop("group", wandb.get("group")), list(raw.pop("tags", None) or wandb.get("tags") or [])
-    keep = {k: raw[k] for k in ("rounds", "seed", "hub_url", "deadline_s", "online_wait_s", "poll_interval_s",
-                                "round_retries", "runs_dir") if k in raw}
+    fields = ("rounds", "seed", "hub_url", "deadline_s", "online_wait_s", "poll_interval_s", "round_retries",
+              "runs_dir", "strict_code_version", "notes")
+    unknown = sorted(set(raw) - set(fields) - {"name"})
+    if unknown:  # a key the schema-1 loader does not read would be dropped without a word
+        raise ValueError(f"{path}: unknown keys for a schema-1 config: {unknown}")
+    keep = {k: raw[k] for k in fields if k in raw}
     return RunConfig(name=raw.get("name", Path(path).stem), schema=1, adapters=adapters, train_config=train,
                      sites=[s for a in adapters for s in a.sites], wandb={**wandb, "group": group, "tags": tags},
                      eval={"every": 1, "site_shaped": False, "split": "test", "threads": 1}, source=str(path),
@@ -189,6 +193,17 @@ def validate(cfg: RunConfig) -> RunConfig:
         raise ValueError(f"participation.min_sites must be in 1..{len(cfg.sites)}")
     if is_payload(cfg.model) and cfg.eval.get("every"):
         cfg.eval["every"] = 0  # nothing to evaluate for an echo payload
+    info = dataset_info(cfg.dataset)
+    if cfg.dataset != DATASET and not cfg.partition:
+        raise ValueError(f"dataset {cfg.dataset} needs a partition (one of {list(info.pids)})")
+    if not info.url and cfg.eval.get("every"):
+        raise ValueError(f"dataset {cfg.dataset} has no public copy (hospital-owned data): the hub has no test "
+                         "set to evaluate on; set eval: {every: 0}")
+    want = input_shape(cfg.model)
+    if want is not None and tuple(want) != tuple(info.image_shape):
+        shape = "x".join(map(str, info.image_shape))
+        raise ValueError(f"model {cfg.model} takes {'x'.join(map(str, want))} images, "
+                         f"dataset {cfg.dataset} has {shape}")
     cfg.aggregator_obj()  # checks name and params
     return cfg
 

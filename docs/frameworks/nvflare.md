@@ -24,7 +24,7 @@ A small, commented version of this server side, with a check mode and an end-to-
 
 | Component | Code | Runs | Role |
 |---|---|---|---|
-| NVFlare server | standard startup kit from `nvflare provision` | central host; ports 8002 and 8003 | Hospitals connect to it over mTLS. The adapter uses its admin port. |
+| NVFlare server | standard startup kit from distributed provisioning (`nvflare cert` + `nvflare package`) | central host; ports 8002 and 8003 | Hospitals connect to it over mTLS. The adapter uses its admin port. |
 | Adapter service | [`adapters/nvflare/service.py`](../../adapters/nvflare/service.py), `NVFlareAdapter(RelayAdapter)` | central host, `127.0.0.1:8811` | Serves flhub JSON-RPC to the orchestrator and the relay routes to the relay. Runs the relay-job *keeper* and a per-round *site watcher*. |
 | FLARE API wrapper | [`adapters/nvflare/flare_admin.py`](../../adapters/nvflare/flare_admin.py) | inside the adapter | One reconnecting admin session (operator's admin kit): list, submit, abort and delete jobs; probe which job each client runs. |
 | Relay job builder | [`adapters/nvflare/job.py`](../../adapters/nvflare/job.py) | once, at install | Exports the job folder `flhub-relay` with NVFlare's Job API. |
@@ -109,8 +109,10 @@ python -m adapters.nvflare.service --admin-kit <admin kit dir> --job-dir <jobs d
 | Script (`deploy/central/nvflare/`) | What it does |
 |---|---|
 | `install.sh` | venv with the pinned versions, `flhub_core` and the hub package; provisioning (`provision.sh`); exports the relay job folder |
-| `provision.sh [--force]` | `nvflare provision`: server (ports 8002/8003), one client per hospital (org `hospital<N>`), one `project_admin` user for the adapter; packs each hospital kit as `<site>.tgz`. Keeps existing certificates unless `--force`. |
-| `provision_extra.sh` | kits for more hospitals with `nvflare provision --add-client`: same root CA, no server restart |
+| `provision.sh` | distributed provisioning, central part: the root CA once (`nvflare cert init`, `ca/`, mode 700), then a request, approval and `nvflare package` for the server (ports 8002/8003) and for the adapter's admin user (role `lead`). Makes **no** hospital kits. Keeps an existing CA and existing kits; writes `rootCA.fingerprint` (public, for the hospitals). Moves the server's job store and snapshots from NVFlare's default `/tmp/nvflare/` (shared by every server on the host, cleared by a reboot) to `$NVF_RUNTIME/storage/` (`local/resources.json`). |
+| `approve.sh <site>.request.zip --expect-pubkey <sha256> [--reissue]` | signs one hospital's request (`nvflare cert approve`) into `signed/<site>.signed.zip` (certificate + `rootCA.pem`). Refuses unless the CSR's public key has the hash the hospital announced; also refuses a zip with a private key, another project, a non-client, a site not in `NVF_SITES`, an org other than `hospital<N>`, and a site with a valid certificate (without `--reissue`). |
+| `check_keys.sh [dir ...]` | scans the NVFlare runtime, `~/flhub-runtime/hospital-kits` and `~/.nvflare`, archives included, for private keys; exit 1 for any key other than the CA's, the server's and the admin's |
+| `teardown.sh` | removes a **test** project (its own `NVF_RUNTIME` and ports): stops it, deletes its runtime; refuses the live project |
 | `start.sh` | starts the server with the kit's `startup/start.sh`, waits for 8002/8003, then starts the adapter; the keeper submits the relay job |
 | `status.sh` | server ports, adapter `discover` (one line per site), relay status; exit 0 only if every base site is online |
 | `stop.sh` | stops the adapter (it asks the relay to end the job and aborts the job if it does not end), then the server through the kit's `shutdown.fl` |
@@ -123,7 +125,8 @@ The hospital side of the testbed has its own scripts:
 
 | Script (`deploy/nvflare-vm/`) | What it does |
 |---|---|
-| `install.sh [kit.tgz ...]` | Python environment (`nvflare`, torch, numpy, safetensors; removes an installed `flhub_core`), sha256-verified data files, the operator's kits (archives deleted after unpacking) |
+| `request.sh <site> [--force]` | makes the site's private key and `<site>.request.zip` in `~/flhub-runtime/nvflare/requests/<site>/` (mode 700) and prints the public key hash to send with it; the key never leaves the machine |
+| `install.sh [<site>.signed.zip ...]` | Python environment (`nvflare`, torch, numpy, safetensors; removes an installed `flhub_core`), sha256-verified data files, and each site's kit, built here with `nvflare package` from the operator's signed zip, the site's own key and the root CA fingerprint (`NVF_CA_FINGERPRINT` or `~/flhub-runtime/nvflare/rootCA.fingerprint`) |
 | `start.sh [site ...]` | starts each site with its kit's `startup/start.sh` and `FLHUB_DATA_PATH` set, waits for "Successfully registered client", enables a per-minute cron watchdog |
 | `status.sh [site ...]` | per site: client process alive and connected to the server |
 | `stop.sh [site ...]` | stops sites through the kit's `shutdown.fl` and disables their watchdog |
@@ -204,7 +207,7 @@ Before the switch, both hospitals ran the job with their installed `flhub_core` 
 |---|---|
 | Code | 0 lines written or changed by the hospital; `client.py` arrives with the job |
 | Software | Python environment with `nvflare==2.9.0`, `torch==2.14.1+cpu`, `numpy==2.4.4`, `safetensors==0.8.0`; **no** `flhub_core` |
-| Credentials | the NVFlare startup kit from the operator: `fed_client.json` (server `flhub-central:8002`, `connection_security: mtls`), `client.crt`, `client.key`, `rootCA.pem` |
+| Credentials | the NVFlare startup kit, built at the hospital: its own `client.key` (made there, never sent), `client.crt` signed by the operator's root CA, `rootCA.pem` (checked against the published fingerprint), `fed_client.json` (server `flhub-central:8002`, `connection_security: mtls`) |
 | Configuration | name resolution of the server name (`/etc/hosts`), the data path (`FLHUB_DATA_PATH` or `FLHUB_DATA_DIR`) |
 | Data | `<site>.csv` and one file per data variant, sha256-verified |
 | Operations | start the client with the kit; once, remove an installed `flhub_core` and restart the client |
@@ -224,7 +227,7 @@ Before the switch, both hospitals ran the job with their installed `flhub_core` 
 The hub reuses an NVFlare 2.9 project as it is: the server, its provisioning and the hospitals' kits stay unchanged. The steps below are what the reference testbed's scripts do; a different layout (for example the hub on another host than the NVFlare server) has not been tested.
 
 1. **Server environment.** Install the hub package and `flhub_core` into the Python environment that runs the NVFlare server: `uv pip install -e ./flhub_core -e .` from a clone of this repository. The server's job process imports the relay from there.
-2. **Admin identity.** The adapter needs an admin startup kit of a user that may submit jobs with custom code and list, abort and delete jobs. The testbed provisions a `project_admin` user for this. Keep the kit on the server host: whoever holds it controls the NVFlare project.
+2. **Admin identity.** The adapter needs an admin startup kit of a user that may submit jobs with custom code and list, abort and delete jobs. With distributed provisioning (`nvflare cert`) admin users can only be `lead`, `member` or `org_admin`; the testbed uses `lead` (submit any job with custom code, manage and download its own jobs, view all), which is all the adapter does. Keep the kit on the server host.
 3. **Job slot.** The relay job runs permanently and takes one of the server's job slots (`max_jobs`, 4 in NVFlare's provisioning template). Other jobs can run next to it; the E7 native FedAvg jobs did.
 4. **Hub core and adapter.** Start the hub core, export the relay job and start the adapter on the server host:
 
@@ -238,7 +241,9 @@ The hub reuses an NVFlare 2.9 project as it is: the server, its provisioning and
 5. **Hospitals.** No new credentials and no new software. Each hospital removes `flhub_core` if it had installed it, restarts its client once, and places its data file at `$FLHUB_DATA_DIR/<site>.csv` or sets `FLHUB_DATA_PATH` in the client's environment. Its Python environment needs torch, numpy and safetensors next to NVFlare; for bit-exact results, the versions of [`deploy/versions.env`](../../deploy/versions.env).
 6. **Check.** `discover` must list every site as `online` (`deploy/central/nvflare/status.sh` does this on the testbed). Then run a few rounds and check each site's `client_code_version` in the round records (`rounds/rNNNN.json`, `updates[].client_code_version`); the orchestrator logs a warning when it differs from the hub's `flhub_core`, and with `strict_code_version: true` in the run configuration it rejects such updates. The conformance suite (`pytest tests/conformance --adapter http://127.0.0.1:8811`) compares every returned update with local training on the same data, so it accepts only the project's benchmark sites (`nvf-h1`, `nvf-h2` with the partitions of `flhub_core.data`): it tests the adapter, for example on test clients provisioned with those names, not the real hospitals.
 
-**Credentials in use:** the hospitals' kits (mTLS client certificates, unchanged), the operator's admin kit (adapter only) and the root CA from `nvflare provision`. New hospitals get kits from `nvflare provision --add-client` with the same root CA; the running server and the existing kits stay valid ([`provision_extra.sh`](../../deploy/central/nvflare/provision_extra.sh)). The testbed kits expire on 2027-10-08; `provision.sh --force` issues new ones, which must then be redistributed. NVFlare 2.9 kits have no `signature.json`, so nothing checks the integrity of a kit's `startup/` folder; the mTLS certificates are the trust anchor.
+**Credentials in use (distributed provisioning, NVFlare 2.9 `nvflare cert`):** the operator holds the root CA and the keys of the server and of its admin user, nothing else. Each hospital makes its own key and a request (`deploy/nvflare-vm/request.sh`, or the hospital kit's `./install.sh`) and sends the operator the request zip (CSR and metadata, no key) together with the public key hash, in one bus message or by a second channel. The operator signs it with `approve.sh --expect-pubkey <hash>` and returns `<site>.signed.zip` (certificate and `rootCA.pem`, both public). The hospital builds its startup kit with `nvflare package --request-dir <its request> --fingerprint <root CA sha256>`, which refuses a root CA other than the published one. New hospitals follow the same steps; the running server needs no restart (it has no client allow-list: any certificate of its root CA registers). `check_keys.sh` proves on central that no hospital key is there. Certificates are valid for 3 years (`cert approve` default), the root CA for 10. Kits from `nvflare package` have no `signature.json`; the mTLS certificates are the trust anchor.
+
+**NVFlare 2.9.0 pitfall:** `nvflare cert init --org <O>` gives the CA the subject `CN=<project>, O=<O>`, but `nvflare cert approve` writes the issuer of every certificate as `CN=<project>` only, so the chain does not verify (`openssl verify`: "unable to get local issuer certificate"). `provision.sh` therefore runs `cert init` without `--org`, and it and `approve.sh` verify every certificate against the CA.
 
 **Two NVFlare 2.9 defaults to know.** Kits enforce a class allow-list (`class_list_enforcement_mode: enforce`) that does not contain `ClientAPIExecutor`; jobs with custom code (BYOC) bypass it, and the relay job is such a job. A server app without custom code is held to the list (`ComponentNotAuthorized`), which is why the E7 native job ships its workflow as custom code.
 
@@ -290,7 +295,7 @@ The adapter touches six NVFlare concepts: the server workflow (`ModelController`
 | Client API: `nvflare.client.init`, `receive`, `send`, `is_running`, `get_site_name` | the hospital script |
 | Job API: `FedJob`, `to_server`, `to_clients`, `to`, `set_app_packages`, `export_job`, `ScriptRunner` | building the relay job |
 | FLARE API: `new_secure_session`, `list_jobs`, `submit_job`, `abort_job`, `delete_job`, `get_client_job_status`; `get_job_meta` for the E7 baseline | the keeper, the online probe and `purge.sh` |
-| Provisioning: `nvflare provision`, `--add-client` | kits for the server, hospitals and admin |
+| Provisioning: `nvflare cert init/request/approve`, `nvflare package` | distributed: the operator's root CA signs requests; every participant builds its own kit |
 
 Moving the adapter from `flhub/0.1` to `flhub/0.2` (one task per site, per-site results and cancels, keeper changes, the job that ships `flhub_core`) changed `adapters/nvflare/` by +313 −94 lines in four files, plus `native.py` (+284) for the E7 baseline; `deploy/central/nvflare/` by +137 −13 lines; `clients/nvflare/` by 0 lines (`git diff --stat stage1-final stage2-final`).
 

@@ -5,6 +5,7 @@ Run configurations for the orchestrator (`python -m hub.orchestrator run --confi
 | Path | What |
 |---|---|
 | `mock-3r.yaml` | 3 rounds against the mock adapter on one machine ([getting started](../docs/getting-started.md)) |
+| `hello-pt.yaml` | NVFlare's hello-pt example on all three frameworks: model `hello-pt`, CIFAR-10 split over the six sites ([hello-pt](../docs/hello-pt.md)) |
 | `final.yaml` | the stage-1 final runs: six sites on three adapters, 30 rounds of FedAvg (`--only nvflare` etc. for the single-framework runs; `hub.sim --mode centralized` for the baseline) |
 | `stage2/base.yaml`, `stage2/tuned.yaml` | stage-2 defaults and the tuned aggregator settings; the run files below extend them |
 | `stage2/topology.yaml` | which adapter serves which site (the six base sites and the six extra sites of the 12-site test) |

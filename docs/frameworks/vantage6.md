@@ -35,8 +35,8 @@ A runnable, annotated launcher of this adapter, with a check that needs no vanta
 vantage6 entities ([`deploy/central/vantage6/entities.template.yaml`](../../deploy/central/vantage6/entities.template.yaml)):
 
 - Organisation `hub-operator` with the users `root` (imported with a generated password; without a user `root` a fresh server creates `root`/`root`) and `hub-adapter` (the adapter's login).
-- One organisation per hospital. **The site id is the organisation name**, for example `v6-h3`.
-- Collaboration `flhub` with `encrypted: false`. Its participants are `hub-operator` and every hospital organisation; vantage6 creates a node record with an API key for each. `hub-operator` must be a participant because vantage6 lets only participating organisations create tasks. Its node is not started for hub runs.
+- One organisation per hospital. **The site id is the organisation name**, for example `v6-h3`. Hospitals are not in the import: [`register_node.sh`](../../deploy/central/vantage6/register_node.sh) adds each one with the node API key that the hospital made (§2.3).
+- Collaboration `flhub` with `encrypted: false`. Its participants are `hub-operator` and every hospital organisation, each with one node record. `hub-operator` must be a participant because vantage6 lets only participating organisations create tasks. Its node is not started for hub runs.
 
 ### 2.2 One round, step by step
 
@@ -72,7 +72,14 @@ The adapter serves a fixed list of sites (`--sites`). At login it maps organisat
 
 Data variants ([ADR-014](../design/decisions.md)): an algorithm receives its data from the node as a DataFrame of the database the task names, so each data variant is one labelled database in the node configuration (§3.2). The label is `db_label(variant)`: the variant with every character outside `[A-Za-z0-9_]` replaced by `_` (`organamnist-dir0.3` → `organamnist_dir0_3`), because node database labels must be Python identifiers. A label that would still not be an identifier (it starts with a digit) gets the prefix `v_` in the adapter, which the hospital-side helper in `deploy/vantage6-vm/common.sh` does not add; avoid variant names that start with a digit. The adapter takes the variant from the dispatch hint `data_variant` (`train_config` stays opaque); without a hint it uses the label `default`. The hub checks which data each site trained on through the `data_fp` metric.
 
-New hospital: the reference script [`deploy/central/vantage6/add_sites.sh`](../../deploy/central/vantage6/add_sites.sh) calls, as `root`, `organization.create`, `collaboration.add_organization` and `node.create`, and writes the new nodes' API keys to one mode-600 file on the operator host (`~/flhub-runtime/vantage6/v6-nodes-extra.env`), which the operator hands to the hospitals. Then add the site to `V6_SITES` and restart the adapter.
+New hospital ([ADR-023](../design/decisions.md)): the operator never creates a hospital's node API key.
+1. The hospital makes the key on its own machine: a random UUID4 (vantage6 4.15.2 node keys must be UUIDs), mode 600. On the testbed: [`deploy/vantage6-vm/make_key.sh <site>`](../../deploy/vantage6-vm/make_key.sh), which writes `~/flhub-runtime/vantage6/keys/<site>.key` and sends it once, encrypted, to the operator (`tools/bus put --secret`), with its fingerprint (the first 12 hex characters of its SHA-256). A hospital kit's `./install.sh` makes `credentials/api_key` the same way.
+2. The operator registers it with [`deploy/central/vantage6/register_node.sh <site> <key file> --fingerprint <fp>`](../../deploy/central/vantage6/register_node.sh) on the running server. The script refuses an unknown site, a key that is not a UUID4, and a fingerprint that does not match. As `root` it calls `organization.create` and `collaboration.add_organization` if needed, and backs up the server database. Then, because the REST API cannot register a given key (`POST /node` and the key reset always generate one: `resource/node.py:436`, `resource/recover.py:640`), it runs [`set_node_key.py`](../../deploy/central/vantage6/set_node_key.py) in the server container (`docker exec -i`, the key on stdin). That script is the call of the entities import (`controller/fixture.py`): `db.Node(..., api_key=key)`, which stores only the bcrypt hash. An existing node only gets the new key (rotation; tasks and history stay), and a key that another node already has is refused. Then it checks: a node login with the new key gives HTTP 200, a login with the site's old operator-made key (if the operator still has one) gives 401. It deletes the key file (`shred -u`), also on failure.
+   Testbed limitation (accepted by the owner for the testbed): `tools/bus put --secret` encrypts with the bus token that all agents share, and that token is also sent over plain HTTP to the bus. So on the testbed, every agent, and anyone who captures a bus request, can decrypt a node key that went over the bus. A real hospital sends its key over a channel that only the operator can read (for example, encrypted to the operator's public key, or handed over in person). Only the fingerprint goes along in the clear, so the operator can check that it is the right key.
+3. The hospital confirms: `make_key.sh <site> --confirm <fp>` with the fingerprint central reported. Only a confirmed key is used by `install.sh` and `extra.sh`, so a key that central has not registered yet never replaces a working one. Then `install.sh` and a node restart.
+4. Add the site to `V6_SITES` and restart the adapter.
+
+Rotation: `make_key.sh <site> --rotate`. The old key is kept as `<site>.key.old`, and a second rotation is refused until the first one is confirmed. Then steps 2 and 3. The old key stops working for new logins at step 2; `--confirm` deletes `<site>.key.old`. A node that is already connected keeps its session after the rotation (observed in the keytest: node 7 stayed online). So a rotation causes no outage until the node is restarted, but revoking a leaked key also requires stopping that node's session: restart the node, or block it on the server. A side-by-side test without touching the live nodes: [`deploy/vantage6-vm/keytest.sh`](../../deploy/vantage6-vm/keytest.sh) and [`deploy/central/vantage6/keytest.sh`](../../deploy/central/vantage6/keytest.sh). They use collaboration `flhub-keytest`, where `v6-h3` and `v6-h4` each have a second node and an adapter on `:8822`.
 
 ### 2.4 Ports and configuration
 
@@ -97,12 +104,12 @@ Ports in the reference deployment ([`deploy/topology.env`](../../deploy/topology
 
 | Script in [`deploy/central/vantage6/`](../../deploy/central/vantage6/) | What it does |
 |---|---|
-| `install.sh` | venv with the vantage6 CLI and client; secrets generated once (mode 600, outside the repository); server configuration from `server.template.yaml`; entities imported once; image built and pushed; `adapter.env` and the node-key file for the hospitals |
+| `install.sh` | venv with the vantage6 CLI and client; secrets generated once (mode 600, outside the repository; no hospital keys); server configuration from `server.template.yaml`; entities (`hub-operator` only) imported once; image built and pushed; `adapter.env` |
 | `start.sh` | starts the server (`v6 server start -c <config> --user`), waits for `/api/version`, starts the adapter; restarts the adapter when `adapter.env` changed, for example after a new image tag |
 | `status.sh` | exit 0 when the server answers, the image is in the registry, the adapter answers `discover` and the base sites are online |
 | `stop.sh` | stops the adapter and the server |
 | `restart_adapter.sh`, `restart_server.sh` | restart only the adapter (tasks in flight live in the server and survive), or only the server |
-| `add_sites.sh`, `purge.sh [--vacuum]` | register hospitals (§2.3); delete all tasks between runs and optionally VACUUM the SQLite file |
+| `register_node.sh`, `purge.sh [--vacuum]` | register a hospital with the key it made, or rotate it (§2.3); delete all tasks between runs and optionally VACUUM the SQLite file |
 
 The adapter answers `GET /health`, and `discover` lists every site as `online`, `offline` or `unknown`. The central scripts take `V6_RT` (runtime directory), `V6_VENV` and `V6_SERVER_BIND` as overrides; the development setup uses them to run a second server on one VM.
 
@@ -110,7 +117,7 @@ Setup notes for vantage6 4.15.2 (stage-1 vantage6 section §3, [ADR-005](../desi
 
 - `v6 server new` and `v6 node new` are interactive only, so the reference scripts render both configurations from templates that follow the CLI's own ([`server.template.yaml`](../../deploy/central/vantage6/server.template.yaml), [`node.template.yaml`](../../deploy/vantage6-vm/node.template.yaml)). The server configuration pins the server image and sets `ui.enabled: false`.
 - The images are on `ghcr.io/vantage6/infrastructure/`. A node's image tag defaults to the server's major.minor version, so the node configuration pins it with `images.node`.
-- The entities import needs every organisation field (`name`, `domain`, `address1`, `address2`, `zipcode`, `country`, `public_key`). Each collaboration participant is `{name, api_key}`, where the API key must be a UUID, and becomes one node.
+- The entities import needs every organisation field (`name`, `domain`, `address1`, `address2`, `zipcode`, `country`, `public_key`). Each collaboration participant is `{name, api_key}`, where the API key must be a UUID, and becomes one node. The import always creates new rows, so it is only for an empty database; hospitals are added to a running server with `register_node.sh`.
 
 ## 3. Client side: what the hospital code must contain
 
@@ -234,7 +241,7 @@ Selfcheck v2 inside the pulled image, run with `--network none`, printed the hub
 
 | When | Type | Change | Lines in hospital code | Node restarts |
 |---|---|---|---|---|
-| stage 1 | install and configuration | standard node: vantage6 4.15.2 CLI in a venv, Docker, node image; node configuration with server address and port, API key (from the operator), data path and `allowed_algorithms` = the operator's image; the operator's plain-HTTP registry in Docker's `insecure-registries` | 0 (no hub code on the host) | — |
+| stage 1 | install and configuration | standard node: vantage6 4.15.2 CLI in a venv, Docker, node image; node configuration with server address and port, API key (made by the hospital), data path and `allowed_algorithms` = the operator's image; the operator's plain-HTTP registry in Docker's `insecure-registries` | 0 (no hub code on the host) | — |
 | stage 2 | data | nine data-variant CSV files per site, sha256-checked against the partition manifests | 0 | 0 |
 | stage 2 | configuration | 10 databases (`default` + one per variant) and `share_config: false`: 13.2 s, both nodes offline for 14.7 s | 0 | 1 per node |
 | stage 2 | operations | clean-up of the task folders that nodes never delete (§6.2) | 0 | 0 |
@@ -268,17 +275,19 @@ The adapter is a vantage6 user, so an existing vantage6 4.15 server and its node
 |---|---|---|
 | adapter user password (on the testbed: all rules of the server, see step 1) | operator | the adapter's environment, read from a mode-600 file |
 | `root` password, server JWT secret | operator (`install.sh`) | mode-600 files on the operator host |
-| node API key | the operator: `install.sh` generates a UUID per node for the entities import; nodes added later through the API (`add_sites.sh`, `node.create`) get a key from the server | the hospital's node configuration (`api_key`, mode 600); the operator keeps copies in mode-600 files |
+| node API key | the hospital (`make_key.sh`, or the kit's `./install.sh`): a UUID4, sent once, encrypted, to the operator, who registers it (`register_node.sh`) and does not keep it | the hospital: its key file and node configuration (`api_key`, mode 600). The server stores only a bcrypt hash |
 | registry credentials | registry owner | none in the reference deployment (plain HTTP, limited by the firewall) |
 
 Network: the hospitals need outgoing access to the server port (7601) and the registry port (5050) only. The reference 4-VM deployment is described in [`deployment.md`](../deployment.md). Its hospital-side scripts, in [`deploy/vantage6-vm/`](../../deploy/vantage6-vm/):
 
 | Script | What it does |
 |---|---|
-| `install.sh --keys <file>` | installs the vantage6 4.15.2 CLI in a venv and pulls the node image; adds the operator's registry to `insecure-registries` (restarts Docker once); writes one node configuration per hospital from the operator's node keys; adds the watchdog and clean-up cron entries |
+| `make_key.sh <site> [--rotate]` | makes the hospital's node API key (UUID4, mode 600) and sends it encrypted to the operator, with its fingerprint |
+| `install.sh` | installs the vantage6 4.15.2 CLI in a venv and pulls the node image; adds the operator's registry to `insecure-registries` (restarts Docker once); writes one node configuration per hospital from its own key (`keys/<site>.key`); adds the watchdog and clean-up cron entries |
 | `start.sh`, `stop.sh`, `status.sh` | start the nodes with `v6 node start --user` and wait until they are connected; stop them with `docker stop`; exit 0 when both are connected |
 | `taskdir_gc.sh` | deletes finished `task-<run id>` folders whose newest file is older than 5 min and whose algorithm container is not running |
 | `extra.sh` | the two extra hospitals of the 12-site run |
+| `keytest.sh` | side-by-side test of hospital-made keys: nodes `v6-h3k`/`v6-h4k` in collaboration `flhub-keytest`, login checks (200 / 401), a node with an unregistered key, rotation |
 | `inject.sh`, `straggler.sh`, `netem.sh`, `sysmon.sh`, `run_follow.py`, `endstate.sh` | experiment tools: fault injection and CPU throttling (E6), link shaping (E4b), monitoring, end-state check |
 | `island.sh`, `island_round.py` | a development setup on one VM |
 

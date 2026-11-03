@@ -2,12 +2,16 @@
 # Install the vantage6 side of the hub on the central VM (idempotent):
 #   ~/venvs/v6 (vantage6 CLI/client + adapter deps), generated secrets in ~/flhub-runtime/vantage6/,
 #   server config, entities import, algorithm image pushed to the registry on :5050.
+# Central never generates a hospital's node API key: each hospital makes its own
+# (deploy/vantage6-vm/make_key.sh) and central registers it with register_node.sh (organisation,
+# membership of flhub, node). The import holds only hub-operator (users root, hub-adapter) and its
+# node record (never started).
 # Usage: bash deploy/central/vantage6/install.sh [--island] [--reimport] [--skip-image]
 #   --island      P1 island on a framework VM: run a local registry on 127.0.0.1:5050 and
 #                 let the nodes pull localhost:5050/... (central: the registry is run by central)
 #   --reimport    wipe the vantage6 server database and import the entities again
 #   --skip-image  do not build/push the algorithm image
-# Outputs: ~/flhub-runtime/vantage6/{secrets.env, adapter.env, v6-nodes.env (send to the vantage6 agent)}
+# Outputs: ~/flhub-runtime/vantage6/{secrets.env, adapter.env}
 set -euo pipefail
 REPO="$(cd "$(dirname "$0")/../../.." && pwd)"
 . "$REPO/deploy/topology.env"
@@ -27,7 +31,7 @@ DB_DIR="$HOME/.local/share/vantage6/server/$NAME"
 . "$REPO/deploy/central/vantage6/common.sh"
 SERVER_HOST="$([ "$V6_SERVER_BIND" = 0.0.0.0 ] && echo 127.0.0.1 || echo "$V6_SERVER_BIND")"
 V6_BASE_SITES="v6-h3 v6-h4"
-V6_EXTRA_SITES="${V6_EXTRA_SITES-v6-h9 v6-h10}"   # E5 sites: registered (add_sites.sh), offline outside E5
+V6_EXTRA_SITES="${V6_EXTRA_SITES-v6-h9 v6-h10}"   # E5 sites: registered (register_node.sh), offline outside E5
 log() { echo "[v6-install] $*"; }
 command -v envsubst >/dev/null || sudo apt-get install -y -q gettext-base >/dev/null
 
@@ -47,8 +51,7 @@ import secrets, uuid
 print(f"V6_JWT_SECRET={secrets.token_hex(32)}")
 print(f"V6_ROOT_PASSWORD=Rt{secrets.token_urlsafe(24)}7!")
 print(f"V6_ADAPTER_PASSWORD=Fl{secrets.token_urlsafe(24)}9!")
-for k in ("HUB", "V6_H3", "V6_H4"):
-    print(f"V6_API_KEY_{k}={uuid.uuid4()}")
+print(f"V6_API_KEY_HUB={uuid.uuid4()}")   # hub-operator's own node record (never started)
 PY
   )
   log "generated $RT/secrets.env"
@@ -68,7 +71,7 @@ if [ "$REIMPORT" = 1 ] || [ ! -f "$RT/.imported" ]; then
   if [ -n "$(server_container)" ]; then docker stop $(server_container) >/dev/null; fi
   mkdir -p "$DB_DIR"
   docker run --rm -v "$DB_DIR:/d" alpine:3 rm -f /d/$NAME.sqlite   # db file is owned by root
-  (umask 077; envsubst '${V6_ROOT_PASSWORD} ${V6_ADAPTER_PASSWORD} ${V6_API_KEY_HUB} ${V6_API_KEY_V6_H3} ${V6_API_KEY_V6_H4}' \
+  (umask 077; envsubst '${V6_ROOT_PASSWORD} ${V6_ADAPTER_PASSWORD} ${V6_API_KEY_HUB}' \
     < "$REPO/deploy/central/vantage6/entities.template.yaml" > "$RT/entities.yaml")
   docker run --rm -v "$CFG:/mnt/config.yaml:ro" -v "$RT/entities.yaml:/mnt/import.yaml:ro" \
     -v "$DB_DIR:/mnt/database" -e VANTAGE6_DB_URI="sqlite:////mnt/database/$NAME.sqlite" \
@@ -76,7 +79,8 @@ if [ "$REIMPORT" = 1 ] || [ ! -f "$RT/.imported" ]; then
   rm -f "$RT/entities.yaml"
   grep -q "Create collaborations" "$RT/import.log" || { echo "entities import failed, see $RT/import.log" >&2; exit 1; }
   touch "$RT/.imported"
-  log "entities imported (orgs hub-operator, v6-h3, v6-h4; collaboration flhub)"
+  log "entities imported (org hub-operator; collaboration flhub); register each hospital's own key:"
+  log "  bash deploy/central/vantage6/register_node.sh <site> <key file from tools/bus get> --fingerprint <fp>"
 else
   log "entities already imported (use --reimport to redo)"
 fi
@@ -99,6 +103,11 @@ curl -sf "http://127.0.0.1:$REGISTRY_PORT/v2/" >/dev/null || { echo "no Docker r
 
 TAG="$(git -C "$REPO" rev-parse --short=12 HEAD)"
 if [ -n "$(git -C "$REPO" status --porcelain -- flhub_core clients/vantage6)" ]; then TAG="$TAG-dirty"; fi
+# plugins (flhub_core/plugins/*.py, not in git) are part of the image: their content names the tag too
+PLUGINS="$REPO/flhub_core/src/flhub_core/plugins"
+if compgen -G "$PLUGINS/[!_]*.py" >/dev/null; then
+  TAG="$TAG-p$(cd "$PLUGINS" && for f in [!_]*.py; do printf '%s\0' "$f"; cat "$f"; done | sha256sum | cut -c1-8)"
+fi
 if [ "$SKIP_IMAGE" = 1 ] && [ -f "$RT/adapter.env" ]; then   # keep the image that was pushed before
   TAG="$(grep '^V6_ALGO_IMAGE=' "$RT/adapter.env" | sed 's/.*://')"
 fi
@@ -113,7 +122,7 @@ if [ "$SKIP_IMAGE" = 0 ]; then
   log "algorithm image pushed: $PUSH_IMAGE (nodes pull $PULL_REGISTRY/flhub/v6-train:$TAG)"
 fi
 
-# --- 6. adapter settings (no secrets) and the node credentials for the vantage6 agent ---
+# --- 6. adapter settings (no secrets) ---
 cat > "$RT/adapter.env.new" <<EOF
 V6_SERVER_URL=http://$SERVER_HOST
 V6_SERVER_PORT=$V6_SERVER_PORT
@@ -125,10 +134,4 @@ ADAPTER_PORT=$ADAPTER_V6_PORT
 EOF
 # replace only on change: start.sh restarts the adapter when adapter.env is newer than its pid file
 if cmp -s "$RT/adapter.env.new" "$RT/adapter.env"; then rm "$RT/adapter.env.new"; else mv "$RT/adapter.env.new" "$RT/adapter.env"; fi
-(umask 077; cat > "$RT/v6-nodes.env" <<EOF
-V6_API_KEY_V6_H3=$V6_API_KEY_V6_H3
-V6_API_KEY_V6_H4=$V6_API_KEY_V6_H4
-EOF
-)
 log "done. adapter image: $PULL_REGISTRY/flhub/v6-train:$TAG"
-log "node credentials for the vantage6 VM: $RT/v6-nodes.env  (tools/bus put $RT/v6-nodes.env --to vantage6 --secret)"

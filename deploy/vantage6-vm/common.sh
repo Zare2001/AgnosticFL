@@ -42,3 +42,20 @@ wait_connected() {
   docker logs --tail 15 "vantage6-$node-user" 2>&1 | grep -v -i api_key >&2
   return 1
 }
+
+# site_key SITE: the node API key of SITE: the hospital's own key file (make_key.sh), once central
+# has registered it (make_key.sh --confirm: <key>.registered). There is no other source.
+site_key() {
+  local f="$HOME/flhub-runtime/vantage6/keys/$1.key"
+  if [ -f "$f" ] && [ -f "$f.registered" ]; then tr -d '[:space:]' < "$f"; return 0; fi
+  if [ -f "$f" ]; then
+    echo "$f is not confirmed as registered: after central registers it, make_key.sh $1 --confirm <fp>" >&2
+  else
+    echo "no node API key for $1: run deploy/vantage6-vm/make_key.sh $1" >&2
+  fi
+  return 1
+}
+# key_source SITE: "own fp=<12 hex>" (for logs; never the key)
+key_source() {
+  echo "own fp=$(tr -d '[:space:]' < "$HOME/flhub-runtime/vantage6/keys/$1.key" | sha256sum | cut -c1-12)"
+}

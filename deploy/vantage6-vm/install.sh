@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 # Install the vantage6 hospital nodes v6-h3 and v6-h4 on the vantage6 VM (idempotent).
 # A hospital installs only the standard vantage6 node (vantage6 CLI + Docker). Hub-specific are
-# only: the server address, the node API keys (from the operator) and the allowed algorithm image.
-# Usage: bash deploy/vantage6-vm/install.sh [--keys FILE] [--island]
-#   --keys FILE  node API keys file from the operator (tools/bus get <id> -o FILE); it is moved
-#                to ~/flhub-runtime/vantage6/node-keys.env (mode 600)
+# only: the server address, the node API keys and the allowed algorithm image.
+# Node API keys are made HERE, by the hospital: make_key.sh <site> writes
+# ~/flhub-runtime/vantage6/keys/<site>.key and sends it encrypted to central, which registers it
+# (deploy/central/vantage6/register_node.sh); then make_key.sh <site> --confirm <fp>. Only a
+# confirmed key is used.
+# Usage: bash deploy/vantage6-vm/install.sh [--island]
 #   --island     P1 island: server on this VM (host.docker.internal:7601), image from localhost:5050
 set -euo pipefail
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -14,13 +16,11 @@ SITES="v6-h3 v6-h4"
 RT="$HOME/flhub-runtime/vantage6"
 VENV="$HOME/venvs/v6"
 DATA_VENV="$HOME/venvs/flhub-data"
-KEYS="$RT/node-keys.env"
 . "$REPO/deploy/vantage6-vm/common.sh"
-ISLAND=0; KEYS_IN=""
+ISLAND=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --island) ISLAND=1 ;;
-    --keys) KEYS_IN="$2"; shift ;;
     *) echo "unknown option $1" >&2; exit 2 ;;
   esac
   shift
@@ -69,27 +69,22 @@ materialize() { PYTHONPATH="$REPO/flhub_core/src" "$DATA_VENV/bin/python" -m flh
 materialize --sites $SITES >/dev/null
 materialize --variants all --sites $SITES --manifests "$REPO/configs/stage2/partitions" | sed 's/^/[v6-vm-install] data /'
 
-# --- 4. node API keys (from the operator, never in git) ---
-if [ -n "$KEYS_IN" ]; then install -m 600 "$KEYS_IN" "$KEYS" && rm -f "$KEYS_IN"; fi
-[ -f "$KEYS" ] || { echo "no node API keys: pass --keys FILE (from the operator via tools/bus)" >&2; exit 1; }
-set -a; . "$KEYS"; set +a
-
-# --- 5. one standard node config per hospital (`v6 node new` is interactive only) ---
+# --- 4. one standard node config per hospital (`v6 node new` is interactive only), with the
+#        hospital's own confirmed key (make_key.sh; never in git) ---
 ALLOWED="^$(echo "$REGISTRY" | sed 's/\./\\./g')/flhub/v6-train(:[A-Za-z0-9._-]+)?(@sha256:[a-f0-9]{64})?\$"
 for s in $SITES; do
-  var="V6_API_KEY_$(echo "$s" | tr 'a-z-' 'A-Z_')"
-  [ -n "${!var:-}" ] || { echo "$KEYS has no $var" >&2; exit 1; }
-  render_node_config "$s" "$s" "${!var}" "$SERVER_URL" "$ALLOWED" "$EXTRA"
-  log "node config ~/.config/vantage6/node/$s.yaml -> $SERVER_URL:$V6_SERVER_PORT ($(node_databases "$s" | grep -c label) databases)"
+  key="$(site_key "$s")" || exit 1
+  render_node_config "$s" "$s" "$key" "$SERVER_URL" "$ALLOWED" "$EXTRA"
+  log "node config ~/.config/vantage6/node/$s.yaml -> $SERVER_URL:$V6_SERVER_PORT ($(node_databases "$s" | grep -c label) databases, key $(key_source "$s"))"
 done
 echo "$([ "$ISLAND" = 1 ] && echo island || echo central)" > "$RT/node-mode"
 
-# --- 6. watchdog: re-run start.sh every minute while the nodes are enabled (start.sh/stop.sh) ---
+# --- 5. watchdog: re-run start.sh every minute while the nodes are enabled (start.sh/stop.sh) ---
 CRON="* * * * * [ -f $RT/nodes.enabled ] && flock -n $RT/watchdog.lock bash $REPO/deploy/vantage6-vm/start.sh >> $RT/watchdog.log 2>&1"
 others="$(crontab -l 2>/dev/null | grep -v 'deploy/vantage6-vm/start.sh' || true)"
 printf '%s\n%s\n' "$others" "$CRON" | sed '/^$/d' | crontab -
 log "watchdog cron entry installed (log $RT/watchdog.log)"
-# --- 7. housekeeping: delete finished per-run task folders the nodes never delete (taskdir_gc.sh) ---
+# --- 6. housekeeping: delete finished per-run task folders the nodes never delete (taskdir_gc.sh) ---
 GC="* * * * * flock -n $RT/taskdir_gc.lock bash $REPO/deploy/vantage6-vm/taskdir_gc.sh >> $RT/taskdir_gc.log 2>&1"
 others="$(crontab -l 2>/dev/null | grep -v 'deploy/vantage6-vm/taskdir_gc.sh' || true)"
 printf '%s\n%s\n' "$others" "$GC" | sed '/^$/d' | crontab -

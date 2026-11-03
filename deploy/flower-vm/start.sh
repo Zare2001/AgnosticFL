@@ -23,11 +23,15 @@ for entry in $NODES; do
     if [ -f "$f" ]; then have_data=1; break; fi
   done
   [ "$have_data" = 1 ] || { echo "$site: no data in $DATA_DIR (<site>.csv or <variant>-<site>.csv)" >&2; exit 1; }
+  if [ "$FLOWER_TLS" = 1 ]; then
+    [ -f "$FLOWER_CA" ] || { echo "$site: FLOWER_TLS=1 but no CA certificate $FLOWER_CA (from central)" >&2; exit 1; }
+    [ -f "$KEY_DIR/$site" ] || { echo "$site: FLOWER_TLS=1 but no key $KEY_DIR/$site (keygen.sh $site)" >&2; exit 1; }
+  fi
   mkdir -p "$RUNTIME/$site"
   # supernode.sh runs the standard flower-supernode and restarts it if it ever exits.
   # One FLWR_HOME per SuperNode so the two nodes never unpack the same FAB concurrently.
   setsid nohup bash "$REPO/deploy/flower-vm/supernode.sh" "$site" "$port" \
       >> "$RUNTIME/logs/supernode-$site.log" 2>&1 < /dev/null &
   echo $! > "$pidf"
-  echo "$(date -u +%FT%TZ) $site: started (pid $!, superlink $SUPERLINK, local runtime port $port)"
+  echo "$(date -u +%FT%TZ) $site: started (pid $!, superlink $SUPERLINK, local runtime port $port, tls=$FLOWER_TLS)"
 done
