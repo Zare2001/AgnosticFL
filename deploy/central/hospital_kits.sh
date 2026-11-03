@@ -8,8 +8,9 @@
 # provisioning; vantage6: the node API key; Flower: none), install/start/stop/status scripts for
 # the framework's STANDARD client with the pinned versions, the operator's address, and a demo data
 # tool (a copy of flhub_core, used with numpy only) with the partition manifests to verify it.
-# Run the framework's central install.sh first (NVFlare provisioning, vantage6 keys); extra sites:
-# deploy/central/nvflare/provision_extra.sh, deploy/central/vantage6/add_sites.sh.
+# Run the framework's central install.sh first (NVFlare provisioning); extra sites:
+# deploy/central/nvflare/provision_extra.sh. vantage6 kits hold no key: the hospital's ./install.sh
+# makes it, the hospital sends it, central registers it (deploy/central/vantage6/register_node.sh).
 set -euo pipefail
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 . "$REPO/deploy/central/nvflare/common.sh"   # NVF_WS, NVF_PROJECT (+ topology.env, versions.env)
@@ -36,14 +37,6 @@ framework_of() {  # topology SITES entry, or the site name's prefix for the extr
   case "$1" in nvf-*) echo nvflare ;; v6-*) echo vantage6 ;; flw-*) echo flower ;; *) echo "" ;; esac
 }
 nvf_kit_of() { ls -d "$NVF_WS/$NVF_PROJECT"/prod_*/"$1"/startup 2>/dev/null | sort -V | tail -1 | xargs -r dirname; }
-v6_key_of() {
-  local var f
-  var="V6_API_KEY_$(echo "$1" | tr 'a-z-' 'A-Z_')"
-  for f in "$V6_RT/secrets.env" "$V6_RT/v6-nodes-extra.env"; do
-    [ -f "$f" ] && grep -E "^$var=" "$f" | tail -1 | cut -d= -f2- && return
-  done
-  return 0
-}
 flower_port_of() {  # the SuperNode's local port, as on the testbed's Flower machine (flw-h5 9094, flw-h6 9095, ...)
   case "$1" in flw-h5) echo 9094 ;; flw-h6) echo 9095 ;; flw-h11) echo 9096 ;; flw-h12) echo 9097 ;; *) echo 9094 ;; esac
 }
@@ -67,9 +60,6 @@ for site in "${sites[@]}"; do
       mkdir -p "$kit/nvflare" && cp -a "$nk" "$kit/nvflare/$site"
       rm -f "$kit/nvflare/$site"/{daemon_pid.fl,pid.fl,log.txt,shutdown.fl} ;;
     vantage6)
-      key="$(v6_key_of "$site")"
-      [ -n "$key" ] || { echo "kits: $site: no vantage6 node API key in $V6_RT (run deploy/central/vantage6/install.sh or add_sites.sh)" >&2; exit 1; }
-      mkdir -p "$kit/credentials" && (umask 077; printf '%s\n' "$key" > "$kit/credentials/api_key")
       cp "$REPO/deploy/vantage6-vm/node.template.yaml" "$kit/" ;;
     flower)
       cp "$REPO/deploy/hospital-kit/flower_supernode.sh" "$kit/" ;;
@@ -114,7 +104,7 @@ EOF
       req="sudo once, to add the server name of the startup kit to /etc/hosts if it does not resolve."
       logs="\`run/\` and \`nvflare/$site/log.txt\`" ;;
     vantage6)
-      creds="credentials/api_key (this node's vantage6 API key)"; port="$V6_SERVER_PORT and $REGISTRY_PORT"
+      creds="credentials/api_key, this node's vantage6 API key, made by \`./install.sh\` on this machine (the operator never makes it). Send that file once to the operator over a secure channel, with the fingerprint that \`./install.sh\` prints; \`./start.sh\` connects after the operator has registered it"; port="$V6_SERVER_PORT and $REGISTRY_PORT"
       req="Docker, usable by this user without sudo (\`sudo usermod -aG docker \$USER\`, then log in again); sudo once, to allow the operator's image registry in Docker."
       data_note="The node offers the files that exist when it starts: after adding files run \`./stop.sh && ./start.sh\`."
       logs="\`run/\` and \`docker logs -f vantage6-$site-user\`" ;;

@@ -15,8 +15,8 @@ Install, start, stop and status scripts of the reference testbed: one central ma
 **Order of a full deployment:**
 
 1. Central machine: `bash deploy/central/install.sh && bash deploy/central/start.sh`, then per framework `bash deploy/central/<fw>/install.sh && bash deploy/central/<fw>/start.sh`.
-2. Hand the hospital credentials to the hospital machines over a secure channel: NVFlare startup kits, vantage6 node API keys (Flower on the testbed needs none). On the testbed this went through the message bus in [`tools/`](../tools/README.md) with client-side encryption.
-3. Hospital machines: `bash deploy/<fw>-vm/install.sh` with the credentials of step 2 (NVFlare: the kit archives as arguments or from `~/flhub-runtime/nvflare/incoming/`; vantage6: `--keys <file>`, without it the script stops), then `bash deploy/<fw>-vm/start.sh`.
+2. Hand the hospital credentials to the hospital machines over a secure channel: NVFlare startup kits (Flower on the testbed needs none). vantage6 node API keys go the other way: the hospital makes the key, central registers it. On the testbed this went through the message bus in [`tools/`](../tools/README.md) with client-side encryption.
+3. Hospital machines: `bash deploy/<fw>-vm/install.sh` with the credentials of step 2 (NVFlare: the kit archives as arguments or from `~/flhub-runtime/nvflare/incoming/`; vantage6: each hospital first makes its own node key with `deploy/vantage6-vm/make_key.sh <site>`, which sends it encrypted to central; central registers it with `deploy/central/vantage6/register_node.sh`), then `bash deploy/<fw>-vm/start.sh`.
 4. Check: `bash deploy/central/status.sh` on the central machine (`HEALTHY`) and `bash deploy/<fw>-vm/status.sh` on each hospital machine.
 
 The scripts assume Ubuntu 24.04, `uv`, Docker (central and vantage6 machines), the paths in `topology.env` and run-time state under `~/flhub-runtime/` (never inside the repository). Credentials live in the run-time directories and in `~/.flhub/secrets.env`, never in git.

@@ -24,14 +24,26 @@ hubcore_up() {
   echo "hub core did not come up, see $V6_RT/hubcore.log" >&2; return 1
 }
 
+island_keys() {  # each island node makes its key here; the island server registers it (register_node.sh)
+  local pair site f tmp
+  mkdir -p "$V6_RT/keys"; chmod 700 "$V6_RT/keys"
+  for pair in $NODES; do
+    site="${pair##*:}"; f="$V6_RT/keys/$site.key"
+    [ -f "$f" ] && continue
+    (umask 077; python3 -c 'import uuid; print(uuid.uuid4())' > "$f.new")
+    tmp="$(mktemp)"; cp "$f.new" "$tmp"   # register_node.sh shreds its input
+    if bash "$REPO/deploy/central/vantage6/register_node.sh" "$site" "$tmp"; then mv "$f.new" "$f"
+    else shred -u "$f.new"; echo "island: registering $site failed" >&2; return 1; fi
+  done
+}
+
 nodes_up() {  # (re)render the island node configs, start missing nodes, wait until connected
-  set -a; . "$V6_RT/v6-nodes.env"; set +a
+  island_keys
   local allowed extra="node_extra_hosts:"$'\n'"  host.docker.internal: host-gateway"
   allowed="^localhost:$REGISTRY_PORT/flhub/v6-train(:[A-Za-z0-9._-]+)?(@sha256:[a-f0-9]{64})?\$"
   for pair in $NODES; do
-    local node="${pair%%:*}" site="${pair##*:}" var
-    var="V6_API_KEY_$(echo "$site" | tr 'a-z-' 'A-Z_')"
-    render_node_config "$node" "$site" "${!var}" "http://host.docker.internal" "$allowed" "$extra"
+    local node="${pair%%:*}" site="${pair##*:}"
+    render_node_config "$node" "$site" "$(tr -d '[:space:]' < "$V6_RT/keys/$site.key")" "http://host.docker.internal" "$allowed" "$extra"
     if [ -z "$(docker ps -q --filter "name=^vantage6-$node-user$")" ]; then
       (cd "$HOME" && "$NODE_VENV/bin/v6" node start -n "$node" --user >/dev/null)
       log "started island node $node (organisation $site)"

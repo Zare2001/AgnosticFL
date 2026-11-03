@@ -1,6 +1,8 @@
 # vantage6 entities for `v6 server import` (rendered by install.sh; the rendered file holds secrets).
 # Site id = organisation name. hub-operator must participate in the collaboration to create tasks;
-# its node record is never started.
+# its node record is never started. The hospitals are not here: each makes its own node API key and
+# central registers organisation, membership and node with register_node.sh (central never
+# generates a hospital's key).
 organizations:
 - name: hub-operator
   domain: flhub.local
@@ -21,24 +23,8 @@ organizations:
     lastname: adapter
     email: hub-adapter@flhub.local
     password: ${V6_ADAPTER_PASSWORD}
-- name: v6-h3
-  domain: v6-h3.flhub.local
-  address1: vantage6 VM
-  address2: ''
-  zipcode: '0003'
-  country: NL
-  public_key: ''
-- name: v6-h4
-  domain: v6-h4.flhub.local
-  address1: vantage6 VM
-  address2: ''
-  zipcode: '0004'
-  country: NL
-  public_key: ''
 collaborations:
 - name: flhub
   encrypted: false
   participants:
   - {name: hub-operator, api_key: ${V6_API_KEY_HUB}}
-  - {name: v6-h3, api_key: ${V6_API_KEY_V6_H3}}
-  - {name: v6-h4, api_key: ${V6_API_KEY_V6_H4}}
