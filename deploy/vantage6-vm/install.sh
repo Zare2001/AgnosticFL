@@ -4,10 +4,9 @@
 # only: the server address, the node API keys and the allowed algorithm image.
 # Node API keys are made HERE, by the hospital: make_key.sh <site> writes
 # ~/flhub-runtime/vantage6/keys/<site>.key and sends it encrypted to central, which registers it
-# (deploy/central/vantage6/register_node.sh). Until the switch-over, a site without such a key file
-# still uses the operator-made key in ~/flhub-runtime/vantage6/node-keys.env (to be removed).
-# Usage: bash deploy/vantage6-vm/install.sh [--keys FILE] [--island]
-#   --keys FILE  (old, until the switch-over) operator-made keys file; moved to node-keys.env
+# (deploy/central/vantage6/register_node.sh); then make_key.sh <site> --confirm <fp>. Only a
+# confirmed key is used.
+# Usage: bash deploy/vantage6-vm/install.sh [--island]
 #   --island     P1 island: server on this VM (host.docker.internal:7601), image from localhost:5050
 set -euo pipefail
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -17,14 +16,11 @@ SITES="v6-h3 v6-h4"
 RT="$HOME/flhub-runtime/vantage6"
 VENV="$HOME/venvs/v6"
 DATA_VENV="$HOME/venvs/flhub-data"
-KEYS="$RT/node-keys.env"
-KEYS_DIR="$RT/keys"
 . "$REPO/deploy/vantage6-vm/common.sh"
-ISLAND=0; KEYS_IN=""
+ISLAND=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --island) ISLAND=1 ;;
-    --keys) KEYS_IN="$2"; shift ;;
     *) echo "unknown option $1" >&2; exit 2 ;;
   esac
   shift
@@ -73,11 +69,8 @@ materialize() { PYTHONPATH="$REPO/flhub_core/src" "$DATA_VENV/bin/python" -m flh
 materialize --sites $SITES >/dev/null
 materialize --variants all --sites $SITES --manifests "$REPO/configs/stage2/partitions" | sed 's/^/[v6-vm-install] data /'
 
-# --- 4. node API keys: the hospital's own (make_key.sh), never in git ---
-if [ -n "$KEYS_IN" ]; then install -m 600 "$KEYS_IN" "$KEYS" && rm -f "$KEYS_IN"; fi
-if [ -f "$KEYS" ]; then set -a; . "$KEYS"; set +a; fi
-
-# --- 5. one standard node config per hospital (`v6 node new` is interactive only) ---
+# --- 4. one standard node config per hospital (`v6 node new` is interactive only), with the
+#        hospital's own confirmed key (make_key.sh; never in git) ---
 ALLOWED="^$(echo "$REGISTRY" | sed 's/\./\\./g')/flhub/v6-train(:[A-Za-z0-9._-]+)?(@sha256:[a-f0-9]{64})?\$"
 for s in $SITES; do
   key="$(site_key "$s")" || exit 1
@@ -86,12 +79,12 @@ for s in $SITES; do
 done
 echo "$([ "$ISLAND" = 1 ] && echo island || echo central)" > "$RT/node-mode"
 
-# --- 6. watchdog: re-run start.sh every minute while the nodes are enabled (start.sh/stop.sh) ---
+# --- 5. watchdog: re-run start.sh every minute while the nodes are enabled (start.sh/stop.sh) ---
 CRON="* * * * * [ -f $RT/nodes.enabled ] && flock -n $RT/watchdog.lock bash $REPO/deploy/vantage6-vm/start.sh >> $RT/watchdog.log 2>&1"
 others="$(crontab -l 2>/dev/null | grep -v 'deploy/vantage6-vm/start.sh' || true)"
 printf '%s\n%s\n' "$others" "$CRON" | sed '/^$/d' | crontab -
 log "watchdog cron entry installed (log $RT/watchdog.log)"
-# --- 7. housekeeping: delete finished per-run task folders the nodes never delete (taskdir_gc.sh) ---
+# --- 6. housekeeping: delete finished per-run task folders the nodes never delete (taskdir_gc.sh) ---
 GC="* * * * * flock -n $RT/taskdir_gc.lock bash $REPO/deploy/vantage6-vm/taskdir_gc.sh >> $RT/taskdir_gc.log 2>&1"
 others="$(crontab -l 2>/dev/null | grep -v 'deploy/vantage6-vm/taskdir_gc.sh' || true)"
 printf '%s\n%s\n' "$others" "$GC" | sed '/^$/d' | crontab -

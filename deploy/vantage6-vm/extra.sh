@@ -15,7 +15,6 @@ SITES="v6-h9 v6-h10"
 RT="$HOME/flhub-runtime/vantage6"
 VENV="$HOME/venvs/v6"
 DATA_VENV="$HOME/venvs/flhub-data"
-KEYS="$RT/node-keys-extra.env"
 CRON="* * * * * [ -f $RT/extra-nodes.enabled ] && flock -n $RT/watchdog-extra.lock bash $REPO/deploy/vantage6-vm/extra.sh start >> $RT/watchdog-extra.log 2>&1"
 log() { echo "[v6-vm-extra] $*"; }
 cron_set() {  # cron_set on|off: the extra nodes' watchdog entry
@@ -26,10 +25,8 @@ cron_set() {  # cron_set on|off: the extra nodes' watchdog entry
 
 case "${1:-}" in
   install)
-    if [ "${2:-}" = "--keys" ]; then install -m 600 "${3:?keys file}" "$KEYS" && rm -f "$3"; fi
     PYTHONPATH="$REPO/flhub_core/src" "$DATA_VENV/bin/python" -m flhub_core.data materialize --out "$V6_DATA_DIR" \
       --variants organamnist-iid12 --sites $SITES --manifests "$REPO/configs/stage2/partitions" | sed 's/^/[v6-vm-extra] data /'
-    if [ -f "$KEYS" ]; then set -a; . "$KEYS"; set +a; fi   # old operator-made keys (until switch-over)
     allowed="^$(echo "$FLHUB_CENTRAL_IP:$REGISTRY_PORT" | sed 's/\./\\./g')/flhub/v6-train(:[A-Za-z0-9._-]+)?(@sha256:[a-f0-9]{64})?\$"
     for s in $SITES; do
       key="$(site_key "$s")" || exit 1
@@ -68,5 +65,5 @@ case "${1:-}" in
     echo "watchdog entry: $(crontab -l 2>/dev/null | grep -c 'deploy/vantage6-vm/extra.sh start')"
     exit $ok
     ;;
-  *) echo "usage: $0 install [--keys FILE] | start | stop | status" >&2; exit 2 ;;
+  *) echo "usage: $0 install | start | stop | status" >&2; exit 2 ;;
 esac
