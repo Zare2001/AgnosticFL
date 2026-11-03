@@ -72,6 +72,28 @@ kit_for "$NVF_ADMIN_USER" "  - name: $NVF_ADMIN_USER
     org: flhub
     role: $NVF_ADMIN_ROLE" "$NVF_ADMIN_KIT"
 
+# The template keeps the server's job store and snapshots in /tmp/nvflare/, shared by every NVFlare
+# server on this host (a test project would see the live jobs) and cleared by a reboot. Each project
+# gets its own under $NVF_RUNTIME/storage (local/resources.json overrides resources.json.default).
+res="$NVF_SERVER_KIT/local/resources.json"
+mkdir -p "$NVF_RUNTIME/storage" && chmod 700 "$NVF_RUNTIME/storage"
+"$NVF_VENV/bin/python" - "$res.default" "$res" "$NVF_RUNTIME/storage" <<'PY'
+import json, os, sys
+src, dst, root = sys.argv[1], sys.argv[2], sys.argv[3]
+cfg = json.load(open(dst if os.path.exists(dst) else src))
+def fix(o):
+    if isinstance(o, dict): return {k: fix(v) for k, v in o.items()}
+    if isinstance(o, list): return [fix(v) for v in o]
+    if isinstance(o, str) and o.startswith("/tmp/nvflare/"): return os.path.join(root, o[len("/tmp/nvflare/"):])
+    return o
+out = fix(cfg)
+text = json.dumps(out, indent=2)
+if "/tmp/nvflare" in text: sys.exit("provision: /tmp/nvflare still referenced in " + dst)
+for need in ("jobs-storage", "snapshot-storage"):
+    if os.path.join(root, need) not in text: sys.exit(f"provision: {need} not under {root} in {dst}")
+open(dst, "w").write(text + "\n")
+PY
+echo "provision: server job store and snapshots in $NVF_RUNTIME/storage"
 for crt in "$NVF_SERVER_KIT/startup/server.crt" "$NVF_ADMIN_KIT/startup/client.crt"; do
   openssl verify -CAfile "$NVF_CA_DIR/rootCA.pem" "$crt" >/dev/null \
     || { echo "provision: $crt does not verify against the root CA" >&2; exit 1; }
