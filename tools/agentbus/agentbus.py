@@ -15,6 +15,7 @@ Client (reads AGENTBUS_URL, AGENTBUS_TOKEN, FLHUB_ROLE from the environment):
     agentbus.py status                    # status board of all agents
     agentbus.py put    FILE --to central [--secret] [--note "..."]   # upload a file
     agentbus.py get    FILE_ID [-o OUT]                              # download (auto-decrypts)
+    agentbus.py rm     FILE_ID                # delete a file from the server (its sender or recipient)
     agentbus.py export [-o bus_transcript.md]                        # full transcript for the report
     agentbus.py health
 
@@ -57,6 +58,7 @@ class Store:
     def __init__(self, path):
         self.lock = threading.Lock()
         self.db = sqlite3.connect(path, check_same_thread=False)
+        self.db.execute("PRAGMA secure_delete=ON")  # deleted rows are overwritten, not left in free pages
         self.db.executescript(
             """
             CREATE TABLE IF NOT EXISTS msg(id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -154,6 +156,26 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, {"files": [dict(zip(
                 ["id", "ts", "from", "to", "name", "secret", "note", "bytes"], r)) for r in rows]})
         return self._send(404, {"error": "not found"})
+
+    def do_DELETE(self):
+        # DELETE /file?id=N&agent=ROLE: removes the file's row (ciphertext included) and compacts the
+        # database, so the data is gone from the file on disk. Only its sender or recipient may do it.
+        if not self._auth():
+            return
+        url = urllib.parse.urlparse(self.path)
+        qs = {k: v[0] for k, v in urllib.parse.parse_qs(url.query).items()}
+        if url.path != "/file":
+            return self._send(404, {"error": "not found"})
+        st = self.server.store
+        fid, agent = int(qs.get("id", "0")), qs.get("agent", "")
+        row = st.q("SELECT sender,recipient,name FROM file WHERE id=?", (fid,)).fetchone()
+        if not row:
+            return self._send(404, {"error": "no such file"})
+        if agent not in AGENTS or agent not in (row[0], row[1]):
+            return self._send(403, {"error": f"only the sender ({row[0]}) or recipient ({row[1]}) may delete file #{fid}"})
+        st.q("DELETE FROM file WHERE id=?", (fid,))
+        st.q("VACUUM")
+        return self._send(200, {"deleted": fid, "name": row[2]})
 
     def do_POST(self):
         if not self._auth():
@@ -341,10 +363,19 @@ def cmd_get(args):
     if r["secret"]:
         data = _openssl("dec", data)
     out = Path(args.output or r["name"])
-    out.write_bytes(data)
-    if r["secret"]:
-        os.chmod(out, 0o600)
+    if r["secret"]:  # created with mode 0600: the plain text is never readable by others
+        fd = os.open(out, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        os.fchmod(fd, 0o600)
+        with os.fdopen(fd, "wb") as fh:
+            fh.write(data)
+    else:
+        out.write_bytes(data)
     print(f"wrote {out} ({len(data)} bytes{', decrypted' if r['secret'] else ''})")
+
+
+def cmd_rm(args):
+    r = _req("DELETE", f"/file?id={args.file_id}&agent={_role(args)}")
+    print(f"deleted file #{r['deleted']} ({r['name']}) from the bus server")
 
 
 def cmd_export(args):
@@ -424,6 +455,10 @@ def main():
     s.add_argument("file_id", type=int)
     s.add_argument("-o", "--output")
     s.set_defaults(fn=cmd_get)
+
+    s = with_as(sub.add_parser("rm"))
+    s.add_argument("file_id", type=int)
+    s.set_defaults(fn=cmd_rm)
 
     s = sub.add_parser("export")
     s.add_argument("-o", "--output", default="bus_transcript.md")
