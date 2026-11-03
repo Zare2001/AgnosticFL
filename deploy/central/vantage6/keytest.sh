@@ -6,7 +6,8 @@
 # collaboration flhub) and its nodes are not touched.
 #   register SITE KEYFILE FP   register_node.sh SITE KEYFILE --collab flhub-keytest --fingerprint FP
 #   adapter start|stop|status  the keytest adapter on :8822 (log ~/flhub-runtime/vantage6/keytest-adapter.log)
-#   conformance                the conformance suite against :8822 (sites v6-h3 v6-h4)
+#   conformance                the conformance suite against :8822 (sites v6-h3 v6-h4), with
+#                              PYTEST_PY (default ~/venvs/hub/bin/python: ~/venvs/v6 has no pytest)
 #   clean                      stop the keytest adapter; delete the nodes of flhub-keytest and the
 #                              collaboration (organisations v6-h3/v6-h4 and their flhub nodes stay)
 set -euo pipefail
@@ -45,7 +46,7 @@ case "${1:-}" in
     esac ;;
   conformance)
     cd "$REPO"
-    "$VENV/bin/python" -m pytest tests/conformance --adapter "http://127.0.0.1:$PORT" --hub http://127.0.0.1:8800 \
+    "${PYTEST_PY:-$HOME/venvs/hub/bin/python}" -m pytest tests/conformance --adapter "http://127.0.0.1:$PORT" --hub http://127.0.0.1:8800 \
       --sites $SITES_T --restart-cmd "bash $REPO/deploy/central/vantage6/keytest.sh adapter stop && bash $REPO/deploy/central/vantage6/keytest.sh adapter start" \
       --variant organamnist-dir0.3 --report "$RT/conformance-v6-keytest.json" -v -s ;;
   clean)
