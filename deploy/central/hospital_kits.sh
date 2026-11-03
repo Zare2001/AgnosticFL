@@ -6,7 +6,9 @@
 #
 # A kit contains no hospital private key: NVFlare: the hospital makes its own key and certificate
 # request with the kit and gets back a certificate; vantage6: the hospital's ./install.sh makes the
-# node API key; Flower: none. It also holds install/start/stop/status scripts for
+# node API key; Flower: the Flower CA certificate only; the hospital's ./install.sh makes its
+# SuperNode key, and the operator registers the public key (deploy/central/flower/register_node.sh).
+# It also holds install/start/stop/status scripts for
 # the framework's STANDARD client with the pinned versions, the operator's address, and a demo data
 # tool (a copy of flhub_core, used with numpy only) with the partition manifests to verify it.
 # Run the framework's central install.sh first (NVFlare root CA). NVFlare: the kit carries the
@@ -20,13 +22,17 @@ REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 OUT="$HOME/flhub-runtime/hospital-kits"
 VARIANTS="cifar10-iid"
 V6_RT="${V6_RT:-$HOME/flhub-runtime/vantage6}"
-FLOWER_TLS="${FLOWER_TLS:-0}"   # 1: Flower kits carry the Flower CA certificate; the hospital makes its own key
 FLOWER_TLS_DIR="${FLOWER_TLS_DIR:-$HOME/flhub-runtime/flower/tls}"   # deploy/central/flower/tls.sh
+# 1: Flower kits carry the Flower CA certificate; the hospital makes its own key. Default as in
+# deploy/central/flower/start.sh: 1 once tls.sh has made the CA, else 0.
+if [ -z "${FLOWER_TLS:-}" ]; then
+  if [ -f "$FLOWER_TLS_DIR/ca.crt" ]; then FLOWER_TLS=1; else FLOWER_TLS=0; fi
+fi
 while [ $# -gt 0 ]; do
   case "$1" in
     --out) OUT="$2"; shift 2 ;;
     --variants) VARIANTS="$2"; shift 2 ;;
-    -h|--help) sed -n '2,13p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,/^set -e/{/^set -e/!p}' "$0"; exit 0 ;;
     -*) echo "unknown option $1" >&2; exit 2 ;;
     *) break ;;
   esac
