@@ -4,19 +4,37 @@
 #   FLHUB_HUB_URL        hub core (default http://127.0.0.1:8800)
 #   FLHUB_FLOWER_VENV    venv (default ~/venvs/flower)
 #   FLHUB_FLOWER_RUNTIME runtime dir for pids, logs, FLWR_HOME (default ~/flhub-runtime/flower)
+#   FLHUB_FLOWER_CONTROL_PORT / FLHUB_ADAPTER_FLOWER_PORT  ports (default: topology.env; a second
+#                        SuperLink next to the live one, e.g. a test, uses its own)
+#   FLHUB_FLOWER_SITES   adapter sites (default: the testbed's flw-* sites)
+#   FLOWER_TLS           1: TLS on all SuperLink APIs and SuperNode authentication (certificates
+#                        from tls.sh, nodes registered with register_node.sh); 0: --insecure, no auth
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 . "$REPO/deploy/versions.env"
 . "$REPO/deploy/topology.env"
 VENV="${FLHUB_FLOWER_VENV:-$HOME/venvs/flower}"
 RUNTIME="${FLHUB_FLOWER_RUNTIME:-$HOME/flhub-runtime/flower}"
 FLEET_BIND="${FLOWER_FLEET_BIND:-0.0.0.0:$FLOWER_FLEET_PORT}"
-CONTROL_PORT="$FLOWER_CONTROL_PORT"   # SuperLink HTTP API (control + ServerApp runtime), local only
-ADAPTER_PORT="$ADAPTER_FLOWER_PORT"
+CONTROL_PORT="${FLHUB_FLOWER_CONTROL_PORT:-$FLOWER_CONTROL_PORT}"   # SuperLink HTTP API (control + ServerApp runtime), local only
+ADAPTER_PORT="${FLHUB_ADAPTER_FLOWER_PORT:-$ADAPTER_FLOWER_PORT}"
 HUB_URL="${FLHUB_HUB_URL:-http://127.0.0.1:$HUB_CORE_PORT}"
-SITES_FLOWER="flw-h5 flw-h6 flw-h11 flw-h12"   # adapter sites; flw-h11/flw-h12 run only during E5
-BASE_SITES_FLOWER="flw-h5 flw-h6"             # status.sh health covers these
+SITES_FLOWER="${FLHUB_FLOWER_SITES:-flw-h5 flw-h6 flw-h11 flw-h12}"   # adapter sites; flw-h11/flw-h12 run only during E5
+BASE_SITES_FLOWER="${FLHUB_FLOWER_BASE_SITES:-flw-h5 flw-h6}"             # status.sh health covers these
 FLWR_HOME_DIR="$RUNTIME/flwr-home"    # SuperLink state + flwr CLI connection config
+FLOWER_TLS="${FLOWER_TLS:-0}"
+TLS_DIR="$RUNTIME/tls"                # Flower CA + SuperLink certificate (tls.sh), mode 700, never in git
+NODES_MAP="$RUNTIME/nodes.map"        # registered SuperNodes: site node_id pubkey_sha256 (register_node.sh)
 export PATH="$VENV/bin:$PATH"         # flower-superexec / flwr-serverapp are found via PATH
 
 pid_alive() { [ -f "$1" ] && kill -0 "$(cat "$1")" 2>/dev/null; }
 port_open() { (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null; }
+
+write_flwr_config() {  # the flwr CLI connection "flhub" to this SuperLink (adapter: flwr run/stop; register_node.sh)
+  mkdir -p "$FLWR_HOME_DIR"
+  {
+    echo "# flwr CLI connection to the local SuperLink (written by deploy/central/flower, FLOWER_TLS=$FLOWER_TLS)"
+    echo "[superlink]"; echo 'default = "flhub"'; echo
+    echo "[superlink.flhub]"; echo "address = \"127.0.0.1:$CONTROL_PORT\""
+    if [ "$FLOWER_TLS" = 1 ]; then echo "root-certificates = \"$TLS_DIR/ca.crt\""; else echo "insecure = true"; fi
+  } > "$FLWR_HOME_DIR/config.toml"
+}
