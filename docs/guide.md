@@ -113,13 +113,15 @@ Each machine needs only its own ports open (NVFlare 8002; vantage6 7601 and 5050
 ```bash
 cd ~/AgnosticFL                                   # on ubuntuserver only
 bash deploy/central/install.sh && bash deploy/central/start.sh
-bash deploy/central/nvflare/install.sh && bash deploy/central/nvflare/start.sh       # provisions the NVFlare kits
-bash deploy/central/vantage6/install.sh && bash deploy/central/vantage6/start.sh     # server, algorithm image, node keys
-bash deploy/central/flower/install.sh && bash deploy/central/flower/start.sh
+bash deploy/central/nvflare/install.sh && bash deploy/central/nvflare/start.sh       # NVFlare root CA, server and admin kits
+bash deploy/central/vantage6/install.sh && bash deploy/central/vantage6/start.sh     # server, algorithm image (no node keys)
+bash deploy/central/flower/install.sh && bash deploy/central/flower/tls.sh && bash deploy/central/flower/start.sh   # Flower CA, SuperLink certificate; TLS + SuperNode authentication
 bash deploy/central/status.sh
 ```
 
-`status.sh` reports every service; until hospitals connect their sites are offline. The **agent bus** line (port 7700) always shows FAIL unless you run the bus; it is optional (credentials can go by `scp`, below) and can be ignored. The extra sites `nvf-h7`, `nvf-h8`, `v6-h9`, `v6-h10`, `flw-h11`, `flw-h12` belong to the 12-site test and stay offline.
+`status.sh` reports every service; until hospitals connect their sites are offline. The **agent bus** line (port 7700) always shows FAIL unless you run the bus; it is optional (requests, public keys and certificates can also go by `scp -3` or e-mail; a vantage6 node key needs a secure channel) and can be ignored. The extra sites `nvf-h7`, `nvf-h8`, `v6-h9`, `v6-h10`, `flw-h11`, `flw-h12` belong to the 12-site test and stay offline.
+
+Central creates no hospital credential. It prints two public fingerprints that the hospitals check: the NVFlare root CA (`~/flhub-runtime/nvflare/server/rootCA.fingerprint`) and the sha256 of the Flower CA certificate (`~/flhub-runtime/flower/tls/ca.crt`, printed by `tls.sh`). Until each hospital's own credential is approved or registered ([3.5](#35-hospitals)), no hospital connects. `bash deploy/central/nvflare/check_keys.sh` proves that no NVFlare hospital private key is on central.
 
 ### 3.5 Hospitals
 
@@ -142,21 +144,30 @@ scp -3 'zpalanciya@145.38.205.58:flhub-runtime/hospital-kits/flw-h*.tgz' zpalanc
 On each hospital machine, for each of its kits ([section 7](#7-for-hospitals-your-kit)):
 
 ```bash
-tar -xzf nvf-h1.tgz && cd flhub-nvf-h1 && ./install.sh && ./prepare_data.sh && ./start.sh && ./status.sh
+tar -xzf nvf-h1.tgz && cd flhub-nvf-h1 && ./install.sh   # makes this hospital's own key or certificate request (below)
 ```
 
-**B. The testbed scripts** `deploy/<framework>-vm/`, which run both sites of a machine and a watchdog. Credentials from your laptop:
+No kit holds a private key or node key: the hospital makes it with `./install.sh`, and only public material (or, for vantage6, the node key once over a secure channel) goes to the operator, who approves or registers it on central:
+
+| Framework | The hospital sends | The operator runs on central | The hospital then |
+|---|---|---|---|
+| NVFlare | `nvflare/<site>.request.zip` and the public key hash `./install.sh` prints | `bash deploy/central/nvflare/approve.sh <site>.request.zip --expect-pubkey <hash>`; returns `signed/<site>.signed.zip` | puts the signed zip into `nvflare/` and runs `./install.sh` again (checks the root CA fingerprint in `kit.env`, builds the startup kit) |
+| vantage6 | `credentials/api_key` and the fingerprint `./install.sh` prints | `bash deploy/central/vantage6/register_node.sh <site> <key file> --fingerprint <fp>` | runs `./start.sh` |
+| Flower | `credentials/node_key.pub` and the sha256 `./install.sh` prints | `bash deploy/central/flower/register_node.sh add <site> <site.pub> --expect-sha256 <sha256>` | runs `./start.sh` (before the registration it stops with 'the SuperLink refused this node's key') |
+
+Confirm each hash or fingerprint on a second channel (for example by phone): it ties the approval to what the hospital sent. Then, on the hospital machine:
 
 ```bash
-scp -3 'zpalanciya@145.38.205.58:flhub-runtime/nvflare/server/kits/nvf-h*.tgz' zpalanciya@145.38.189.142:flhub-runtime/nvflare/incoming/
-scp -3 zpalanciya@145.38.205.58:flhub-runtime/vantage6/v6-nodes.env zpalanciya@145.38.186.63:/tmp/v6-nodes.env
+./prepare_data.sh && ./start.sh && ./status.sh
 ```
+
+**B. The testbed scripts** `deploy/<framework>-vm/`, which run both sites of a machine and a watchdog. Each machine makes its sites' credentials itself; only public material, or the vantage6 node key once, goes to central (on the testbed with `tools/bus put ... --to central`, which encrypts with the shared bus token: acceptable for the testbed only, see [docs/frameworks/vantage6.md](frameworks/vantage6.md)).
 
 | Machine | Commands |
 |---|---|
-| `ubuntunvflare` | `mkdir -p ~/flhub-runtime/nvflare/incoming` (before the copy); `bash deploy/nvflare-vm/install.sh && bash deploy/nvflare-vm/start.sh && bash deploy/nvflare-vm/status.sh` |
-| `ubuntuvantage` | `bash deploy/vantage6-vm/install.sh --keys /tmp/v6-nodes.env && bash deploy/vantage6-vm/start.sh && bash deploy/vantage6-vm/status.sh` |
-| `ubuntuflower` | `bash deploy/flower-vm/install.sh && bash deploy/flower-vm/start.sh`, then `sleep 30; bash deploy/flower-vm/status.sh` |
+| `ubuntunvflare` | `bash deploy/nvflare-vm/request.sh nvf-h1` (and `nvf-h2`): send each `requests/<site>/<site>.request.zip` with its printed hash to central, which runs `deploy/central/nvflare/approve.sh <zip> --expect-pubkey <hash>` and returns `<site>.signed.zip` into `~/flhub-runtime/nvflare/incoming/`; write the root CA fingerprint central publishes to `~/flhub-runtime/nvflare/rootCA.fingerprint`; then `bash deploy/nvflare-vm/install.sh && bash deploy/nvflare-vm/start.sh && bash deploy/nvflare-vm/status.sh` |
+| `ubuntuvantage` | `bash deploy/vantage6-vm/make_key.sh v6-h3` (and `v6-h4`): each sends its key encrypted to central and prints `fp=...`; on central, for each: `tools/bus get <id> -o <file> && bash deploy/central/vantage6/register_node.sh <site> <file> --fingerprint <fp>`; back here: `bash deploy/vantage6-vm/make_key.sh <site> --confirm <fp>`; then `bash deploy/vantage6-vm/install.sh && bash deploy/vantage6-vm/start.sh && bash deploy/vantage6-vm/status.sh` |
+| `ubuntuflower` | `bash deploy/flower-vm/install.sh`; once per site `bash deploy/flower-vm/keygen.sh flw-h5` (and `flw-h6`): send each `~/flhub-runtime/flower/keys/<site>.pub` with its printed sha256 to central, which runs `register_node.sh add` (above); copy the CA certificate from your laptop: `scp -3 zpalanciya@145.38.205.58:flhub-runtime/flower/tls/ca.crt zpalanciya@145.38.187.20:flhub-runtime/flower/ca.crt` and compare its `sha256sum` with what `tls.sh` printed; then `bash deploy/flower-vm/start.sh`, `sleep 30; bash deploy/flower-vm/status.sh` (the scripts use TLS and the site's key as soon as `~/flhub-runtime/flower/ca.crt` exists) |
 
 To switch from B to A, stop B first (`bash deploy/<framework>-vm/stop.sh`, which also disables its watchdog).
 
@@ -366,7 +377,7 @@ Commit before `rollout.sh`: the vantage6 image tag is the commit (uncommitted ch
 
 ## 7. For hospitals: your kit
 
-The operator sends you `<site>.tgz` over a secure channel. It contains your credentials (NVFlare: a certificate and private key; vantage6: a node API key; Flower: none on the testbed), the address of the operator, pinned versions, and five scripts:
+The operator sends you `<site>.tgz`. It holds no secret of yours: you make your own credential with `./install.sh`, and your private key never leaves your machine. NVFlare: `./install.sh` makes your key and a certificate request; send the request and the public key hash it prints to the operator, put the signed answer into `nvflare/` and run `./install.sh` again, which checks the operator's root CA fingerprint from `kit.env` and builds your startup kit. vantage6: `./install.sh` makes `credentials/api_key` and prints its fingerprint; send the file once to the operator over a secure channel; the operator registers it (the server keeps only a hash). Flower: the kit holds the operator's CA certificate only; `./install.sh` makes your SuperNode key pair; send only `credentials/node_key.pub` and the sha256 it prints, and compare the CA's sha256 in `kit.env` with the one the operator gives you on a second channel. The kit also holds the address of the operator, pinned versions, and five scripts:
 
 ```bash
 tar -xzf <site>.tgz && cd flhub-<site>      # where it should live; it stays mode 700
@@ -388,15 +399,22 @@ Requirements: Linux x86_64, bash, curl, outbound TCP to the operator on your fra
 | `permission denied while trying to connect to the docker API` | the docker group is not active in this login | log out, SSH in again, `docker ps` |
 | `AGENTBUS_TOKEN not set` (`tools/bus`) | the optional bus is not configured | send credentials with `scp -3` ([3.5](#35-hospitals)) |
 | `-bash: id: No such file or directory` | `<id>` in a command is a placeholder; bash read `<` as a redirect | put the real value |
-| `FileNotFoundError: .../v6-nodes.env` | the vantage6 central install stopped earlier (Docker) | fix that, rerun `deploy/central/vantage6/install.sh` |
-| `no startup kit for nvf-h1` / `no node config for v6-h3` | hospital started before its credentials arrived | copy them ([3.5](#35-hospitals)), rerun `install.sh` |
+| `no startup kit for nvf-h1` | the hospital started before its certificate came back | central: `approve.sh`; the hospital: signed zip into `incoming/` (or the kit's `nvflare/`), rerun `install.sh` ([3.5](#35-hospitals)) |
+| `approve: REFUSED: public key ... is not the one the hospital announced` | the request zip and the announced hash differ | ask the hospital for its hash again; never approve without a match |
+| `nvflare package` `ROOTCA_FINGERPRINT_MISMATCH` | the signed zip is not from this operator's CA, or the pinned fingerprint is wrong | compare `rootCA.fingerprint` with what central published |
+| `no node API key for v6-h3: run deploy/vantage6-vm/make_key.sh v6-h3` | the hospital has not made its key | `make_key.sh <site>`, central `register_node.sh`, then `make_key.sh <site> --confirm <fp>` |
+| `... is not confirmed as registered` | central has not registered the key, or `--confirm` is missing | central `register_node.sh`, then `make_key.sh <site> --confirm <fp>` |
+| vantage6 node log `Api key is not recognized` | the key is not registered, or was rotated away | central `register_node.sh` with the current key |
+| Flower `start.sh`: 'the SuperLink refused this node's key'; log `[code: 2004] Failed to activate SuperNode` | the operator has not registered this site's key (or another one) | send `node_key.pub` + sha256; operator: `register_node.sh list`, `register_node.sh add` |
+| Flower log `CERTIFICATE_VERIFY_FAILED` | the CA certificate is not the operator's | get `ca.crt` again; compare its sha256 |
+| Flower site connected but `discover` shows it offline; relay log `claims site ... refused` | the node's key is registered for another site | register the right key for the site (`register_node.sh add <site> ... --replace`) |
 | Flower `NOT connected`, `UNHEALTHY` right after start | not connected yet, or port 9092 blocked | wait 30 s and rerun `status.sh`; else [3.3](#33-firewall) |
 | all ports `BLOCKED` from a hospital | no security-group rules on central | [3.3](#33-firewall) |
 | `Invalid CIDR notation '145.38.189.142'` | the portal wants CIDR, one address per rule | `145.38.189.142/32`, one rule per port |
 | rules added, still blocked | the rules are on a hospital's workspace | add them to the central workspace (FrameworkServer) |
 | `central VM status: UNHEALTHY` with only `agent bus FAIL` | the bus is not running | ignore |
 | central services also running on a hospital machine | `deploy/central/*` was run there | there: `bash deploy/central/flower/stop.sh; bash deploy/central/nvflare/stop.sh`, then `rm -rf ~/venvs ~/flhub-runtime ~/.config/vantage6/server` (never on central) and reinstall the hospital side |
-| central's runtime deleted by mistake | the clean-up above ran on central | `pkill -f adapters.vantage6`, then rerun [3.4](#34-central) with `sudo systemctl restart flhub-hubcore` before `start.sh`; new NVFlare kits and vantage6 keys must go to the hospitals again |
+| central's runtime deleted by mistake | the clean-up above ran on central | `pkill -f adapters.vantage6`, then rerun [3.4](#34-central) with `sudo systemctl restart flhub-hubcore` before `start.sh`; the CAs are new: every hospital requests a new NVFlare certificate (`request.sh` / `./install.sh`, central `approve.sh`), vantage6 keys are registered again (`register_node.sh`), Flower keys are registered again and the new `ca.crt` goes to the Flower hospitals |
 | `no partition manifest .../cifar10-iid.json` | the hub pins each site's file of a public dataset | `python -m flhub_core.data manifests --variants cifar10-iid --out configs/stage2/partitions` on central |
 | `model X takes 3x32x32 images, dataset Y has 1x28x28` | model and dataset do not fit | choose a matching model or dataset |
 | a site's update rejected: `data_fp ... != manifest` | the site trained on other data than the manifest pins | rewrite the file (`prepare_data.sh` / `materialize --manifests`) |
@@ -411,7 +429,7 @@ Requirements: Linux x86_64, bash, curl, outbound TCP to the operator on your fra
 | 8002 | central, public | NVFlare hospitals |
 | 8003 | central, keep closed | NVFlare adapter (local) |
 | 7601, 5050 | central, public | vantage6 nodes (server API, image registry) |
-| 9092 | central, public | Flower SuperNodes |
+| 9092 | central, public | Flower SuperNodes (TLS; registered keys only) |
 | 9093, 8800, 8811-8813 | central, `127.0.0.1` | SuperLink HTTP API, hub core, adapters |
 | 7700 | central | optional agent bus |
 | 9094, 9095 | Flower hospital, local | SuperNode runtime port per site |
@@ -420,7 +438,9 @@ Requirements: Linux x86_64, bash, curl, outbound TCP to the operator on your fra
 |---|---|
 | `~/flhub-runtime/` | all run-time state (central and testbed hospitals); never in the repository |
 | `~/flhub-runtime/runs/` | run directories (central) |
-| `~/flhub-runtime/hospital-kits/` | kits (central) |
+| `~/flhub-runtime/hospital-kits/` | kits (central); they hold no hospital secret |
+| `~/flhub-runtime/nvflare/server/ca/` | NVFlare root CA (central, mode 700; its key never leaves) |
+| `~/flhub-runtime/flower/tls/`, `~/flhub-runtime/flower/nodes.map` | Flower CA and SuperLink certificate (mode 700); registered SuperNodes: site, node id, public key sha256 |
 | `~/flhub-data/` | site data and `raw/` downloads |
 | `~/venvs/` | per-role virtual environments of the testbed scripts |
 | `deploy/versions.env` | pinned versions: Python 3.11.17, torch 2.14.1 (CPU), numpy 2.4.4, NVFlare 2.9.0, vantage6 4.15.2, Flower 1.39.0 |
