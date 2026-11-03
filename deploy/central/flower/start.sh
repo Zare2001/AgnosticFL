@@ -16,6 +16,10 @@ if [ "$FLOWER_TLS" = 1 ]; then
              --ssl-keyfile "$TLS_DIR/server.key" --enable-supernode-auth)
   adapter_args=(--node-map "$NODES_MAP")
 else
+  if [ -f "$TLS_DIR/server.crt" ] && [ "${FLOWER_ROLLBACK:-0}" != 1 ]; then
+    echo "FLOWER_TLS=0 but $TLS_DIR/server.crt exists: refusing an insecure SuperLink (rollback: FLOWER_ROLLBACK=1)" >&2
+    exit 1
+  fi
   link_args=(--insecure); adapter_args=()
 fi
 write_flwr_config   # the adapter's flwr run/stop connection matches the SuperLink's TLS mode
@@ -41,6 +45,14 @@ else
   echo "superlink: started (pid $(cat "$RUNTIME/run/superlink.pid"), fleet $FLEET_BIND, http 127.0.0.1:$CONTROL_PORT, tls=$FLOWER_TLS)"
 fi
 
+if [ "$FLOWER_TLS" = 1 ] && pid_alive "$RUNTIME/run/adapter.pid" \
+   && ! tr '\0' ' ' < "/proc/$(cat "$RUNTIME/run/adapter.pid")/cmdline" | grep -q -- "--node-map $NODES_MAP"; then
+  # an adapter from before TLS would run its relay without the site binding: replace it
+  echo "adapter: running without --node-map $NODES_MAP, restarting it"
+  kill "$(cat "$RUNTIME/run/adapter.pid")"
+  for _ in $(seq 60); do pid_alive "$RUNTIME/run/adapter.pid" || break; sleep 0.5; done
+  pid_alive "$RUNTIME/run/adapter.pid" && { echo "adapter did not stop" >&2; exit 1; }
+fi
 if pid_alive "$RUNTIME/run/adapter.pid"; then
   echo "adapter: already running (pid $(cat "$RUNTIME/run/adapter.pid"))"
 else

@@ -18,7 +18,7 @@ cd "$TLS_DIR"
 if [ ! -f ca.key ]; then
   openssl ecparam -name secp384r1 -genkey -noout -out ca.key
   openssl req -x509 -new -key ca.key -sha384 -days "$CA_DAYS" -subj "/O=AgnosticFL/CN=flhub Flower CA" \
-      -addext "basicConstraints=critical,CA:TRUE" -addext "keyUsage=critical,keyCertSign,cRLSign" \
+      -addext "basicConstraints=critical,CA:TRUE,pathlen:0" -addext "keyUsage=critical,keyCertSign,cRLSign" \
       -out ca.crt
   echo "tls: new Flower CA $TLS_DIR/ca.crt"
 fi

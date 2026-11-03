@@ -179,7 +179,7 @@ def test_node_map_binds_site_to_registered_node(env, monkeypatch):
     client = env["client"]
     p5, p6 = site_csv(env["tmp"], "flw-h5", 1), site_csv(env["tmp"], "flw-h6", 2)
     node_map = env["tmp"] / "nodes.map"
-    node_map.write_text("# site node_id pubkey_sha256\nflw-h5 15 aa\nflw-h6 16 bb\n")
+    node_map.write_text("# site node_id pubkey_sha256\nflw-h5 15 aa\nbad-line not-a-number\nflw-h6 16 bb\n")
     # node 17 is registered (it has a key) but claims flw-h6, whose registered node is 16 (offline)
     env["start_relay"](FakeGrid({15: node("flw-h5", p5, 15), 17: node("flw-h6", p6, 17)}), node_map=str(node_map))
     wait_online(client, ["flw-h5"])

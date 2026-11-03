@@ -8,7 +8,9 @@
 #                        SuperLink next to the live one, e.g. a test, uses its own)
 #   FLHUB_FLOWER_SITES   adapter sites (default: the testbed's flw-* sites)
 #   FLOWER_TLS           1: TLS on all SuperLink APIs and SuperNode authentication (certificates
-#                        from tls.sh, nodes registered with register_node.sh); 0: --insecure, no auth
+#                        from tls.sh, nodes registered with register_node.sh); 0: --insecure, no auth.
+#                        Default: 1 once tls.sh has made $TLS_DIR/server.crt, else 0. FLOWER_TLS=0 with
+#                        a certificate present is refused unless FLOWER_ROLLBACK=1 (rollback only).
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 . "$REPO/deploy/versions.env"
 . "$REPO/deploy/topology.env"
@@ -21,8 +23,10 @@ HUB_URL="${FLHUB_HUB_URL:-http://127.0.0.1:$HUB_CORE_PORT}"
 SITES_FLOWER="${FLHUB_FLOWER_SITES:-flw-h5 flw-h6 flw-h11 flw-h12}"   # adapter sites; flw-h11/flw-h12 run only during E5
 BASE_SITES_FLOWER="${FLHUB_FLOWER_BASE_SITES:-flw-h5 flw-h6}"             # status.sh health covers these
 FLWR_HOME_DIR="$RUNTIME/flwr-home"    # SuperLink state + flwr CLI connection config
-FLOWER_TLS="${FLOWER_TLS:-0}"
 TLS_DIR="$RUNTIME/tls"                # Flower CA + SuperLink certificate (tls.sh), mode 700, never in git
+if [ -z "${FLOWER_TLS:-}" ]; then
+  if [ -f "$TLS_DIR/server.crt" ]; then FLOWER_TLS=1; else FLOWER_TLS=0; fi
+fi
 NODES_MAP="$RUNTIME/nodes.map"        # registered SuperNodes: site node_id pubkey_sha256 (register_node.sh)
 export PATH="$VENV/bin:$PATH"         # flower-superexec / flwr-serverapp are found via PATH
 

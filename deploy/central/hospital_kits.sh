@@ -128,7 +128,7 @@ EOF
       logs="\`run/\` and \`docker logs -f vantage6-$site-user\`" ;;
     flower)
       if [ "$FLOWER_TLS" = 1 ]; then
-        creds="credentials/ca.crt (the operator's Flower CA, public; its sha256 is FLOWER_CA_SHA256 in kit.env) and credentials/node_key, this hospital's SuperNode key pair, which \`./install.sh\` makes here. Send only \`credentials/node_key.pub\` and the sha256 that install.sh prints to the operator, who registers it; the SuperNode connects after that. The private key never leaves this machine"
+        creds="credentials/ca.crt (the operator's Flower CA, public; its sha256 is FLOWER_CA_SHA256 in kit.env) and credentials/node_key, this hospital's SuperNode key pair, which \`./install.sh\` makes here. Send only \`credentials/node_key.pub\` and the sha256 that install.sh prints to the operator, who registers it; the SuperNode connects after that. Before install, compare FLOWER_CA_SHA256 with the CA sha256 the operator gives you on a second channel (the copy in this kit proves only that the file is intact). The private key never leaves this machine"
         req="ssh-keygen (package openssh-client), to make the SuperNode key."
       else
         creds="none (Flower runs without client credentials on this testbed)"

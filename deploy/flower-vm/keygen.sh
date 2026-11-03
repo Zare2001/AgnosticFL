@@ -6,6 +6,7 @@
 set -euo pipefail
 . "$(dirname "$0")/common.sh"
 site="${1:?usage: keygen.sh <site> [--send]}"
+[[ "$site" =~ ^[a-z0-9][a-z0-9-]{0,62}$ ]] || { echo "keygen: bad site id '$site'" >&2; exit 2; }
 umask 077
 mkdir -p "$KEY_DIR" && chmod 700 "$KEY_DIR"
 if [ -f "$KEY_DIR/$site" ]; then

@@ -94,8 +94,12 @@ class Relay:
             with open(self.node_map_path, encoding="utf-8") as fh:
                 for line in fh:
                     parts = line.split("#", 1)[0].split()
-                    if len(parts) >= 2:
+                    if len(parts) < 2:
+                        continue
+                    try:
                         entries[parts[0]] = int(parts[1])
+                    except ValueError:
+                        log.warning("node map %s: bad line skipped: %r", self.node_map_path, line.strip())
             self._node_map, self._node_map_mtime = entries, mtime
         return self._node_map.get(site)
 

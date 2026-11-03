@@ -10,7 +10,7 @@ live="$(realpath -m "$HOME/flhub-runtime/flower")"
 rt="$(realpath -m "$RUNTIME")"
 [ "$rt" != "$live" ] || { echo "remove_test: $RUNTIME is the live Flower runtime: refused" >&2; exit 1; }
 [ -n "${FLHUB_FLOWER_RUNTIME:-}" ] || { echo "remove_test: set FLHUB_FLOWER_RUNTIME to the test runtime" >&2; exit 1; }
-case "$rt" in "$HOME"/flhub-runtime/?*) ;; *) echo "remove_test: $rt is not under ~/flhub-runtime: refused" >&2; exit 1 ;; esac
+case "$rt" in "$HOME"/flhub-runtime/flower-?*) ;; *) echo "remove_test: $rt is not a ~/flhub-runtime/flower-<name> test runtime: refused" >&2; exit 1 ;; esac
 bash "$(dirname "$0")/stop.sh"
 rm -rf "$rt"
 echo "remove_test: $rt removed"
