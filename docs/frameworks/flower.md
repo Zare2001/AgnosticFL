@@ -128,7 +128,7 @@ FLWR_HOME=~/flhub-runtime/flower/flwr-home flower-superlink \
     --database ~/flhub-runtime/flower/superlink.db --disable-runtime-dependency-installation
 ```
 
-- The certificate covers all three APIs: the Fleet API for the hospitals and, on 127.0.0.1, the HTTP API that `flwr run` and the ServerApp use. The SuperLink passes its CA file to the `flower-superexec` it starts, so the relay needs no extra setting. With `FLOWER_TLS=0`, `--insecure` replaces the four TLS and authentication options.
+- The certificate covers all three APIs: the Fleet API for the hospitals and, on 127.0.0.1, the HTTP API that `flwr run` and the ServerApp use. The SuperLink passes its CA file to the `flower-superexec` it starts, so the relay needs no extra setting. `FLOWER_TLS` defaults to 1 once `tls.sh` has made the certificate (and to 0 before); with a certificate present, `start.sh` refuses `FLOWER_TLS=0` unless `FLOWER_ROLLBACK=1`, so no restart falls back to `--insecure` by accident. With TLS, `start.sh` also replaces a running adapter that lacks `--node-map`.
 
 - `--database` keeps node ids and runs across a SuperLink restart, so connected SuperNodes stay registered.
 - `--disable-runtime-dependency-installation`: the dependencies are preinstalled; the SuperLink never installs FAB dependencies at run time.
@@ -359,11 +359,13 @@ With `FLOWER_TLS=1` the hospitals own their keys; nothing secret travels.
 | hospital, once | makes its SuperNode key pair; the private key never leaves the hospital | `ssh-keygen -t ecdsa -b 384 -N "" -f <site>` ([`keygen.sh`](../../deploy/flower-vm/keygen.sh); a hospital kit's `./install.sh`) |
 | hospital | sends `<site>.pub` and its sha256 (`sha256sum <site>.pub`) to the operator | testbed: `tools/bus put <site>.pub --to central`, sha256 in the bus message |
 | operator | checks site, sha256 and key type, registers the key; the SuperLink gives it a node id | `bash deploy/central/flower/register_node.sh add <site> <site.pub> --expect-sha256 <hex>` (runs `flwr supernode register`) |
-| operator | sends `ca.crt` (public) and its sha256; the hospital compares the sha256 | in the hospital kit: `credentials/ca.crt`, `FLOWER_CA_SHA256` in `kit.env` |
+| operator | sends `ca.crt` (public) and its sha256; the hospital compares the sha256 with one received on a second channel (the hash inside the kit proves only that the file is intact) | in the hospital kit: `credentials/ca.crt`, `FLOWER_CA_SHA256` in `kit.env` |
 
-What it enforces, tested side by side with the running federation: a SuperNode with an unregistered key (`[code: 2004] Failed to activate SuperNode`), without a key (`[code: 2001] SuperNode authentication is enabled`), with `--insecure`, or trusting another CA (`CERTIFICATE_VERIFY_FAILED`) is refused. After `register_node.sh add --replace` (key rotation) the old key is refused.
+What it enforces, tested side by side with the running federation: a SuperNode with an unregistered key (`[code: 2004] Failed to activate SuperNode`), without a key (`[code: 2001] SuperNode authentication is enabled`), with `--insecure`, or trusting another CA (`CERTIFICATE_VERIFY_FAILED`) is refused. After `register_node.sh add --replace` (key rotation: the new key is registered first, then the old node removed) the old key is refused. Flower never accepts a removed key again (`[code: 23] Public key already in use`): a hospital that rotates makes a new key pair.
 
 **Site binding.** The SuperLink authenticates a key, not a site: the site id is what the SuperNode's node config claims (§2.3). With authentication a node id belongs to one registered key and stays the same across restarts, so `register_node.sh` records `site node_id key_sha256` in `~/flhub-runtime/flower/nodes.map`; the adapter passes the file to the relay (run config `node-map`), and the relay accepts a node for a site only with that site's registered node id (`node … claims site flw-h6, registered node id for flw-h6 is …: refused` in the relay log). Without the file every node is refused. Without authentication (`FLOWER_TLS=0`) there is no map and no check.
+
+**Reply attribution.** A known Flower limitation in reply attribution, reported upstream; mitigations in place.
 
 **Registration order.** A key can be registered while the SuperLink still runs without `--enable-supernode-auth`; the registration is kept in `--database` and holds after a restart with authentication (tested). The switch-over therefore registers the hospitals first and restarts the SuperLink once.
 
