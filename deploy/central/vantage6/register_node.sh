@@ -27,16 +27,16 @@ EXTRA_SITES="v6-h9 v6-h10"
 SITE="${1:?usage: register_node.sh SITE KEYFILE [--collab NAME] [--fingerprint FP]}"
 KEYFILE="${2:?usage: register_node.sh SITE KEYFILE [--collab NAME] [--fingerprint FP]}"
 shift 2
+trap 'shred -u "$KEYFILE" 2>/dev/null || rm -f "$KEYFILE"' EXIT   # set before anything can fail
 COLLAB=flhub; FP_EXPECTED=""
 while [ $# -gt 0 ]; do
   case "$1" in
-    --collab) COLLAB="$2"; shift ;;
-    --fingerprint) FP_EXPECTED="$2"; shift ;;
+    --collab) COLLAB="${2:?--collab needs a value}"; shift ;;
+    --fingerprint) FP_EXPECTED="${2:?--fingerprint needs a value}"; shift ;;
     *) echo "unknown option $1" >&2; exit 2 ;;
   esac
   shift
 done
-trap 'shred -u "$KEYFILE" 2>/dev/null || rm -f "$KEYFILE"' EXIT
 log() { echo "[v6-register] $*"; }
 die() { echo "[v6-register] REFUSED: $*" >&2; exit 1; }
 
@@ -91,12 +91,15 @@ PY
 # --- 3. DB backup (sqlite online backup inside the container, then copied out) ---
 mkdir -p "$RT/db-backups"; chmod 700 "$RT/db-backups"
 BACKUP="$RT/db-backups/$(date -u +%Y%m%dT%H%M%SZ)-$SITE.sqlite"
+CTMP="$(docker exec "$CONTAINER" mktemp /tmp/flhub-backup.XXXXXX)"   # holds node key hashes
+cleanup_ctmp() { docker exec "$CONTAINER" rm -f "$CTMP" 2>/dev/null || true; }
+trap 'cleanup_ctmp; shred -u "$KEYFILE" 2>/dev/null || rm -f "$KEYFILE"' EXIT
 docker exec "$CONTAINER" python -c '
-import os, sqlite3
+import os, sqlite3, sys
 src = sqlite3.connect(os.environ["VANTAGE6_DB_URI"].replace("sqlite:///", "", 1))
-dst = sqlite3.connect("/tmp/flhub-backup.sqlite"); src.backup(dst); dst.close(); src.close()'
-(umask 077; docker cp -q "$CONTAINER:/tmp/flhub-backup.sqlite" "$BACKUP")
-docker exec "$CONTAINER" rm -f /tmp/flhub-backup.sqlite
+dst = sqlite3.connect(sys.argv[1]); src.backup(dst); dst.close(); src.close()' "$CTMP"
+(umask 077; docker cp -q "$CONTAINER:$CTMP" "$BACKUP")
+cleanup_ctmp
 chmod 600 "$BACKUP"
 log "DB backup: $BACKUP"
 

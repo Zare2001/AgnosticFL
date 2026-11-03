@@ -104,7 +104,7 @@ case "${1:-}" in
     for s in $SITES; do
       n="$(node_of "$s")"; stop_node "$n"; docker rm -f "vantage6-$n-user" >/dev/null 2>&1 || true
       rm -rf "$HOME/.config/vantage6/node/$n.yaml" "$HOME/.local/share/vantage6/node/$n"
-      f="$(keyfile "$s")"; for k in "$f" "$f.old"; do [ -f "$k" ] && shred -u "$k"; done
+      f="$(keyfile "$s")"; for k in "$f" "$f.old" "$f.registered"; do [ -f "$k" ] && shred -u "$k"; done
     done
     log "test nodes, configs, task dirs and test keys removed (central: deploy/central/vantage6/keytest.sh clean)" ;;
   *) echo "usage: $0 keys|install|start|stop|status|check|badnode|rotate SITE|clean" >&2; exit 2 ;;

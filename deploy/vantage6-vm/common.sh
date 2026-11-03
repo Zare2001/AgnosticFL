@@ -43,11 +43,13 @@ wait_connected() {
   return 1
 }
 
-# site_key SITE: the node API key of SITE: the hospital's own key file (make_key.sh) or, until the
-# switch-over, the operator-made V6_API_KEY_<SITE> from an env file sourced by the caller
+# site_key SITE: the node API key of SITE: the hospital's own key file (make_key.sh), once central
+# has registered it (make_key.sh --confirm: <key>.registered), or, until the switch-over, the
+# operator-made V6_API_KEY_<SITE> from an env file sourced by the caller
 site_key() {
   local f="$HOME/flhub-runtime/vantage6/keys/$1.key" var
-  if [ -f "$f" ]; then tr -d '[:space:]' < "$f"; return 0; fi
+  if [ -f "$f" ] && [ -f "$f.registered" ]; then tr -d '[:space:]' < "$f"; return 0; fi
+  if [ -f "$f" ]; then echo "note: $f is not confirmed as registered (make_key.sh $1 --confirm <fp>); not used" >&2; fi
   var="V6_API_KEY_$(echo "$1" | tr 'a-z-' 'A-Z_')"
   [ -n "${!var:-}" ] || { echo "no node API key for $1: run deploy/vantage6-vm/make_key.sh $1" >&2; return 1; }
   echo "${!var}"
@@ -55,5 +57,5 @@ site_key() {
 # key_source SITE: "own fp=<12 hex>" or "operator-made" (for logs; never the key)
 key_source() {
   local f="$HOME/flhub-runtime/vantage6/keys/$1.key"
-  if [ -f "$f" ]; then echo "own fp=$(tr -d '[:space:]' < "$f" | sha256sum | cut -c1-12)"; else echo "operator-made"; fi
+  if [ -f "$f" ] && [ -f "$f.registered" ]; then echo "own fp=$(tr -d '[:space:]' < "$f" | sha256sum | cut -c1-12)"; else echo "operator-made"; fi
 }

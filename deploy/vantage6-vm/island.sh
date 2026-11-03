@@ -30,9 +30,10 @@ island_keys() {  # each island node makes its key here; the island server regist
   for pair in $NODES; do
     site="${pair##*:}"; f="$V6_RT/keys/$site.key"
     [ -f "$f" ] && continue
-    (umask 077; python3 -c 'import uuid; print(uuid.uuid4())' > "$f")
-    tmp="$(mktemp)"; cp "$f" "$tmp"   # register_node.sh shreds its input
-    bash "$REPO/deploy/central/vantage6/register_node.sh" "$site" "$tmp"
+    (umask 077; python3 -c 'import uuid; print(uuid.uuid4())' > "$f.new")
+    tmp="$(mktemp)"; cp "$f.new" "$tmp"   # register_node.sh shreds its input
+    if bash "$REPO/deploy/central/vantage6/register_node.sh" "$site" "$tmp"; then mv "$f.new" "$f"
+    else shred -u "$f.new"; echo "island: registering $site failed" >&2; return 1; fi
   done
 }
 
