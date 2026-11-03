@@ -18,6 +18,13 @@ NVF_SITES="${NVF_SITES:-$(for s in $SITES; do IFS=: read -r id fw _ <<<"$s"; if 
 NVF_SITES="${NVF_SITES% }"
 
 nvf_pid_alive() { [ -f "$1" ] && kill -0 "$(cat "$1")" 2>/dev/null; }
+# exact site check: name nvf-h<N> and a word of the list $2 (no regex, no substring)
+nvf_site_in() {
+  local x
+  [[ "$1" =~ ^nvf-h[0-9]+$ ]] || return 1
+  for x in $2; do [ "$x" = "$1" ] && return 0; done
+  return 1
+}
 
 # Watchdog: one cron line per sites dir runs `start.sh --watchdog` every minute, which starts every
 # site of that dir with an enabled marker ($ws/.enabled: start.sh sets it, stop.sh removes it).
@@ -47,7 +54,7 @@ nvf_watchdog_sync() {  # the cron line exists iff a site of this sites dir is en
 nvf_install_signed() {
   local zip=$1 allowed=$2 site fp tmp kit
   site=$(basename "$zip" .signed.zip)
-  if ! grep -qw -- "$site" <<<"$allowed"; then
+  if ! nvf_site_in "$site" "$allowed"; then
     echo "install: signed zip for unexpected site '$site' (expected: $allowed)" >&2; return 1
   fi
   [ -f "$NVF_REQ_DIR/$site/$site.key" ] || { echo "install: no request with a key for $site in $NVF_REQ_DIR/$site (request.sh $site)" >&2; return 1; }
@@ -57,21 +64,21 @@ nvf_install_signed() {
   if nvf_pid_alive "$NVF_SITES_DIR/$site/daemon_pid.fl"; then
     echo "install: $site is running; stop it first (stop.sh $site)" >&2; return 1
   fi
-  tmp=$(mktemp -d)
-  if ! "$NVF_VENV/bin/nvflare" package "$zip" -w "$tmp" --request-dir "$NVF_REQ_DIR/$site" \
-       --fingerprint "$fp" > "$tmp.log" 2>&1; then
-    tail -5 "$tmp.log" >&2; rm -rf "$tmp" "$tmp.log"; return 1
+  tmp=$(mktemp -d); chmod 700 "$tmp"
+  if ! "$NVF_VENV/bin/nvflare" package "$zip" -w "$tmp/ws" --request-dir "$NVF_REQ_DIR/$site" \
+       --fingerprint "$fp" > "$tmp/package.log" 2>&1; then
+    tail -5 "$tmp/package.log" >&2; rm -rf "$tmp"; return 1
   fi
-  kit=$(ls -d "$tmp"/*/prod_*/"$site" 2>/dev/null | head -1)
+  kit=$(ls -d "$tmp"/ws/*/prod_*/"$site" 2>/dev/null | head -1)
   if [ -z "$kit" ] || [ ! -f "$kit/startup/fed_client.json" ] || [ ! -f "$kit/startup/client.key" ]; then
-    echo "install: nvflare package made no client kit for $site" >&2; rm -rf "$tmp" "$tmp.log"; return 1
+    echo "install: nvflare package made no client kit for $site" >&2; rm -rf "$tmp"; return 1
   fi
   if ! cmp -s "$kit/startup/client.key" "$NVF_REQ_DIR/$site/$site.key"; then
-    echo "install: kit key is not $site's own request key" >&2; rm -rf "$tmp" "$tmp.log"; return 1
+    echo "install: kit key is not $site's own request key" >&2; rm -rf "$tmp"; return 1
   fi
   mkdir -p "$NVF_SITES_DIR" && chmod 700 "$NVF_SITES_DIR"
   rm -rf "${NVF_SITES_DIR:?}/$site"
-  mv "$kit" "$NVF_SITES_DIR/$site" && rm -rf "$tmp" "$tmp.log"
+  mv "$kit" "$NVF_SITES_DIR/$site" && rm -rf "$tmp"
   chmod -R go-rwx "$NVF_SITES_DIR/$site"
   rm -f "$NVF_REQ_DIR/$site/$site.key" "$zip"
   echo "install: kit $site -> $NVF_SITES_DIR/$site (built here; root CA $fp)"
@@ -87,7 +94,7 @@ nvf_install_kit() {
   if [ "$(wc -w <<<"$site")" != 1 ] || [ ! -f "$tmp/$site/startup/fed_client.json" ]; then
     echo "install: $kit is not a single NVFlare client kit" >&2; rm -rf "$tmp"; return 1
   fi
-  if ! grep -qw -- "$site" <<<"$allowed"; then
+  if ! nvf_site_in "$site" "$allowed"; then
     echo "install: kit for unexpected site '$site' (expected: $allowed)" >&2; rm -rf "$tmp"; return 1
   fi
   if nvf_pid_alive "$NVF_SITES_DIR/$site/daemon_pid.fl"; then

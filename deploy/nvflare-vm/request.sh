@@ -13,7 +13,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$HERE/common.sh"
 site="${1:-}"; force="${2:-}"
 [ -n "$site" ] || { sed -n '2,10p' "$0" >&2; exit 2; }
-grep -qw -- "$site" <<<"$NVF_SITES $NVF_EXTRA_SITES" || { echo "request: unknown site $site (expected one of: $NVF_SITES $NVF_EXTRA_SITES)" >&2; exit 1; }
+nvf_site_in "$site" "$NVF_SITES $NVF_EXTRA_SITES" || { echo "request: unknown site $site (expected one of: $NVF_SITES $NVF_EXTRA_SITES)" >&2; exit 1; }
 num=$(sed -n 's/^nvf-h\([0-9][0-9]*\).*/\1/p' <<<"$site")
 [ -n "$num" ] || { echo "request: site name $site is not nvf-h<N>" >&2; exit 1; }
 req="$NVF_REQ_DIR/$site"

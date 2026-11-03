@@ -24,6 +24,10 @@ done
 [[ "$expect" =~ ^[0-9a-f]{64}$ ]] || { echo "approve: --expect-pubkey <64 hex chars> is required" >&2; exit 2; }
 [ -f "$NVF_CA_DIR/ca.json" ] && [ -f "$NVF_PROFILE" ] || { echo "approve: no CA; run provision.sh first" >&2; exit 1; }
 
+# One private copy is checked AND signed (no swap between the check and `nvflare cert approve`).
+work=$(mktemp -d); chmod 700 "$work"; trap 'rm -rf "$work"' EXIT
+cp -- "$zip" "$work/request.zip"; zip="$work/request.zip"
+
 # Checks the zip and prints the site name; exits non-zero with the reason otherwise.
 site=$("$NVF_VENV/bin/python" - "$zip" "$expect" "$NVF_PROJECT" "$NVF_SITES" <<'PY'
 import hashlib, json, re, sys, zipfile
@@ -72,13 +76,15 @@ PY
 )
 
 issued="$NVF_ISSUED/$site.crt"
-if [ -f "$issued" ] && openssl x509 -in "$issued" -noout -checkend 0 >/dev/null 2>&1 \
-   && openssl verify -CAfile "$NVF_CA_DIR/rootCA.pem" "$issued" >/dev/null 2>&1; then
+ilog="$NVF_ISSUED/issued.log"   # append-only: <utc> <site> <serial> <notAfter epoch> <pubkey sha256>
+valid_logged=$(awk -v s="$site" -v n="$(date +%s)" '$2 == s && $4 > n' "$ilog" 2>/dev/null | tail -1 || true)
+if [ -n "$valid_logged" ] || { [ -f "$issued" ] && openssl x509 -in "$issued" -noout -checkend 0 >/dev/null 2>&1 \
+   && openssl verify -CAfile "$NVF_CA_DIR/rootCA.pem" "$issued" >/dev/null 2>&1; }; then
   if [ "$reissue" = 0 ]; then
-    echo "approve: REFUSED: $site already has a valid certificate ($(openssl x509 -in "$issued" -noout -enddate)); use --reissue" >&2
+    echo "approve: REFUSED: $site already has a valid certificate (${valid_logged:-$(openssl x509 -in "$issued" -noout -enddate)}); use --reissue" >&2
     exit 1
   fi
-  echo "approve: --reissue: replacing the certificate of $site"
+  echo "approve: --reissue: new certificate for $site; the old one stays valid until it expires (NVFlare has no revocation)"
 fi
 
 out="$NVF_SIGNED_OUT/$site.signed.zip"
@@ -89,7 +95,22 @@ chmod 644 "$out"
   "$out" "$issued.new" "$site.crt"
 openssl verify -CAfile "$NVF_CA_DIR/rootCA.pem" "$issued.new" >/dev/null \
   || { echo "approve: the signed certificate does not verify against the root CA" >&2; rm -f "$out" "$issued.new"; exit 1; }
+# what was signed is what was checked: the hospital's announced key, its name and its org
+"$NVF_VENV/bin/python" - "$issued.new" "$expect" "$site" <<'PY' || { rm -f "$out" "$issued.new"; exit 1; }
+import hashlib, re, sys
+from cryptography import x509
+from cryptography.hazmat.primitives import serialization
+c = x509.load_pem_x509_certificate(open(sys.argv[1], "rb").read())
+der = c.public_key().public_bytes(serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo)
+cn = [a.value for a in c.subject.get_attributes_for_oid(x509.NameOID.COMMON_NAME)]
+o = [a.value for a in c.subject.get_attributes_for_oid(x509.NameOID.ORGANIZATION_NAME)]
+want_o = "hospital" + re.match(r"^nvf-h(\d+)", sys.argv[3]).group(1)
+if hashlib.sha256(der).hexdigest() != sys.argv[2] or cn != [sys.argv[3]] or o != [want_o]:
+    sys.exit(f"approve: the signed certificate does not match the request (CN {cn}, O {o}); not returned")
+PY
 mv "$issued.new" "$issued"
+printf '%s %s %s %s %s\n' "$(date -u +%FT%TZ)" "$site" "$(openssl x509 -in "$issued" -noout -serial | cut -d= -f2)" \
+  "$(date -d "$(openssl x509 -in "$issued" -noout -enddate | cut -d= -f2)" +%s)" "$expect" >> "$ilog"
 echo "approve: signed $site ($(openssl x509 -in "$issued" -noout -serial -enddate | tr '\n' ' '))"
 echo "approve: root CA fingerprint $(nvf_ca_fingerprint)"
 echo "approve: return it with: tools/bus put $out --to nvflare"

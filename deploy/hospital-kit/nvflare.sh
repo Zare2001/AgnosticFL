@@ -52,13 +52,15 @@ nvf_package() {  # startup kit from the operator's signed zip + this site's own 
   [ -n "${NVFLARE_CA_FINGERPRINT:-}" ] || die "kit.env has no NVFLARE_CA_FINGERPRINT"
   [ -f "$REQ/$SITE.key" ] || die "no private key in $REQ: the signed zip must answer this kit's own request"
   local tmp kit
-  tmp=$(mktemp -d)
-  "$VENV/bin/nvflare" package "$KIT/nvflare/$SITE.signed.zip" -w "$tmp" --request-dir "$REQ" \
-    --fingerprint "$NVFLARE_CA_FINGERPRINT" > "$tmp.log" 2>&1 \
-    || { tail -5 "$tmp.log" >&2; rm -rf "$tmp" "$tmp.log"; die "nvflare package refused the signed zip"; }
-  kit=$(ls -d "$tmp"/*/prod_*/"$SITE" 2>/dev/null | head -1)
-  [ -n "$kit" ] && [ -f "$kit/startup/fed_client.json" ] || { rm -rf "$tmp" "$tmp.log"; die "no client kit for $SITE in the signed zip"; }
-  rm -rf "$WS" && mv "$kit" "$WS" && rm -rf "$tmp" "$tmp.log"
+  tmp=$(mktemp -d); chmod 700 "$tmp"
+  "$VENV/bin/nvflare" package "$KIT/nvflare/$SITE.signed.zip" -w "$tmp/ws" --request-dir "$REQ" \
+    --fingerprint "$NVFLARE_CA_FINGERPRINT" > "$tmp/package.log" 2>&1 \
+    || { tail -5 "$tmp/package.log" >&2; rm -rf "$tmp"; die "nvflare package refused the signed zip"; }
+  kit=$(ls -d "$tmp"/ws/*/prod_*/"$SITE" 2>/dev/null | head -1)
+  [ -n "$kit" ] && [ -f "$kit/startup/fed_client.json" ] || { rm -rf "$tmp"; die "no client kit for $SITE in the signed zip"; }
+  cmp -s "$kit/startup/client.key" "$REQ/$SITE.key" || { rm -rf "$tmp"; die "the kit's key is not this site's own request key"; }
+  rm -rf "$WS" && mv "$kit" "$WS" && rm -rf "$tmp"
+  chmod -R go-rwx "$WS"
   rm -f "$REQ/$SITE.key" "$KIT/nvflare/$SITE.signed.zip" "$KIT/nvflare/$SITE.request.zip"
   log "startup kit built here: $WS (root CA $NVFLARE_CA_FINGERPRINT)"
 }
