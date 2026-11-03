@@ -7,6 +7,10 @@ the ``Grid`` and reports every site's reply back as soon as it arrives (flhub/0.
 results). Weights move between the relay and the hub core by blob reference (PROTOCOL.md
 §4); the adapter builds the envelopes.
 
+With SuperNode authentication (FLOWER_TLS=1) a node id belongs to one registered public
+key, and the ``node-map`` run config lists which node id each site registered: the relay then
+accepts a node for a site only if that site's registered node id is the node's own, so a
+registered key cannot claim another site's name. Without authentication (no node map)
 SuperNode ids change whenever a SuperNode restarts, so the relay maps node ids to site ids
 by sending a QUERY message to every new node (answered by the ClientApp's ``@app.query()``
 handler with its ``site-id`` node config) and reports the mapped sites for ``discover``.
@@ -18,6 +22,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import threading
 import time
 from typing import Any
@@ -56,7 +61,8 @@ class Relay:
     """Moves flhub rounds between the adapter service and the Flower Grid."""
 
     def __init__(self, grid: Grid, client: RelayClient, poll_timeout_s: float = 10.0,
-                 query_timeout_s: float = 60.0, fab_id: str = "", run_id: int | None = None) -> None:
+                 query_timeout_s: float = 60.0, fab_id: str = "", run_id: int | None = None,
+                 node_map_path: str = "") -> None:
         self.grid = grid
         self.client = client
         self.poll_timeout_s = poll_timeout_s
@@ -71,6 +77,27 @@ class Relay:
         self._superseded: set[int] = set()  # nodes replaced by a newer node of the same site
         self._orphans: dict[str, tuple[str, str, float]] = {}  # msg id -> (site, job, forget-after)
         self._last_refresh = float("-inf")
+        self.node_map_path = node_map_path
+        self._node_map: dict[str, int] = {}
+        self._node_map_mtime: float | None = None
+
+    # ---------------------------------------------------------------- site binding
+    def registered_node(self, site: str) -> int | None:
+        """The node id registered for ``site`` in the node map (re-read when it changes)."""
+        try:
+            mtime = os.stat(self.node_map_path).st_mtime
+        except OSError:
+            self._node_map, self._node_map_mtime = {}, None
+            return None
+        if mtime != self._node_map_mtime:
+            entries: dict[str, int] = {}
+            with open(self.node_map_path, encoding="utf-8") as fh:
+                for line in fh:
+                    parts = line.split("#", 1)[0].split()
+                    if len(parts) >= 2:
+                        entries[parts[0]] = int(parts[1])
+            self._node_map, self._node_map_mtime = entries, mtime
+        return self._node_map.get(site)
 
     # ---------------------------------------------------------------- node mapping
     def refresh_nodes(self, force: bool = False) -> None:
@@ -128,6 +155,13 @@ class Relay:
             return
         info = reply.content[SITE_INFO]
         site = str(info["site-id"])
+        if self.node_map_path:
+            expected = self.registered_node(site)
+            if expected != nid:
+                log.warning("node %s claims site %s, registered node id for %s is %s: refused",
+                            nid, site, site, expected)
+                self._query_failed[nid] = time.monotonic() + QUERY_RETRY_S
+                return
         for other, other_info in list(self.sites.items()):
             if other != nid and other_info["site_id"] == site:
                 # A restarted SuperNode gets a new id while the old id is still listed
@@ -376,4 +410,4 @@ def main(grid: Grid, context: Context) -> None:
     client = RelayClient(str(cfg["adapter-url"]), hub_url=str(cfg["hub-url"]))
     Relay(grid, client, poll_timeout_s=float(cfg["poll-timeout-s"]),
           query_timeout_s=float(cfg["query-timeout-s"]), fab_id=str(cfg.get("fab-id", "")),
-          run_id=context.run_id).serve()
+          run_id=context.run_id, node_map_path=str(cfg.get("node-map", ""))).serve()

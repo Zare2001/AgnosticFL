@@ -102,9 +102,9 @@ def env(tmp_path, monkeypatch):
     srv = adapter.build_server("127.0.0.1", 0).start()
     relays = []
 
-    def start_relay(grid, fab_id=""):
+    def start_relay(grid, fab_id="", node_map=""):
         relay = server_app.Relay(grid, RelayClient(srv.url, hub_srv.url), poll_timeout_s=0.5, query_timeout_s=5.0,
-                                 fab_id=fab_id)
+                                 fab_id=fab_id, node_map_path=node_map)
         t = threading.Thread(target=relay.serve, daemon=True)
         t.start()
         relays.append(t)
@@ -171,6 +171,36 @@ def test_restarted_supernode_replaces_stale_node(env):
     wait_online(client, ["flw-h5", "flw-h6"])
     tid = client.dispatch(1, {"ref": env["hub"].put_weights(init_weights(1))}, TC, ["flw-h5"], deadline_s=60)
     assert wait_state(client, tid)["state"] == "completed"
+
+
+def test_node_map_binds_site_to_registered_node(env, monkeypatch):
+    """With node auth, a node serves a site only with that site's registered node id."""
+    monkeypatch.setattr(server_app, "QUERY_RETRY_S", 0.2)
+    client = env["client"]
+    p5, p6 = site_csv(env["tmp"], "flw-h5", 1), site_csv(env["tmp"], "flw-h6", 2)
+    node_map = env["tmp"] / "nodes.map"
+    node_map.write_text("# site node_id pubkey_sha256\nflw-h5 15 aa\nflw-h6 16 bb\n")
+    # node 17 is registered (it has a key) but claims flw-h6, whose registered node is 16 (offline)
+    env["start_relay"](FakeGrid({15: node("flw-h5", p5, 15), 17: node("flw-h6", p6, 17)}), node_map=str(node_map))
+    wait_online(client, ["flw-h5"])
+    time.sleep(1.0)
+    status = {s["site_id"]: s["status"] for s in client.discover()["sites"]}
+    assert status.get("flw-h6") != "online"
+    # key rotation: central registers node 17 for flw-h6; the relay re-reads the map
+    node_map.write_text("flw-h5 15 aa\nflw-h6 17 cc\n")
+    wait_online(client, ["flw-h5", "flw-h6"])
+    tid = client.dispatch(1, {"ref": env["hub"].put_weights(init_weights(1))}, TC, ["flw-h5", "flw-h6"],
+                          deadline_s=60)
+    assert wait_state(client, tid)["state"] == "completed"
+
+
+def test_missing_node_map_refuses_every_node(env, monkeypatch):
+    monkeypatch.setattr(server_app, "QUERY_RETRY_S", 0.2)
+    p5 = site_csv(env["tmp"], "flw-h5", 1)
+    env["start_relay"](FakeGrid({15: node("flw-h5", p5, 15)}), node_map=str(env["tmp"] / "absent.map"))
+    time.sleep(1.5)
+    status = {s["site_id"]: s["status"] for s in env["client"].discover()["sites"]}
+    assert status.get("flw-h5") != "online"
 
 
 def test_missing_and_lost_sites_fail_fast(env):
