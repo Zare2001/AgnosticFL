@@ -11,7 +11,7 @@ Template for a framework guide. Copy it to `docs/frameworks/<framework>.md`, kee
 ## 2. Server side: how the adapter maps flhub onto <Framework>
 
 - Components: the adapter service and, if used, the relay job, run or tasks inside the framework server.
-- How one round is executed (`dispatch` → framework messages → envelopes).
+- How one round is executed (from `dispatch` through the framework's messages to the envelopes).
 - Ports, configuration, start, stop and health check.
 - How sites are discovered and identified (`site_id`).
 
@@ -43,7 +43,7 @@ Template for a framework guide. Copy it to `docs/frameworks/<framework>.md`, kee
 
 ## 7. Troubleshooting
 
-- Problems met during testing, as short entries: symptom → cause → fix.
+- Problems met during testing, as short entries, one per problem: `- **symptom** Cause: ... Fix: ...` (bold only on the symptom).
 
 ## 8. Future work and upstream reports
 
