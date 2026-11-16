@@ -1,11 +1,11 @@
-"""Generate every stage-2 run config from one place (EXPERIMENTS.md), so names and settings match.
+"""Generate every stage-2 run config from one place, so names and settings match.
 
     python scripts/stage2/make_configs.py [--out configs/stage2] [--check]
 
 Tuned values (client lr, server eta per aggregator, FedProx mu, A*) come from
-configs/stage2/tuned.yaml once S3 is done; until then the plan's defaults are used.
+configs/stage2/tuned.yaml once the tuning (scripts/stage2/tune.py) is done; until then the defaults below are used.
 Writes configs/stage2/{s3,e1,e2,e3,e4a,e4b,e5,e6,e7}/<run name>.yaml; --check fails if a file
-would change (used at S3-frozen).
+would change.
 """
 
 from __future__ import annotations

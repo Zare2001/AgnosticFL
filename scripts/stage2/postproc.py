@@ -8,7 +8,7 @@ Takes jobs from ~/flhub-runtime/runs/stage2/queue/ in order (written by run_fina
              counterpart real run is in runs.md)
   reference  hub.sim --mode centralized|local then finalize --mode reference
   native     finalize --mode native --hub-run (deferred until the hub run is finalized)
-CPU hygiene (PLAN.md §6): no sims while an E3/E4/E5/E7 run is active or HOLD_POST exists (a sweep
+CPU rule: no sims while an E3/E4/E5/E7 run is active or HOLD_POST exists (a sweep
 in progress); otherwise nice 19 and at most 2 workers while any run is active (4 when idle).
 """
 
@@ -83,12 +83,12 @@ def process(job: dict, workers: int) -> str:
         else:
             rc = sh(sim_cmd(workers) + ["--config", job["config"], "--compare", run_dir, "--name",
                                         f"{name}-inv1sim", "--runs-dir", str(RUNS / "inv1")], log)
-            if rc == 0 and ("payload" in name or "-e4" in name):  # echo payloads: hashes suffice (PLAN §7)
+            if rc == 0 and ("payload" in name or "-e4" in name):  # echo payloads: hashes suffice
                 sim_dir = latest_run(f"{name}-inv1sim", RUNS / "inv1")
                 for p in (sim_dir / "rounds").glob("*.safetensors") if sim_dir else []:
                     p.unlink()
             rc = rc or finalize([run_dir, "--mode", "real", *notes], log)
-            if rc == 0:  # finalized: the comparison is recorded, the sim's checkpoints are not needed (PLAN §7)
+            if rc == 0:  # finalized: the comparison is recorded, the sim's checkpoints are not needed
                 sim_dir = latest_run(f"{name}-inv1sim", RUNS / "inv1")
                 for p in (sim_dir / "rounds").glob("*.safetensors") if sim_dir else []:
                     p.unlink()

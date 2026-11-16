@@ -1,4 +1,4 @@
-"""Keep only finished runs tagged `final` in the W&B project (COLLABORATION.md §6).
+"""Keep only finished runs tagged `final` in the W&B project.
 
     python scripts/wandb_cleanup.py [--apply] [--project AgnosticFL] [--entity E] [--tag final] [--dedupe]
 

@@ -1,4 +1,4 @@
-"""Read-only W&B audit for the stage-2 Definition of Done (PLAN.md stage 2 §9.5).
+"""Read-only W&B audit of the stage-2 runs.
 
     python scripts/stage2/wandb_audit.py [--out docs/results/evidence/stage2/wandb_audit.json]
 

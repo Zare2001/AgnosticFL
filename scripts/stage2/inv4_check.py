@@ -1,4 +1,4 @@
-"""INV-4 check (PLAN.md stage 2 §2, §9.2): re-run a final config from the frozen SHA and compare.
+"""INV-4 check: re-run a final config from the frozen SHA and compare.
 
     python scripts/stage2/inv4_check.py configs/stage2/e1/s2-e1-dir0.3-fedavg.yaml [--sim]
 

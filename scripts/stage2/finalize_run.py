@@ -1,4 +1,4 @@
-"""Finalize a stage-2 final run (PLAN.md stage 2 §6): gate -> W&B -> runs.md -> retention.
+"""Finalize a stage-2 final run: gate, W&B upload, row in runs.md, retention.
 
     python scripts/stage2/finalize_run.py <run_dir> --mode real [--replay] [--equal-to RUN_DIR]
     python scripts/stage2/finalize_run.py <run_dir> --mode sim --counterpart <real run name>

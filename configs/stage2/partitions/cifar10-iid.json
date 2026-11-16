@@ -1,0 +1,19 @@
+{
+ "variant": "cifar10-iid",
+ "dataset": "cifar10",
+ "pid": "iid",
+ "definition": "stratified random split, equal sizes",
+ "partition_seed": 2026,
+ "dataset_sha256": "6d958be074577803d12ecdefd02955f39262c83c16fe9348329d7fe0b5c001ce",
+ "num_classes": 10,
+ "class_names": ["airplane", "automobile", "bird", "cat", "deer", "dog", "frog", "horse", "ship", "truck"],
+ "total": 50000,
+ "sites": {
+  "nvf-h1": {"n": 8334, "label_hist": [834, 833, 833, 834, 833, 833, 834, 833, 833, 834], "sha256": "b45dc0a1b3d6299da4e83b33769106a80a4debb6286da30eae4b0b0b5944b795", "fingerprint": "7a6bbe843f5641ab2cf36b9e498ac73c61d5a9f8b4fa7dfe8db72a0de7dee7a4", "file": "cifar10-iid-nvf-h1.csv"},
+  "nvf-h2": {"n": 8334, "label_hist": [834, 833, 833, 834, 833, 833, 834, 833, 833, 834], "sha256": "be1725265b35d35e82fc495b706b2d5a74aa208428f63e05b2f2a86915669970", "fingerprint": "0220b3a22113afa7b8d14e88c3f14459db0d38077715eeb943c0a7534ce7a38d", "file": "cifar10-iid-nvf-h2.csv"},
+  "v6-h3": {"n": 8333, "label_hist": [833, 834, 833, 833, 834, 833, 833, 834, 833, 833], "sha256": "2b68009405518c740a690ffd1d06efd6608d3ba2eaf03b2b3d842e63926e91cc", "fingerprint": "0bfa66d6c3f0e2b3fe0a4b957a7796311f6a1dceabaea54a3f79e91e69d54ff7", "file": "cifar10-iid-v6-h3.csv"},
+  "v6-h4": {"n": 8333, "label_hist": [833, 834, 833, 833, 834, 833, 833, 834, 833, 833], "sha256": "ef595e8f5d0d859f35a5814976d78e1d6a425da0b8b5a38ca5f1004929160660", "fingerprint": "569147d00c010e4115d639f59c9a4b702dea2718d756e336f78ff64f72893ace", "file": "cifar10-iid-v6-h4.csv"},
+  "flw-h5": {"n": 8333, "label_hist": [833, 833, 834, 833, 833, 834, 833, 833, 834, 833], "sha256": "5b7f289ea241a1a1442fd118bedcc5133d5de730a42cc823d5f9cbbb7f81888c", "fingerprint": "aaf1c6a449956b813d3b30ff3aa9e990f7b139547acf8563354fdb1b78140b02", "file": "cifar10-iid-flw-h5.csv"},
+  "flw-h6": {"n": 8333, "label_hist": [833, 833, 834, 833, 833, 834, 833, 833, 834, 833], "sha256": "6f133cba09766652a7a70317342888396aaf7e382d89cbe53cba26ebb88abb58", "fingerprint": "61f33274040fc8311fe251d7a88e9e66415bd59f361784d55ddd942408a26c08", "file": "cifar10-iid-flw-h6.csv"}
+ }
+}

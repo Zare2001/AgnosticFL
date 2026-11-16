@@ -1,4 +1,4 @@
-"""Markdown tables for REPORT_STAGE2.md, computed from the run dirs (no hand-copied numbers).
+"""Markdown tables of the stage-2 results, computed from the run dirs (no hand-copied numbers).
 
     python scripts/stage2/report_tables.py [--runs ~/flhub-runtime/runs/stage2] [--out docs/results/evidence/stage2/tables.md]
 

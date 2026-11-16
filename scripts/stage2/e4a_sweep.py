@@ -1,15 +1,15 @@
-"""E4a payload sweep for one scope with the stop rule (EXPERIMENTS.md E4a, PLAN.md stage 2 §7).
+"""E4a payload sweep for one scope with the stop rule (docs/results/stage2.md, E4a).
 
     python scripts/stage2/e4a_sweep.py --scope nvflare|vantage6|flower|mixed [--sizes 1,8,...,512] [--retry]
 
 Per size, in order: purge the scope's framework stores (deploy/central/<fw>/purge.sh), then
 run_final.py real (which applies the disk rule: free >= 3 GB + 4 x payload x sites). After the run:
 the central RAM rule (any process peak RSS > 70 % of RAM ends the sweep for the scope), and on a
-failed run the sweep stops and the framework agent is asked for a server-side knob; after the knob
+failed run the sweep stops and the framework's operator is asked on the bus for a server-side knob; after the knob
 is deployed, rerun with --retry --sizes <that size>,... (one retry; a second failure is the limit).
 After a successful run its weight checkpoints are deleted (echo payloads: the global_ref hashes in
-rounds/*.json suffice for INV-1, PLAN.md §7). Results go to <runs>/e4a-<scope>.json and the campaign log. While the sweep runs, HOLD_POST keeps
-postproc.py from starting sims (CPU hygiene); the queued INV-1 jobs run after the sweep.
+rounds/*.json suffice for INV-1). Results go to <runs>/e4a-<scope>.json and the campaign log. While the sweep
+runs, HOLD_POST keeps postproc.py from starting sims; the queued INV-1 jobs run after the sweep.
 """
 
 from __future__ import annotations

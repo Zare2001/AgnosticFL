@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# E7 overhead vs native FedAvg (EXPERIMENTS.md E7): per framework the native run (the framework
-# agent's deploy/central/<fw>/native/run.sh) then the matching hub run, for C1 (cnn) and C2 (payload).
+# E7 overhead vs native FedAvg (docs/results/stage2.md): per framework the native run
+# (deploy/central/<fw>/native/run.sh) then the matching hub run, for C1 (cnn) and C2 (payload).
 # No sims on central during the phase (HOLD_POST). The native finalize waits for the hub run (postproc).
 #   nohup bash scripts/stage2/campaign_e7.sh [nvflare vantage6 flower] > ~/flhub-runtime/runs/stage2/logs/campaign_e7.log 2>&1 &
 set -uo pipefail

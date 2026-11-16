@@ -1,4 +1,4 @@
-"""Bytes on wire per framework for E4 runs (PLAN.md stage 2 §4.3): sysmon interface deltas.
+"""Bytes on wire per framework for E4 runs: sysmon interface deltas.
 
     python scripts/stage2/e4_bytes.py [--runs ~/flhub-runtime/runs/stage2] [--out docs/results/evidence/stage2/e4_bytes.md]
 

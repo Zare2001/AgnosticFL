@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# End-state evidence on central for the stage-2 DoD (PLAN.md stage 2 §9.8). Read-only checks:
+# End-state evidence on central after stage 2. Read-only checks:
 # no tc rules, no netem revert timers, no experiment processes, E5 extra sites offline, >= 3 GB free,
 # hub core up and the six base sites online in all three adapters.
 #   bash scripts/stage2/endstate_central.sh        (exit 0 only if every check passes)

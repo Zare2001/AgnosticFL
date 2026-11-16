@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# P3 final runs on the central VM, online to W&B (tag final, one group), then the equivalence check.
+# Stage-1 final runs on the central VM, online to W&B (tag final, one group), then the equivalence check.
 #   bash scripts/run_final.sh all            # all six runs + equivalence, in order
 #   bash scripts/run_final.sh <step> ...     # steps: centralized sim nvflare vantage6 flower mixed equivalence
 # A failed or superseded run must be deleted from W&B (scripts/wandb_cleanup.py) before re-running it.

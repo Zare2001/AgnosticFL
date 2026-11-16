@@ -1,4 +1,4 @@
-"""Central-side fault injection for E6 (EXPERIMENTS.md E6d, E6e; PLAN.md stage 2 §8.5).
+"""Central-side fault injection for E6 (E6d, E6e; docs/results/stage2.md, RQ5).
 
     python scripts/stage2/inject_central.py e6d [--config configs/stage2/e6/s2-e6d-resume.yaml] [--round 20]
            [--delay 3] [--equal-to s2-e2-dir0.3-fedavgm]
@@ -31,8 +31,8 @@ from campaign import ACTIVE, LOGS, PY, REPO, RUNS, bus, enqueue, ensure_dirs, re
 
 ADAPTER_PATTERNS = {"nvflare": "adapters.nvflare.service", "vantage6": "-m adapters.vantage6",
                     "flower": "adapters.flower.service"}
-# command that starts only the adapter again (framework server and hospitals untouched); bus #156,
-# answers #160 (flower), #162 (nvflare) and #169 (vantage6): start.sh starts only what is not running
+# command that starts only the adapter again (framework server and hospitals untouched):
+# each start.sh starts only what is not running
 ADAPTER_START = {
     "nvflare": "bash deploy/central/nvflare/start.sh",
     "vantage6": "bash deploy/central/vantage6/start.sh",

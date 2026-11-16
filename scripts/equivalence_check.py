@@ -1,4 +1,4 @@
-"""Compare two runs round by round (PROJECT_PLAN.md §6 P3).
+"""Compare two runs round by round (docs/results/stage1.md).
 
     python scripts/equivalence_check.py RUN_A RUN_B [--weight-tol 1e-5] [--acc-tol-pp 0.1]
                                         [--json OUT] [--wandb-run ENTITY/PROJECT/RUN_ID]

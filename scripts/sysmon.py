@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""System monitor for stage-2 runs (PLAN.md stage 2 §4.3). Standard library only (reads /proc).
+"""System monitor for stage-2 runs. Standard library only (reads /proc).
 
     python3 scripts/sysmon.py run [--dir ~/flhub-runtime/sysmon] [--interval 1] [--keep-hours 48]
                                   [--proc NAME=REGEX ...]

@@ -1,4 +1,4 @@
-"""Round-time cost model for RQ4 (REPORT_TEMPLATE §6): round_time ≈ a + b·payload + max_k train_k.
+"""Round-time cost model for RQ4 (docs/results/stage2.md): round_time ≈ a + b·payload + max_k train_k.
 
     python scripts/stage2/cost_model.py [--out docs/results/evidence/stage2/cost_model.md]
 

@@ -1,11 +1,11 @@
-"""One E4b run with network shaping on both ends (EXPERIMENTS.md E4b, PLAN.md stage 2 §8).
+"""One E4b run with network shaping on both ends (docs/results/stage2.md, E4b).
 
     python scripts/stage2/e4b_run.py <profile>          profile: none | wan1g | wan100 | wan20
 
 For a shaped profile: central applies deploy/central/netem.sh to all three framework VMs in one call
-(revert timer first), asks every framework agent with 'NETEM APPLY <profile> <minutes>' and waits for
-replies containing 'NETEM APPLIED <profile>'; then runs s2-e4b-<profile> (run_final.py, HOLD_POST
-for the whole step); then clears central, asks 'NETEM CLEAR <profile>' and waits for 'NETEM CLEARED'.
+(revert timer first), asks every framework operator on the bus with 'NETEM APPLY <profile> <minutes>'
+and waits for replies containing 'NETEM APPLIED <profile>'; then runs s2-e4b-<profile> (run_final.py,
+HOLD_POST for the whole step); then clears central, asks 'NETEM CLEAR <profile>' and waits for 'NETEM CLEARED'.
 Central's rule is cleared even when the run fails.
 """
 
@@ -22,14 +22,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from campaign import PY, REPO, RUNS, bus, utc  # noqa: E402
 
 PEERS = ["145.38.189.142", "145.38.186.63", "145.38.187.20"]
-AGENTS = ["nvflare", "vantage6", "flower"]
+ROLES = ["nvflare", "vantage6", "flower"]
 MINUTES = {"wan1g": 30, "wan100": 40, "wan20": 75}
 MSG = re.compile(r"^#(\d+) \S+ \[[\w-]+\] (\S+) -> \S+: (.*)$")
 
 
 def send_all(subject: str, body: str) -> int:
     first = None
-    for a in AGENTS:
+    for a in ROLES:
         out = subprocess.run([str(REPO / "tools" / "bus"), "send", "--to", a, "--type", "request", "--subject",
                               subject, "--body", body], cwd=REPO, capture_output=True, text=True).stdout
         m = re.search(r"sent #(\d+)", out)
@@ -38,7 +38,7 @@ def send_all(subject: str, body: str) -> int:
 
 
 def wait_ack(since: int, keyword: str, timeout: float = 900) -> bool:
-    waiting = set(AGENTS)
+    waiting = set(ROLES)
     end = time.time() + timeout
     while waiting and time.time() < end:
         log = subprocess.run([str(REPO / "tools" / "bus"), "log", "--since", str(since), "--limit", "1000"], cwd=REPO,

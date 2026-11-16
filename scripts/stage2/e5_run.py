@@ -1,8 +1,8 @@
-"""E5 number of sites (EXPERIMENTS.md E5): 6 base sites, then 12 with the extra sites up.
+"""E5 number of sites (docs/results/stage2.md, E5): 6 base sites, then 12 with the extra sites up.
 
     python scripts/stage2/e5_run.py [--skip-6]
 
-Holds post-processing for the phase (no sims during E5). Runs s2-e5-6sites; asks every framework agent
+Holds post-processing for the phase (no sims during E5). Runs s2-e5-6sites; asks every framework operator on the bus
 'E5 EXTRAS UP' and waits for 'E5 EXTRAS ONLINE'; runs s2-e5-12sites (the orchestrator also waits until
 all 12 sites are online); then 'E5 EXTRAS DOWN' and waits for 'E5 EXTRAS STOPPED'.
 """

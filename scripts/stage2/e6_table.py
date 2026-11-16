@@ -1,8 +1,8 @@
-"""E6 robustness tables (EXPERIMENTS.md E6): injections, per-run outcome, straggler windows.
+"""E6 robustness tables (docs/results/stage2.md, RQ5): injections, per-run outcome, straggler windows.
 
     python scripts/stage2/e6_table.py [--out docs/results/evidence/stage2/e6.md]
 
-Framework-side injections come from the bus ('E6 inject ...' info messages from the framework agents'
+Framework-side injections come from the bus ('E6 inject ...' info messages from the framework VMs'
 inject.sh) inside each E6 run's window: detection = first failed attempt or dropped site after the
 injection (run events.jsonl); recovery = end of the round that was hit (completed, after retries if
 strict). Central's own injections (E6d, E6e) come from <run>/injections.jsonl, which also records

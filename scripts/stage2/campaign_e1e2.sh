@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# E1 then E2 real runs, one at a time (EXPERIMENTS.md §Order step 3). After each real run its
+# E1 then E2 real runs, one at a time. After each real run its
 # seed-2027/2028 sims are queued; postproc.py runs them (nice 19, <= 2 workers) once the real run
 # passed INV-1 and was finalized. The E1 references are queued first.
 #   nohup bash scripts/stage2/campaign_e1e2.sh [e1|e2|all] > ~/flhub-runtime/runs/stage2/logs/campaign_e1e2.log 2>&1 &

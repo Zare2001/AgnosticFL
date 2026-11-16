@@ -1,12 +1,12 @@
-"""E6 ARM handshake (PLAN.md stage 2 §6): send ARM requests, wait for every ARMED reply.
+"""E6 ARM handshake (docs/results/stage2.md, E6): send ARM requests, wait for every ARMED reply.
 
     python scripts/stage2/arm.py --run s2-e6a-strict \
         --arm "nvflare:nvf-h1 kill at round 5 +0.5s" --arm "vantage6:v6-h3 kill at round 10 +0.3s" \
         --arm "flower:flw-h5 kill-node at round 15 +4s" [--timeout 1200]
 
-Each --arm "<agent>:<site> <action ...>" becomes a bus request "ARM <run> <site> <action ...>" to that
-agent. Exit 0 once every addressed agent sent a message mentioning ARMED and the run name after
-the requests; exit 1 on timeout (then the run must not start).
+Each --arm "<role>:<site> <action ...>" becomes a bus request "ARM <run> <site> <action ...>" to that
+bus role (the framework's operator). Exit 0 once every addressed role sent a message that mentions
+ARMED and the run name after the requests; exit 1 on timeout (then the run must not start).
 """
 
 from __future__ import annotations
@@ -33,16 +33,16 @@ def send(to: str, subject: str, body: str = "") -> int:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--run", required=True)
-    ap.add_argument("--arm", action="append", required=True, metavar="AGENT:SITE ACTION...")
+    ap.add_argument("--arm", action="append", required=True, metavar="ROLE:SITE ACTION...")
     ap.add_argument("--timeout", type=float, default=1200)
     args = ap.parse_args(argv)
     first, waiting = None, set()
     for spec in args.arm:
-        agent, _, what = spec.partition(":")
-        mid = send(agent, f"ARM {args.run} {what}", "Reply 'ARMED " + args.run + "' when armed (PLAN.md §6).")
+        role, _, what = spec.partition(":")
+        mid = send(role, f"ARM {args.run} {what}", "Reply 'ARMED " + args.run + "' when armed.")
         first = mid if first is None else min(first, mid)
-        waiting.add(agent)
-        print(f"ARM -> {agent}: {args.run} {what} (#{mid})", flush=True)
+        waiting.add(role)
+        print(f"ARM -> {role}: {args.run} {what} (#{mid})", flush=True)
     end = time.time() + args.timeout
     while waiting and time.time() < end:
         log = subprocess.run([BUS, "log", "--since", str(first), "--limit", "1000"], cwd=REPO, capture_output=True,

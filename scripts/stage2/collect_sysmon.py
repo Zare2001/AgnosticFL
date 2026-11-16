@@ -1,4 +1,4 @@
-"""Fetch the framework agents' sysmon summaries from the bus into the run dirs (PLAN.md §4.3).
+"""Fetch the framework VMs' sysmon summaries from the bus into the run dirs.
 
     python scripts/stage2/collect_sysmon.py [--since 98]
 

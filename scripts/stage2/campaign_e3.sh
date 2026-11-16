@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# E3 model scale (EXPERIMENTS.md E3), one run at a time, no sims on central during the whole phase
+# E3 model scale (docs/results/stage2.md), one run at a time, no sims on central during the whole phase
 # (HOLD_POST). cnn-medium: INV-1 by full sim afterwards; resnet18-gn: replay spot-check (rounds 1,2,3,last).
 # The vantage6 store is purged before every run: cnn-medium tasks stay in the server DB (~2.4 GB per run,
 # below the adapter's 16 MB per-round delete, ADR-020). After every run the hold is lifted until that run

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""agentbus - tiny message bus for the AgnosticFL build agents.
+"""agentbus - small message bus between the operators of the AgnosticFL testbed VMs.
 
 Stdlib only. One server (on the central VM, port 7700) and a CLI client.
 
@@ -11,14 +11,14 @@ Client (reads AGENTBUS_URL, AGENTBUS_TOKEN, FLHUB_ROLE from the environment):
     agentbus.py inbox  [--all]            # new messages since your cursor (advances cursor)
     agentbus.py wait   [--timeout 600]    # block until a new message arrives (long-poll)
     agentbus.py log    [--since 0] [--limit 200]
-    agentbus.py status-set --phase P1 --summary "island run passes" [--blockers "..."]
-    agentbus.py status                    # status board of all agents
+    agentbus.py status-set --phase testing --summary "island run passes" [--blockers "..."]
+    agentbus.py status                    # status board of all roles
     agentbus.py put    FILE --to central [--secret] [--note "..."]   # upload a file
     agentbus.py get    FILE_ID [-o OUT]                              # download (auto-decrypts)
     agentbus.py export [-o bus_transcript.md]                        # full transcript for the report
     agentbus.py health
 
-Agents: central, nvflare, vantage6, flower. Use --to all to broadcast.
+Roles: central, nvflare, vantage6, flower. Use --to all to broadcast.
 Secret files are encrypted client-side with openssl (AES-256-CBC, PBKDF2) using
 AGENTBUS_TOKEN as the passphrase, so the server only ever stores ciphertext.
 """
@@ -355,7 +355,7 @@ def cmd_export(args):
             break
         msgs += chunk
         since = chunk[-1]["id"]
-    lines = ["# Agent bus transcript", "", f"Exported {now()} - {len(msgs)} messages", ""]
+    lines = ["# Message bus transcript", "", f"Exported {now()} - {len(msgs)} messages", ""]
     for m in msgs:
         lines.append(f"- **#{m['id']}** `{m['ts']}` **{m['from']} → {m['to']}** [{m['type']}] {m['subject']}")
         if m.get("body"):

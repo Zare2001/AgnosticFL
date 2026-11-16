@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# E6 runs (EXPERIMENTS.md E6), one at a time. Injected runs start only after every ARMED reply.
+# E6 runs (docs/results/stage2.md, RQ5), one at a time. Injected runs start only after every ARMED reply.
 #   bash scripts/stage2/campaign_e6.sh <step>     steps: a-strict a-minsites b-straggler c d e
 set -uo pipefail
 cd "$(dirname "$0")/../.."

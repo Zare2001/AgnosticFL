@@ -1,4 +1,4 @@
-"""Report figures for REPORT_STAGE2.md (docs/agents/stage2/REPORT_TEMPLATE.md, figure list).
+"""Figures of the stage-2 report (docs/results/stage2.md).
 
     python scripts/stage2/plots.py [--runs ~/flhub-runtime/runs/stage2] [--out docs/results/figures]
                                    [--only e1_acc ...]
@@ -420,7 +420,7 @@ def fig_e6_timeline(out: Path, name: str = "s2-e6a-strict") -> None:
             elif ev["action"] == "sigkill":
                 back = next((x for x in evs if x["action"] == "resume"), ev)
                 marks.append((sec(ev["utc"]) - t0, sec(back["utc"]) - t0, "SIGKILL hub + adapters"))
-    else:  # the framework agents' injections, announced on the bus
+    else:  # injections on the framework VMs, announced on the bus
         sys.path.insert(0, str(Path(__file__).resolve().parent))
         from e6_table import bus_injections
 

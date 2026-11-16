@@ -1,4 +1,4 @@
-"""Run one stage-2 final run on central (PLAN.md stage 2 §6) or queue its post-processing.
+"""Run one stage-2 final run on central or queue its post-processing.
 
     python scripts/stage2/run_final.py real <config.yaml> [--replay] [--equal-to RUN_NAME] [--notes ".."]
                                        [--no-post] [--allow-unfrozen]
@@ -8,7 +8,7 @@
 
 real: frozen-SHA and disk checks -> bus "RUN start <name> <UTC>" -> hub.orchestrator -> bus "RUN end"
 (with per-round UTC windows) -> central sysmon summary into <run_dir>/sysmon/central.json -> queue
-INV-1 + finalize for scripts/stage2/postproc.py. ACTIVE_RUN marks the run for the CPU-hygiene rule.
+INV-1 + finalize for scripts/stage2/postproc.py. ACTIVE_RUN marks the run for the CPU rule (scripts/stage2/postproc.py).
 """
 
 from __future__ import annotations
@@ -88,7 +88,7 @@ def real(args) -> int:
         need = max(need, 3.0 + float(json.loads(proj.read_text()).get(cfg.name, 0.0)))
     if free_gb() < need:
         bus("info", f"S2 testbed disk limit: {cfg.name} needs {need:.1f} GB free, have {free_gb():.1f} GB",
-            "Run not started (PLAN.md §7 disk rule).")
+            "Run not started (disk rule).")
         record({"event": "disk_limit", "name": cfg.name, "need_gb": need, "free_gb": free_gb()})
         print(f"testbed disk limit: need {need:.1f} GB, free {free_gb():.1f} GB")
         return 3
@@ -129,7 +129,7 @@ def real(args) -> int:
 
 
 def native(args) -> int:
-    """E7: the framework agent's native FedAvg script, run like a real run; finalize is queued."""
+    """E7: the framework's native FedAvg script (deploy/central/<fw>/native/run.sh), run like a real run; finalize is queued."""
     wait_pause()
     cfg = load_config(args.config)
     ok, msg = frozen_check()

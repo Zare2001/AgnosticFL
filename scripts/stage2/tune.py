@@ -1,4 +1,4 @@
-"""S3 tuning grid (EXPERIMENTS.md §S3): sim only, validation split, dir0.3, 30 rounds, seed 2026.
+"""S3 tuning grid (docs/aggregators.md, "Tuned values"): sim only, validation split, dir0.3, 30 rounds, seed 2026.
 
     python scripts/stage2/tune.py [--parallel 3] [--nice 10]
 

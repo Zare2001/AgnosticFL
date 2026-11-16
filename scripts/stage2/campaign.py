@@ -19,9 +19,9 @@ LOGS = RUNS / "logs"
 ACTIVE = RUNS / "ACTIVE_RUN"
 CAMPAIGN = RUNS / "campaign.jsonl"
 FROZEN = Path.home() / "flhub-runtime" / "frozen_sha"
-# what a final run executes (PLAN.md §5); report/finalize tooling in scripts/ may still be fixed
+# what a final run executes; the report and finalize tooling in scripts/ is not part of it
 FROZEN_PATHS = ["flhub_core", "adapters", "clients", "hub", "configs/stage2", "deploy/central"]
-NO_SIM_EXPERIMENTS = {"E3", "E4", "E5", "E7"}  # PLAN.md §6 CPU hygiene
+NO_SIM_EXPERIMENTS = {"E3", "E4", "E5", "E7"}  # no sims on central while such a run is active
 
 
 def utc(ms: bool = False) -> str:
@@ -53,7 +53,7 @@ def frozen_check() -> tuple[bool, str]:
     if dirty:
         return False, f"uncommitted changes in frozen paths:\n{dirty}"
     if not FROZEN.exists():
-        return True, f"no frozen SHA yet (pre-S3-frozen); HEAD {git('rev-parse', '--short', 'HEAD')}"
+        return True, f"no frozen SHA yet (before the tuning was fixed); HEAD {git('rev-parse', '--short', 'HEAD')}"
     sha = FROZEN.read_text().split()[0]
     diff = git("diff", "--stat", sha, "HEAD", "--", *FROZEN_PATHS)
     if diff:
