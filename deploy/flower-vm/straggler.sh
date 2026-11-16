@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# E6b straggler on the flower VM: throttle ONE hospital SuperNode's CPU (EXPERIMENTS.md E6b).
+# E6b straggler on the flower VM: throttle ONE hospital SuperNode's CPU.
 #   bash deploy/flower-vm/straggler.sh prepare <site>     restart it inside its scope, no limit yet
 #   bash deploy/flower-vm/straggler.sh on <site> <cpu%>   e.g. on flw-h5 10
 #   bash deploy/flower-vm/straggler.sh off <site>         remove the limit (no restart)

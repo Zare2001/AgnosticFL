@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# E4b network shaping on the flower VM (PLAN.md §8): egress toward central's Flower Fleet API
+# E4b network shaping on the flower VM: egress toward central's Flower Fleet API
 # (145.38.205.58:9092) only, i.e. the SuperNode uploads (and the ACKs of downloads). Central
 # shapes the downloads with deploy/central/netem.sh.
 # Usage: bash deploy/flower-vm/netem.sh apply <profile> [--minutes N] | clear | show
-#   profiles (EXPERIMENTS.md E4b): wan1g 1gbit/5ms, wan100 100mbit/20ms, wan20 20mbit/40ms;
-#            test 100mbit/20ms (for the 1-minute RUNLOCK check)
+#   profiles: wan1g 1gbit/5ms, wan100 100mbit/20ms, wan20 20mbit/40ms;
+#            test 100mbit/20ms (for a 1-minute check of the set-up)
 #   --minutes N  planned duration (default 60); the revert timer fires at N + 15 min (max 180)
 # One root prio qdisc: band 1:1 = netem leaf, reached only by the u32 filter (dst central IP and
 # dst port 9092); all other traffic (SSH 22, bus 7700, DNS) goes to band 1:2 untouched.

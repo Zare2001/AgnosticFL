@@ -1,4 +1,4 @@
-# Flower island (P1, flower VM only): local hub core :8800 + local Flower server side
+# Flower island (everything on the flower VM): local hub core :8800 + local Flower server side
 # (deploy/central/flower with FLOWER_FLEET_BIND=127.0.0.1:9092) + the two SuperNodes.
 #   python -m hub.orchestrator run --config deploy/flower-vm/island-3r.yaml --wandb offline
 name: flower-island-3r

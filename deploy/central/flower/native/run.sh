@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# E7 native baseline for Flower, run by central (EXPERIMENTS.md E7):
+# E7 native baseline for Flower, run on the central VM (docs/reproducing-results.md, E7):
 #   bash deploy/central/flower/native/run.sh configs/stage2/<run>.yaml <out_dir>
 # Stages a FAB from this checkout (the native ServerApp flhub_native + the hospitals' standard
 # ClientApp flhub_flower + flhub_core), submits it with `flwr run` to the local SuperLink as a run
