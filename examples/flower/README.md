@@ -66,7 +66,7 @@ flower-supernode --insecure --superlink <central-host>:9092 --port 9094 \
 | hub core URL | `adapter.py --hub` | `http://127.0.0.1:8800` |
 | Flower app for the FAB | `adapter.py --app-dir` | `clients/flower` |
 | `FLWR_HOME` with `config.toml`; the FAB goes to `../fab-src` | `adapter.py --flwr-home`, `--connection` | `~/flhub-runtime/flower/flwr-home`, `flhub` |
-| adapter URL, hub URL, fab id for the relay | run config, set by the adapter | — |
+| adapter URL, hub URL, fab id for the relay | run config, set by the adapter | - |
 | poll and QUERY timeouts of the relay | `[tool.flwr.app.config]` of the app's `pyproject.toml` | 5 s, 60 s |
 
 **Hub core.** The adapter uses the hub core only as its blob store: the relay reads the global model there and stores each site's weights there; the protocol carries references. Nothing registers with the hub core: the orchestrator finds the adapter through its run configuration, for example (as `run_local.py` writes it):
@@ -98,16 +98,16 @@ Output (excerpt; timestamps and the working directory shortened):
 ```
 health: {"ok": true, "name": "flower-adapter"}
 discover: flower flower 1.39.0 flhub/0.2 {'flw-h5': 'unknown', 'flw-h6': 'unknown'}
-working directory /tmp/flhub-flower-example-…
+working directory /tmp/flhub-flower-example-...
 relay run started, flw-h5 and flw-h6 online after 32 s
-… INFO round 1/3 | 2/2 sites | 7.5s | agg 0.00s eval 0.1s | acc 0.6250
-… INFO round 2/3 | 2/2 sites | 7.8s | agg 0.00s eval 0.1s | acc 0.6250
-… INFO round 3/3 | 2/2 sites | 6.8s | agg 0.00s eval 0.1s | acc 0.6250
-INV-1 full sim vs /tmp/flhub-flower-example-…/runs/flower-local-latest: hashes_equal=True max_abs_diff=0.000e+00 -> PASS
+... INFO round 1/3 | 2/2 sites | 7.5s | agg 0.00s eval 0.1s | acc 0.6250
+... INFO round 2/3 | 2/2 sites | 7.8s | agg 0.00s eval 0.1s | acc 0.6250
+... INFO round 3/3 | 2/2 sites | 6.8s | agg 0.00s eval 0.1s | acc 0.6250
+INV-1 full sim vs /tmp/flhub-flower-example-.../runs/flower-local-latest: hashes_equal=True max_abs_diff=0.000e+00 -> PASS
 flower example: PASS
 ```
 
-`run_local.py` started the hub core, a SuperLink, the example adapter and two SuperNodes for the benchmark sites `flw-h5` and `flw-h6`, all on `127.0.0.1` on free ports. The FAB carried the example ServerApp and ClientApp in place of the library's. The orchestrator then trained 3 rounds through Flower (median 7.3 s per round), and `hub.sim` trained the same configuration without a framework. Both ended with the same global model (`sha256:54c4f093…`); test accuracy after 3 rounds is 0.625, the share of the majority class, as in [getting started](../../docs/getting-started.md). Clone, install and both checks took 2 min 6 s with a warm `uv` cache. All processes were stopped and the working directory was removed.
+`run_local.py` started the hub core, a SuperLink, the example adapter and two SuperNodes for the benchmark sites `flw-h5` and `flw-h6`, all on `127.0.0.1` on free ports. The FAB carried the example ServerApp and ClientApp in place of the library's. The orchestrator then trained 3 rounds through Flower (median 7.3 s per round), and `hub.sim` trained the same configuration without a framework. Both ended with the same global model (`sha256:54c4f093...`); test accuracy after 3 rounds is 0.625, the share of the majority class, as in [getting started](../../docs/getting-started.md). Clone, install and both checks took 2 min 6 s with a warm `uv` cache. All processes were stopped and the working directory was removed.
 
 Flower's simulation engine is not used: its simulated nodes get only `partition-id` and `num-partitions` as node config (`flwr/server/superlink/fleet/vce/vce_api.py`) and it needs Ray, while the hub's relay identifies hospitals by the `site-id` of a real SuperNode.
 
