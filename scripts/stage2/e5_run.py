@@ -41,7 +41,7 @@ def main(argv: list[str] | None = None) -> int:
                                            "and reply 'E5 EXTRAS STOPPED'.")
         wait_ack(first, "E5 EXTRAS STOPPED", timeout=1800)
         hold.unlink(missing_ok=True)
-        bus("info", f"S4 E5 step done rc={rc} {utc()}")
+        bus("info", f"E5 step done rc={rc} {utc()}")
     return rc
 
 

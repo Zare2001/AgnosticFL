@@ -91,7 +91,7 @@ def main(argv: list[str] | None = None) -> int:
             wait_ack(first, "NETEM CLEARED")
             netem("show")
         hold.unlink(missing_ok=True)
-        bus("info", f"S4 E4b {prof} step done rc={rc} {utc()}", "central netem cleared" if prof != "none" else "")
+        bus("info", f"E4b {prof} step done rc={rc} {utc()}", "central netem cleared" if prof != "none" else "")
     return rc
 
 

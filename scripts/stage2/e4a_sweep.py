@@ -97,7 +97,7 @@ def main(argv: list[str] | None = None) -> int:
             if rc == 3:
                 entry["result"] = "testbed disk limit"
                 state["runs"].append(entry)
-                bus("info", f"S2 E4a {args.scope}: testbed disk limit at {size} MB", "sweep stopped for this scope")
+                bus("info", f"E4a {args.scope}: testbed disk limit at {size} MB", "sweep stopped for this scope")
                 break
             peak = {}
             if run_dir and (run_dir / "sysmon" / "central.json").exists():
@@ -111,7 +111,7 @@ def main(argv: list[str] | None = None) -> int:
                 state["runs"].append(entry)
                 rc_all = 1
                 for fw in fws:
-                    bus("request", f"S2 E4a {args.scope} FAILED at {size} MB{' (retry)' if args.retry else ''}: "
+                    bus("request", f"E4a {args.scope} FAILED at {size} MB{' (retry)' if args.retry else ''}: "
                         f"server-side knob?", f"{entry['error'][:1200]}\nrun dir {run_dir}. Per the stop rule: "
                         "propose a server-side knob (deploy-request + ADR) for ONE retry of this size, or confirm "
                         "this is the limit (component, error, knob, side).", to=fw)
@@ -121,7 +121,7 @@ def main(argv: list[str] | None = None) -> int:
             state["runs"].append(entry)
             if over:
                 entry["result"] = "ok, RAM rule hit"
-                bus("info", f"S2 E4a {args.scope}: RAM rule at {size} MB (peak RSS > 70 % of RAM)", json.dumps(over))
+                bus("info", f"E4a {args.scope}: RAM rule at {size} MB (peak RSS > 70 % of RAM)", json.dumps(over))
                 break
             state_path.write_text(json.dumps(state, indent=1))
     finally:
