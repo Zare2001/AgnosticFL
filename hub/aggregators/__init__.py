@@ -1,4 +1,4 @@
-"""Server aggregators (stage-2 PLAN.md §4.1): pure numpy, framework-free and stateful.
+"""Server aggregators (docs/aggregators.md): pure numpy, framework-free and stateful.
 
 One implementation serves hub.orchestrator and hub.sim, which keeps INV-1 at 0.0.
 

@@ -1,4 +1,4 @@
-"""Envelope (one per site per round, PROTOCOL.md §3) and its validation."""
+"""Envelope (one per site per round, docs/protocol.md §3) and its validation."""
 
 from __future__ import annotations
 

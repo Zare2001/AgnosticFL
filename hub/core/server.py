@@ -1,4 +1,4 @@
-"""Hub core: content-addressed blob store + model spec registry (PROTOCOL.md §4).
+"""Hub core: content-addressed blob store + model spec registry (docs/protocol.md §4).
 
     python -m hub.core [--host 127.0.0.1] [--port 8800] [--root ~/flhub-runtime/hubcore]
 

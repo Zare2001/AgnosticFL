@@ -25,7 +25,7 @@ from typing import Any
 from .protocol import INTERNAL_ERROR, INVALID_PARAMS, INVALID_REQUEST, METHOD_NOT_FOUND, PARSE_ERROR, RpcError
 
 log = logging.getLogger("flhub.server")
-# flhub/0.2 raises the cap from 512 MiB so that 1 GB payloads fit (PLAN.md §4.4)
+# flhub/0.2 raises the cap from 512 MiB so that 1 GB payloads fit
 MAX_BODY = int(os.environ.get("FLHUB_MAX_BODY_MB", "2048")) * 2**20
 CHUNK = 2**20
 

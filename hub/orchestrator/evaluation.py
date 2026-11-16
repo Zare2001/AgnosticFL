@@ -1,4 +1,4 @@
-"""Global evaluation on the central test (or validation) split (stage-2 PLAN.md §4.3).
+"""Global evaluation on the central test (or validation) split.
 
 Metrics: loss, accuracy, balanced accuracy (mean per-class recall), macro one-vs-rest AUC and the
 site-shaped accuracy: the per-class test accuracies reweighted to each site's training label

@@ -1,6 +1,6 @@
 """Run configuration: schema 2 (configs/stage2/*.yaml) and the stage-1 schema (configs/*.yaml).
 
-Schema 2 (stage-2 PLAN.md §4.3):
+Schema 2:
 
     schema: 2
     name: s2-e1-dir0.3-fedavg

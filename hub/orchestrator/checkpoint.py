@@ -1,4 +1,4 @@
-"""Run directory: checkpoints after every round, resume, retention (stage-2 PLAN.md §4.3, §7).
+"""Run directory: checkpoints after every round, resume, retention.
 
     <runs_dir>/<name>-<UTC stamp>/
         config.json          resolved run config + environment

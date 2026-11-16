@@ -1,4 +1,4 @@
-"""The stage-2 aggregators (formulas in hub/aggregators/__init__.py and PLAN.md stage 2 §4.1)."""
+"""The stage-2 aggregators (formulas in hub/aggregators/__init__.py and docs/aggregators.md)."""
 
 from __future__ import annotations
 

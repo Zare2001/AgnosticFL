@@ -1,6 +1,6 @@
 """flhub/0.2 constants and small helpers shared by adapters and the orchestrator.
 
-flhub/0.2 (ADR-008) only adds optional fields to flhub/0.1, so a 0.2 adapter also serves
+flhub/0.2 (docs/protocol.md §7) only adds optional fields to flhub/0.1, so a 0.2 adapter also serves
 0.1 callers: it accepts both versions and echoes the request's version in its envelopes.
 """
 
@@ -21,7 +21,7 @@ INVALID_REQUEST = -32600
 METHOD_NOT_FOUND = -32601
 INVALID_PARAMS = -32602
 INTERNAL_ERROR = -32603
-# flhub/0.1 codes (PROTOCOL.md §2)
+# flhub/0.1 codes (docs/protocol.md §2)
 UNSUPPORTED_PROTOCOL = -32010
 UNKNOWN_SITE = -32011
 TASK_NOT_FOUND = -32012

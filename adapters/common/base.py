@@ -1,4 +1,4 @@
-"""BaseAdapter: the flhub/0.2 methods (PROTOCOL.md), framework-free. A framework adapter
+"""BaseAdapter: the flhub/0.2 methods (docs/protocol.md), framework-free. A framework adapter
 subclasses it and implements two hooks:
 
     site_status() -> {site_id: "online" | "offline" | "unknown"}

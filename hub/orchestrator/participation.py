@@ -1,4 +1,4 @@
-"""Seeded client sampling (stage-2 PLAN.md §4.3).
+"""Seeded client sampling.
 
 The sample of round r is a pure function of (sites, fraction, seed, r): a RandomState (frozen
 stream) seeded from sha256(seed, r). There is no sampler state to save, so --resume and

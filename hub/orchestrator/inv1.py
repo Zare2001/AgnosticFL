@@ -1,4 +1,4 @@
-"""INV-1: a real run equals hub.sim for the same config, seed and participants (stage-2 PLAN.md §2).
+"""INV-1: a real run equals hub.sim for the same config, seed and participants (docs/reproducing-results.md).
 
 compare_runs(real, sim) checks every round's global_ref (sha256 of the global weights); where
 the hashes differ it computes the max abs weight difference from the kept checkpoints. Pass:

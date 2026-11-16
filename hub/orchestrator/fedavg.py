@@ -1,4 +1,4 @@
-"""Weighted FedAvg (PROJECT_PLAN.md §5)."""
+"""Weighted FedAvg."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""Client for the hub core HTTP API (PROTOCOL.md §4): blobs and the model spec."""
+"""Client for the hub core HTTP API (docs/protocol.md §4): blobs and the model spec."""
 
 from __future__ import annotations
 
