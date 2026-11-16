@@ -1,4 +1,4 @@
-"""Stage-2 site partitions of an official train split (stage-2 EXPERIMENTS.md §Partitions, ADR-009).
+"""Stage-2 site partitions of an official train split (docs/design/decisions.md, ADR-009).
 
 make_partition(pid, labels, num_classes, seed) -> {site: sorted indices}; every index is used once.
 Deterministic in (pid, labels, seed): only numpy's legacy RandomState is used (its streams are

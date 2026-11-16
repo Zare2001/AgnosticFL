@@ -1,4 +1,4 @@
-"""Deterministic local training and evaluation (PROJECT_PLAN.md §5; stage-2 PLAN.md §4.2).
+"""Deterministic local training and evaluation.
 
 Every client calls train() with the round's global weights and its own data. Same weights,
 data, config and torch version => bit-identical result, whichever framework runs it:
