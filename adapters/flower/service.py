@@ -6,10 +6,10 @@ local SuperLink. This service keeps exactly one relay run alive:
 
 - FAB: at start-up the service stages clients/flower plus the flhub_core package into one
   directory and submits that with ``flwr run <dir> <connection>`` (SuperLink HTTP API on
-  127.0.0.1:9093, per ADR-007). The FAB thus carries the training code to the hospital
-  SuperNodes, Flower's own code-distribution channel (ADR-016). The staged content id
-  (``fab-id``) goes to the relay as run config and comes back with its polls and beats; a relay
-  with another fab id (left from a rollout) is told to leave and is never handed a job.
+  127.0.0.1:9093). The FAB carries the training code to the hospital SuperNodes: Flower's own
+  code-distribution channel (ADR-007 and ADR-016 in docs/design/decisions.md). The content id
+  of the staged files (``fab-id``) goes to the relay as run config and comes back with its
+  polls and beats; a relay with another fab id (left from a rollout) must leave and gets no job.
 - Liveness: the relay posts /relay/beat from a thread every few seconds. When no poll,
   progress or beat arrived for RELAY_STALE_S (e.g. the SuperLink restarted and took the relay
   run with it), the rounds that relay had taken fail at once and a new relay run is submitted.
