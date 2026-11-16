@@ -6,12 +6,12 @@
 
 Measured on a reference testbed of four VMs, two simulated hospitals per framework ([results](docs/results/README.md)):
 
-- **Exact.** Every compared real run equals its framework-free reference with weight difference 0.0: the stage-1 mixed run in all 31 checkpoints, and all 69 stage-2 real runs (66 simulated round by round, the 2 `resnet18-gn` runs by replaying rounds 1-3 and the last, the resumed run against the uninterrupted run).
-- **On par with centralized training.** 86.5 % accuracy / 0.925 AUC federated across NVFlare, vantage6 and Flower, against 86.1 % / 0.928 centralized on the pooled data (PneumoniaMNIST, 30 rounds).
-- **No hospital code changes.** 0 changed lines in the hospitals' client code while aggregators, data, models and participation changed on the hub; 0 hospital steps per library update.
-- **Small overhead.** −20 % to +10 % round time against each framework's own FedAvg, at most +0.73 s per round.
-- **Large models.** Updates of 512 MiB per site carried by NVFlare and Flower; vantage6 up to 128 MiB.
-- **Recovers by itself.** Hospital crashes, stragglers, a hub crash (resumed bit-exactly) and framework-server restarts all recovered without manual action.
+- Exact: every compared real run equals its framework-free reference with weight difference 0.0: the stage-1 mixed run in all 31 checkpoints, and all 69 stage-2 real runs (66 simulated round by round, the 2 `resnet18-gn` runs by replaying rounds 1-3 and the last, the resumed run against the uninterrupted run).
+- On par with centralized training: 86.5 % accuracy / 0.925 AUC federated across NVFlare, vantage6 and Flower, against 86.1 % / 0.928 centralized on the pooled data (PneumoniaMNIST, 30 rounds).
+- No hospital code changes: 0 changed lines in the hospitals' client code while aggregators, data, models and participation changed on the hub; 0 hospital steps per library update.
+- Small overhead: −20 % to +10 % round time against each framework's own FedAvg, at most +0.73 s per round.
+- Large models: updates of 512 MiB per site carried by NVFlare and Flower; vantage6 up to 128 MiB.
+- Recovery without manual action: hospital crashes, stragglers, a hub crash (resumed bit-exactly) and framework-server restarts.
 
 ## Architecture
 
@@ -36,7 +36,7 @@ Measured on a reference testbed of four VMs, two simulated hospitals per framewo
 
 Every hospital trains with the same shared library, `flhub_core` (data loading, models, a deterministic training loop). That makes aggregation across frameworks valid, and it makes training bit-reproducible: the same weights, data and configuration give the same result on every machine and inside the vantage6 image.
 
-**One round:** the orchestrator stores the global model in the hub core → `dispatch` to every adapter in parallel → each adapter sends the model through its framework's own channel to its hospitals → each hospital runs `flhub_core.train` in its standard client → the adapter turns each reply into an envelope (weights stored in the hub core) → the orchestrator validates every envelope, aggregates (float64, fixed site order), evaluates on its test split and checkpoints. Details: [architecture](docs/architecture.md), [protocol](docs/protocol.md).
+One round: the orchestrator stores the global model in the hub core and calls `dispatch` on every adapter in parallel. Each adapter sends the model through its framework's own channel to its hospitals, and each hospital runs `flhub_core.train` in its standard client. The adapter turns each reply into an envelope (weights stored in the hub core). The orchestrator validates every envelope, aggregates (float64, fixed site order), evaluates on its test split and writes a checkpoint. Details: [architecture](docs/architecture.md), [protocol](docs/protocol.md).
 
 ## What it supports
 
@@ -147,4 +147,4 @@ Developed at [SURF](https://www.surf.nl), the collaborative organisation for IT 
 
 ## History
 
-The complete development history, including the material of the automated build, is kept on branch [`archive/agentic-build`](https://github.com/Zare2001/AgnosticFL/tree/archive/agentic-build) and at the tags [`stage1-final`](https://github.com/Zare2001/AgnosticFL/tree/stage1-final) and [`stage2-final`](https://github.com/Zare2001/AgnosticFL/tree/stage2-final).
+The complete development history, including the planning documents, is kept on branch [`archive/agentic-build`](https://github.com/Zare2001/AgnosticFL/tree/archive/agentic-build) and at the tags [`stage1-final`](https://github.com/Zare2001/AgnosticFL/tree/stage1-final) and [`stage2-final`](https://github.com/Zare2001/AgnosticFL/tree/stage2-final).

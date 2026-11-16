@@ -2,7 +2,7 @@
 
 For three readers: the **operator** who runs the hub, the **hospitals** that join it with their own framework, and whoever **develops a model or training method** for the federation. It collects what was learned while setting up the four-VM testbed on SURF Research Cloud and while moving NVFlare's hello-pt example onto all three frameworks. Background: [architecture](architecture.md), [client contract](client-contract.md), [hello-pt](hello-pt.md).
 
-**The one idea.** Every hospital trains with the same library, `flhub_core` (model, data loading, training loop). The framework a hospital runs (NVFlare, vantage6 or Flower) only carries weights to and from the hub. So a new algorithm is a change to `flhub_core`, made once, and it reaches every hospital through each framework's own code channel; the hospitals install nothing of the hub.
+The main idea: every hospital trains with the same library, `flhub_core` (model, data loading, training loop). The framework a hospital runs (NVFlare, vantage6 or Flower) only carries weights to and from the hub. So a new algorithm is a change to `flhub_core`, made once, and it reaches every hospital through each framework's own code channel; the hospitals install nothing of the hub.
 
 ## Contents
 
@@ -119,7 +119,7 @@ bash deploy/central/flower/install.sh && bash deploy/central/flower/tls.sh && ba
 bash deploy/central/status.sh
 ```
 
-`status.sh` reports every service; until hospitals connect their sites are offline. The **agent bus** line (port 7700) always shows FAIL unless you run the bus; it is optional (requests, public keys and certificates can also go by `scp -3` or e-mail; a vantage6 node key needs a secure channel) and can be ignored. The extra sites `nvf-h7`, `nvf-h8`, `v6-h9`, `v6-h10`, `flw-h11`, `flw-h12` belong to the 12-site test and stay offline.
+`status.sh` reports every service; until hospitals connect their sites are offline. The **message bus** line (port 7700) always shows FAIL unless you run the bus; it is optional (requests, public keys and certificates can also go by `scp -3` or e-mail; a vantage6 node key needs a secure channel) and can be ignored. The extra sites `nvf-h7`, `nvf-h8`, `v6-h9`, `v6-h10`, `flw-h11`, `flw-h12` belong to the 12-site test and stay offline.
 
 Central creates no hospital credential. It prints two public fingerprints that the hospitals check: the NVFlare root CA (`~/flhub-runtime/nvflare/server/rootCA.fingerprint`) and the sha256 of the Flower CA certificate (`~/flhub-runtime/flower/tls/ca.crt`, printed by `tls.sh`). Until each hospital's own credential is approved or registered ([3.5](#35-hospitals)), no hospital connects. `bash deploy/central/nvflare/check_keys.sh` proves that no NVFlare hospital private key is on central.
 
@@ -412,7 +412,7 @@ Requirements: Linux x86_64, bash, curl, outbound TCP to the operator on your fra
 | all ports `BLOCKED` from a hospital | no security-group rules on central | [3.3](#33-firewall) |
 | `Invalid CIDR notation '145.38.189.142'` | the portal wants CIDR, one address per rule | `145.38.189.142/32`, one rule per port |
 | rules added, still blocked | the rules are on a hospital's workspace | add them to the central workspace (FrameworkServer) |
-| `central VM status: UNHEALTHY` with only `agent bus FAIL` | the bus is not running | ignore |
+| `central VM status: UNHEALTHY` with only `message bus FAIL` | the bus is not running | ignore |
 | central services also running on a hospital machine | `deploy/central/*` was run there | there: `bash deploy/central/flower/stop.sh; bash deploy/central/nvflare/stop.sh`, then `rm -rf ~/venvs ~/flhub-runtime ~/.config/vantage6/server` (never on central) and reinstall the hospital side |
 | central's runtime deleted by mistake | the clean-up above ran on central | `pkill -f adapters.vantage6`, then rerun [3.4](#34-central) with `sudo systemctl restart flhub-hubcore` before `start.sh`; the CAs are new: every hospital requests a new NVFlare certificate (`request.sh` / `./install.sh`, central `approve.sh`), vantage6 keys are registered again (`register_node.sh`), Flower keys are registered again and the new `ca.crt` goes to the Flower hospitals |
 | `no partition manifest .../cifar10-iid.json` | the hub pins each site's file of a public dataset | `python -m flhub_core.data manifests --variants cifar10-iid --out configs/stage2/partitions` on central |
@@ -431,7 +431,7 @@ Requirements: Linux x86_64, bash, curl, outbound TCP to the operator on your fra
 | 7601, 5050 | central, public | vantage6 nodes (server API, image registry) |
 | 9092 | central, public | Flower SuperNodes (TLS; registered keys only) |
 | 9093, 8800, 8811-8813 | central, `127.0.0.1` | SuperLink HTTP API, hub core, adapters |
-| 7700 | central | optional agent bus |
+| 7700 | central | optional message bus |
 | 9094, 9095 | Flower hospital, local | SuperNode runtime port per site |
 
 | Path | What |

@@ -66,7 +66,7 @@ The second test stage (full system and performance test) and the restructure of 
 - Adapters moved to `flhub/0.2`: NVFlare sends one task per site from its relay job; vantage6 creates one task per site and round and selects data variants by database label; Flower's relay posts a liveness beat and is relaunched when it is lost.
 - The orchestrator writes a run directory only; runs are uploaded to W&B after their equivalence check passed (`scripts/stage2/finalize_run.py`).
 - New `flhub_core` versions reach the hospitals through each framework's own channel: NVFlare job custom code, a vantage6 algorithm image tag, the Flower FAB.
-- Repository layout: the protocol moved to `docs/protocol.md`, the decision records to `docs/design/decisions.md`, results and evidence to `docs/results/`. The full stage reports and the material of the automated build are kept on branch `archive/agentic-build` and at the tags `stage1-final` and `stage2-final`.
+- Repository layout: the protocol moved to `docs/protocol.md`, the decision records to `docs/design/decisions.md`, results and evidence to `docs/results/`. The full stage reports and the planning documents are kept on branch `archive/agentic-build` and at the tags `stage1-final` and `stage2-final`.
 
 ## [0.1.0] - 2026-10-13
 

@@ -1,8 +1,8 @@
-# flhub/0.2 — adapter protocol
+# flhub/0.2: adapter protocol
 
-**Status: flhub/0.1 FROZEN 2026-10-13; flhub/0.2 (stage 2, ADR-008) adds optional fields only (§7).** Reference implementation: `adapters/common/` (server side) and `adapters/common/rpcclient.py` (orchestrator side).
+Status: flhub/0.1 is fixed since 2026-10-13; flhub/0.2 (stage 2, ADR-008) adds optional fields only (§7). Reference implementation: `adapters/common/` (server side) and `adapters/common/rpcclient.py` (orchestrator side).
 
-The translation layer between the framework-free orchestrator and one framework. Inspired by MCP: one small, versioned protocol; each framework gets an adapter that speaks it; the orchestrator never contains framework code. Changes need a decision record ([design/decisions.md](design/decisions.md)) and a version bump (`flhub/0.2`).
+The translation layer between the framework-free orchestrator and one framework: one small, versioned protocol; each framework gets an adapter that speaks it; the orchestrator never contains framework code. Changes need a decision record ([design/decisions.md](design/decisions.md)) and a version bump (`flhub/0.2`).
 
 ## 1. Roles
 
@@ -14,7 +14,7 @@ The translation layer between the framework-free orchestrator and one framework.
 
 All requests: `{"jsonrpc":"2.0","id":<int>,"method":"<name>","params":{...}}`. Every `params` carries `"protocol":"flhub/0.1"` (or `"flhub/0.2"`, §7); adapters reject unknown versions with error `-32010`. Responses always use HTTP 200 with a JSON-RPC `result` or `error`.
 
-### `discover` → adapter description
+### `discover`: adapter description
 ```json
 {"adapter":"nvflare","framework":"nvflare","framework_version":"2.x.y","protocol":"flhub/0.1",
  "sites":[{"site_id":"nvf-h1","status":"online"},{"site_id":"nvf-h2","status":"online"}],
@@ -23,7 +23,7 @@ All requests: `{"jsonrpc":"2.0","id":<int>,"method":"<name>","params":{...}}`. E
 ```
 `sites` lists every site the adapter serves. `status` ∈ `online | offline | unknown` (`unknown`: the adapter cannot tell right now, e.g. its relay is not running). An adapter is ready only when all its sites are `online` (flhub/0.2: only the sites of the run, §7; `max_payload_mb` ≥ 1024).
 
-### `dispatch` → start one training round on some or all of the adapter's sites
+### `dispatch`: start one training round on some or all of the adapter's sites
 params:
 ```json
 {"protocol":"flhub/0.1","round":7,
@@ -34,18 +34,18 @@ params:
 - `round`: int ≥ 0. `model.ref` is required (the adapter fetches the blob from the hub core); `model.url` is informational.
 - `train_config`: the five keys above are required; adapters pass it through unchanged.
 - **Client config**: what a hospital client receives is `train_config` plus `"round": <round>`, e.g. `{"local_epochs":1,…,"seed":2026,"round":7}`. Clients hand it unchanged to `flhub_core.train.train(weights, data, cfg)`.
-- `sites`: non-empty subset of the adapter's sites, no duplicates (default: all). Unknown → `-32011`.
+- `sites`: non-empty subset of the adapter's sites, no duplicates (default: all). An unknown site gives `-32011`.
 - `deadline_s` (default 1800): after it the task becomes `failed` ("deadline … exceeded").
 
-result: `{"task_id":"nvflare-r7-…"}`. Must return quickly (< 5 s); the work runs asynchronously. A task still `queued`/`running` for any of the same sites → `-32015`.
+result: `{"task_id":"nvflare-r7-…"}`. Must return quickly (< 5 s); the work runs asynchronously. A task still `queued`/`running` for any of the same sites gives `-32015`.
 
-### `tasks/get` → task state
+### `tasks/get`: task state
 params `{"task_id"}`; result: `{"task_id":"…","state":"queued|running|completed|failed|cancelled","progress":{"done":1,"total":2},"error":null}`. For `failed`, `error` is a string that includes the framework's own error text.
 
-### `collect` → envelopes of a completed task
+### `collect`: envelopes of a completed task
 params `{"task_id"}`; result: `{"task_id":"…","envelopes":[<Envelope>, …]}`, one per dispatched site, in dispatch order. Valid only in state `completed` (else `-32013`, with `data.error` when failed). Idempotent.
 
-### `cancel` → best-effort cancel
+### `cancel`: best-effort cancel
 params `{"task_id"}`; result: `{"task_id":"…","state":"cancelled"}`. On a task that already finished it changes nothing and returns its current state.
 
 ### Errors
@@ -105,7 +105,7 @@ The cells describe the adapters as implemented for the tested versions; the fram
 
 Implement the 5 methods above in a service on a free local port (simplest: subclass `adapters.common.BaseAdapter` and implement `site_status()` and `run_round()`), keep the hospital side standard for that framework, and pass `tests/conformance/`. Nothing in the orchestrator or hub core may change. The full guide is [Adding a framework](adding-a-framework.md).
 
-## 7. flhub/0.2 — backward-compatible extensions (stage 2, ADR-008)
+## 7. flhub/0.2: backward-compatible extensions (stage 2, ADR-008)
 
 flhub/0.2 adds optional request fields and extra response fields only. A 0.2 adapter accepts `protocol` `"flhub/0.1"` and `"flhub/0.2"` and answers each caller in its own version; a 0.1 caller never sends the new fields and ignores the extra ones.
 

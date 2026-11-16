@@ -162,7 +162,7 @@ Echo models (no compute: round time = transport + framework + hub), 3 rounds, tw
 | 64 | 3.7 | 9.1 | 115.3 | 116.2 |
 | 128 | 5.1 | 13.5 | 468.2 | 393.8 |
 | 256 | 10.3 | 20.6 | limit: result never delivered | testbed disk |
-| 512 | 15.5 | 45.8 | – | – |
+| 512 | 15.5 | 45.8 | - | - |
 
 Source: [tables.md](evidence/stage2/tables.md). 1024 MiB (two sites) and 256 MiB (six sites) were not run: the testbed's 19 GB central disk was the limit, not a framework.
 
@@ -183,7 +183,7 @@ Source: [tables.md](evidence/stage2/tables.md). 1024 MiB (two sites) and 256 MiB
 
 | Profile | Lower bound (s) | NVFlare (s) | Flower (s) | vantage6 (s) | Round (s) |
 |---|---|---|---|---|---|
-| none | – | 3.3 | 7.5 | 81.8 | 82.2 |
+| none | - | 3.3 | 7.5 | 81.8 | 82.2 |
 | 1 Gbit/s, 5 ms | 1.5 | 4.3 | 8.9 | 83.3 | 83.7 |
 | 100 Mbit/s, 20 ms | 15.1 | 17.0 | 22.7 | 129.5 | 130.0 |
 | 20 Mbit/s, 40 ms | 75.5 | 80.3 | 85.1 | 463.8 | 464.3 |

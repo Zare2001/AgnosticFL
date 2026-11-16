@@ -140,7 +140,7 @@ Source: [e4_bytes.md](results/evidence/stage2/e4_bytes.md), [vantage6 guide](fra
 
 | Profile | Lower bound (s) | NVFlare (s), efficiency | Flower (s), efficiency | vantage6 (s), efficiency | vantage6 against its own volume 21.36·P |
 |---|---|---|---|---|---|
-| none | – | 3.3 | 7.5 | 81.8 | – |
+| none | - | 3.3 | 7.5 | 81.8 | - |
 | 1 Gbit/s, 5 ms | 1.5 | 4.3, 0.35 | 8.9, 0.17 | 83.3, 0.02 | 8.1 s bound, 0.10 |
 | 100 Mbit/s, 20 ms | 15.1 | 17.0, 0.89 | 22.7, 0.67 | 129.5, 0.12 | 80.6 s bound, 0.62 |
 | 20 Mbit/s, 40 ms | 75.5 | 80.3, 0.94 | 85.1, 0.89 | 463.8, 0.16 | 403.2 s bound, 0.87 |

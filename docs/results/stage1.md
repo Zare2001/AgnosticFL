@@ -42,7 +42,7 @@ The hub, the three framework servers and their adapters ran on a fourth VM. The 
 |---|---|---|---|---|---|---|
 | mixed (NVFlare + vantage6 + Flower) | 6 | **0.8654** | **0.9247** | 0.3497 | 244 s | [iehjnc44](https://wandb.ai/hpml_surf-surf/AgnosticFL/runs/iehjnc44) |
 | framework-free simulation | 6 | 0.8654 | 0.9247 | 0.3497 | 20 s | [kur37gs2](https://wandb.ai/hpml_surf-surf/AgnosticFL/runs/kur37gs2) |
-| centralized (pooled data, 30 epochs) | – | 0.8606 | 0.9279 | 0.5412 | 20 s | [j5gn5knm](https://wandb.ai/hpml_surf-surf/AgnosticFL/runs/j5gn5knm) |
+| centralized (pooled data, 30 epochs) | - | 0.8606 | 0.9279 | 0.5412 | 20 s | [j5gn5knm](https://wandb.ai/hpml_surf-surf/AgnosticFL/runs/j5gn5knm) |
 | NVFlare only | 2 | 0.8173 | 0.9224 | 0.4188 | 80 s | [pavr8q6u](https://wandb.ai/hpml_surf-surf/AgnosticFL/runs/pavr8q6u) |
 | vantage6 only | 2 | 0.8638 | 0.9246 | 0.3631 | 238 s | [twk49dhp](https://wandb.ai/hpml_surf-surf/AgnosticFL/runs/twk49dhp) |
 | Flower only | 2 | 0.7580 | 0.9149 | 0.6225 | 221 s | [011lasv0](https://wandb.ai/hpml_surf-surf/AgnosticFL/runs/011lasv0) |
