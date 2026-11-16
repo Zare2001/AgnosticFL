@@ -55,7 +55,6 @@ Each finding is described with its cause in the framework guide's §6, and draft
 | The figure `e4a_peak_rss_vs_payload.png` labels its axis MB; the stage-2 report at its tag writes GB for values in MiB / 1000 | the documentation uses MiB and GiB; the values are MiB |
 | The generated E3 resource table ([tables.md](results/evidence/stage2/tables.md)) lists vantage6's "largest process" as one container; it is the sum of both sites' training containers (2.1 GiB) | stated correctly in the documentation |
 | [cost_model.md](results/evidence/stage2/cost_model.md) derives vantage6's E4b volume V = 17.8 from four input copies; the vantage6 4.15.2 node downloads five (the stage-2 analysis missed the response to the start-time PATCH), so 17.8·P is its downstream volume alone and both directions are 21.36·P | the documentation uses the five copies ([vantage6 guide](frameworks/vantage6.md) §5.4); the generated evidence is kept as produced |
-| Two docstrings in `flhub_core` (`train.py`, `partition.py`) cite planning documents that are not in this repository (`PROJECT_PLAN.md`, `PLAN.md`, `EXPERIMENTS.md`) | the documents are on branch `archive/agentic-build`; changing `flhub_core`, even a comment, changes the code version that every site reports, so it goes with the next rollout |
 
 ## Future work
 
