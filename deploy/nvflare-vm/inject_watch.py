@@ -3,7 +3,7 @@
 Follows the job logs (<ws>/<job id>/log.txt) of one NVFlare site, also those of relay jobs that
 start later. Round N has started at the first "got task assignment" after the site printed
 "[flhub] <site>: round N-1" (for N = 1: the first task after arming). Then it waits --after
-seconds, announces the injection on the agent bus, acts, and records the client's recovery:
+seconds, announces the injection on the bus, acts, and records the client's recovery:
 new client process, registration, job process back.
 """
 

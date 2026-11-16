@@ -1,4 +1,4 @@
-"""NVFlare adapter service: flhub/0.1 JSON-RPC + relay routes on 127.0.0.1:8811.
+"""NVFlare adapter service: flhub JSON-RPC + relay routes on 127.0.0.1:8811.
 
 Built on adapters.common.RelayAdapter. With the operator's admin startup kit (FLARE API) it
 keeps exactly one long-running NVFlare relay job ("flhub-relay", see adapters/nvflare/job.py)
@@ -6,9 +6,9 @@ alive, and restarts it gracefully when a hospital client (re)connects that is no
 A site is online only when the relay reports it as a live job client AND the client answers
 the server's job-status probe for the running relay job.
 
-flhub/0.2: a round runs on the online sites of its dispatch; an offline site, or one that goes
+A round runs on the online sites of its dispatch; an offline site, or one that goes
 offline during the round, fails on its own (the others go on). Registered sites that are not
-connected (e.g. the E5 extra sites) never block anything; --base-sites only shapes when the
+connected (e.g. extra sites that are stopped) never block anything; --base-sites only shapes when the
 relay job is (re)submitted.
 
     python -m adapters.nvflare.service --admin-kit DIR --job-dir DIR [--port 8811] [--sites nvf-h1 nvf-h2]

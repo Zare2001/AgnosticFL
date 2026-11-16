@@ -2,9 +2,9 @@
 
 ## 1. What this shows
 
-- **Client:** what an NVFlare hospital client must contain to train with the hub: NVFlare's standard Client API loop around one call to `flhub_core.train`, every line marked as NVFlare's pattern or the hub's addition.
-- **Server:** how the hub's NVFlare side is built from the library: the *relay job* that runs inside the NVFlare server, and the *adapter* next to it that the orchestrator talks to.
-- **Without a deployment:** everything runs on one machine with NVFlare's own simulator, ending with the hub's equivalence check against a framework-free simulation.
+- Client: what an NVFlare hospital client must contain to train with the hub: NVFlare's standard Client API loop around one call to `flhub_core.train`, every line marked as NVFlare's pattern or the hub's addition.
+- Server: how the hub's NVFlare side is built from the library: the *relay job* that runs inside the NVFlare server, and the *adapter* next to it that the orchestrator talks to.
+- No deployment needed: everything runs on one machine with NVFlare's own simulator, ending with the hub's equivalence check against a framework-free simulation.
 
 The production code is [`clients/nvflare/`](../../clients/nvflare/) and [`adapters/nvflare/`](../../adapters/nvflare/); the full guide is [NVFlare](../../docs/frameworks/nvflare.md).
 
@@ -75,7 +75,7 @@ python examples/nvflare/server/run_local.py
 
 - `adapter.py --check`: `health {'ok': True, 'name': 'nvflare-adapter'}`; `discover` answers `adapter=nvflare framework 2.9.0 protocol flhub/0.2` with `nvf-h1` and `nvf-h2` offline (no relay, no client); the keeper submits no job; `check: PASS`.
 - `relay_job.py export`: the folder `flhub-relay/` holds `app/config/config_fed_server.json` (`HubRelayController`), `app/config/config_fed_client.json` (`ClientAPIExecutor`, `in_process`, `task_script_path: client.py`, numpy), `app/custom/client.py` (byte-identical to `client/client.py`), `app/custom/flhub_core/` and `meta.json` (the app on `@ALL`).
-- `run_local.py`: `"status": "finished"`, 3 rounds in 9.6 s, median round 2.39 s (NVFlare's task-request interval, [guide §5.3](../../docs/frameworks/nvflare.md#53-runtime-overhead)), final test accuracy 0.625 (still the majority class after 3 rounds, as in stage 1); the simulator exited with 0; `INV-1 full sim vs …/nvflare-example-latest: hashes_equal=True max_abs_diff=0.000e+00 -> PASS`. 77 s in total, including the 4 MB data download and the simulator start. The round-1 training losses, 0.6005 (`nvf-h1`) and 0.6182 (`nvf-h2`), equal those of the conformance run against the reference deployment ([evidence](../../docs/results/evidence/stage1/conformance-nvflare-central.json)).
+- `run_local.py`: `"status": "finished"`, 3 rounds in 9.6 s, median round 2.39 s (NVFlare's task-request interval, [guide §5.3](../../docs/frameworks/nvflare.md#53-runtime-overhead)), final test accuracy 0.625 (still the majority class after 3 rounds, as in stage 1); the simulator exited with 0; `INV-1 full sim vs .../nvflare-example-latest: hashes_equal=True max_abs_diff=0.000e+00 -> PASS`. 77 s in total, including the 4 MB data download and the simulator start. The round-1 training losses, 0.6005 (`nvf-h1`) and 0.6182 (`nvf-h2`), equal those of the conformance run against the reference deployment ([evidence](../../docs/results/evidence/stage1/conformance-nvflare-central.json)).
 - Interrupted runs (failure paths), with `--rounds 20` so that every signal arrived mid-run: SIGTERM, SIGHUP and SIGINT to the `run_local.py` process and SIGINT to its process group (what Ctrl-C in a terminal sends), each 5 s after the simulator started, and `timeout 30` (SIGTERM to the process and its group). Exit codes 143, 129, 130, 130 and 124; in every case no process of the run and no work directory was left (`ps`, `ls`), tested on a fresh clone of `cf7eb5a`.
 
 ## 5. Links

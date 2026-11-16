@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""Follow central's "RUN start <name> <UTC>" / "RUN end <name> <UTC>" bus messages (stage-2 S4) on the
-NVFlare VM. For every final run it
+"""Follow central's "RUN start <name> <UTC>" / "RUN end <name> <UTC>" bus messages on the NVFlare VM.
+For every final run it
   - sends this VM's sysmon summary of the run window to central (deploy/nvflare-vm/sysmon.sh send),
   - scans what the NVFlare client logs (client + job logs of every site) appended during the run:
     rounds trained per site and anomalies (errors, tracebacks, job ends/aborts, lost server),
@@ -140,7 +140,7 @@ def main() -> None:
                 body = "\n".join([f"sysmon summary rc={proc.returncode}; {rec['health']}; rounds trained {trained}",
                                   f"NVFlare client log lines flagged during {start}..{utc}: {counts}"] + hits)
                 subprocess.run([BUS, "send", "--to", "central", "--type", "info", "--subject",
-                                f"S4 nvflare {name}: flagged NVFlare client log lines or health", "--body", body],
+                                f"nvflare {name}: flagged NVFlare client log lines or health", "--body", body],
                                capture_output=True, text=True, timeout=60)
         state["last_offsets"] = offsets_now()
         state_path.write_text(json.dumps(state))

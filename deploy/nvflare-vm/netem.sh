@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# E4b network shaping on the NVFlare VM (PLAN.md §8): egress toward central's NVFlare server port
+# Network shaping on the NVFlare VM (experiment E4b): egress toward central's NVFlare server port
 # only (8002, the hospitals' uploads); central shapes the downloads with deploy/central/netem.sh.
 # Usage: bash deploy/nvflare-vm/netem.sh apply <profile> [--minutes N] | clear | show
-#   profiles (EXPERIMENTS.md E4b): wan1g 1gbit/5ms, wan100 100mbit/20ms, wan20 20mbit/40ms
+#   profiles: wan1g 1gbit/5ms, wan100 100mbit/20ms, wan20 20mbit/40ms
 #   --minutes N  planned duration (default 60); the revert timer fires at N + 15 min (max 180)
 # One root prio qdisc: band 1:1 = netem leaf, reached only by the u32 filter (dst central IP and
-# dst port 8002, which also covers the E5 extra clients); all other traffic (SSH, bus 7700, DNS)
+# dst port 8002, which also covers the extra clients); all other traffic (SSH, bus 7700, DNS)
 # goes to band 1:2 untouched. A systemd timer that deletes the root qdisc is scheduled BEFORE the
 # rule is applied; without it the script refuses. Idempotent: apply replaces rule and timer.
 set -euo pipefail

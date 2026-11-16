@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# E6 fault injection for the NVFlare hospitals on this VM (PLAN.md §8, EXPERIMENTS.md E6).
+# Fault injection for the NVFlare hospitals on this VM (experiment E6, docs/results/stage2.md).
 #   inject.sh arm <site> <kill|kill-job|restart|straggler-on:<cpu%>|straggler-off> --round N [--after S]
 #   inject.sh disarm [<site>]
 #   inject.sh status
@@ -17,7 +17,7 @@ set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$HERE/common.sh"
 NVF_INJECT_DIR="${NVF_INJECT_DIR:-$(dirname "$NVF_SITES_DIR")/inject}"
-NVF_INJECT_BUS="${NVF_INJECT_BUS:-$REPO/tools/bus}"  # island tests: NVF_INJECT_BUS=true (no announcement)
+NVF_INJECT_BUS="${NVF_INJECT_BUS:-$REPO/tools/bus}"  # NVF_INJECT_BUS=true: no announcement (tests without the bus)
 mkdir -p "$NVF_INJECT_DIR"
 
 usage() { sed -n '2,5p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 2; }

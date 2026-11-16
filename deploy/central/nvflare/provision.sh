@@ -3,7 +3,7 @@
 #  1. root CA, once (`nvflare cert init`): $NVF_CA_DIR, mode 700;
 #  2. the server ($NVF_SERVER_NAME, fed $NVF_FL_PORT, admin $NVF_ADMIN_PORT) and the adapter's admin
 #     identity ($NVF_ADMIN_USER, role $NVF_ADMIN_ROLE) each make a request, central approves it, and
-#     `nvflare package` builds their kits in $NVF_PROD (same paths as the stage-1 provisioning).
+#     `nvflare package` builds their kits in $NVF_PROD.
 # Hospital kits are NOT made here: each hospital runs deploy/nvflare-vm/request.sh, central signs the
 # request with approve.sh, the hospital builds its own kit (deploy/nvflare-vm/install.sh).
 # Idempotent: an existing CA and existing kits are kept. A new CA means new kits everywhere; to make

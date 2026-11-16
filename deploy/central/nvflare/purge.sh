@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Frees disk on central from NVFlare job data (PLAN.md §7; between E4a payload runs):
+# Frees disk on central from NVFlare job data (used between the E4a payload runs):
 #  - finished jobs (any job not queued or running) are deleted from the server's job store
 #    through the FLARE API (job definitions + their workspace archives);
 #  - server job workspaces (<server kit>/<job uuid>/) of jobs that are no longer active.

@@ -1,4 +1,4 @@
-"""E7 native baseline: NVFlare's built-in FedAvg on the hub's NVFlare hospitals, without the hub.
+"""Native baseline (experiment E7): NVFlare's built-in FedAvg on the hub's NVFlare hospitals, without the hub.
 
 NativeFedAvg is nvflare.app_common.workflows.fedavg.FedAvg (client sampling, InTime aggregation
 weighted by FLModel.meta NUM_STEPS_CURRENT_ROUND = num_examples, round loop) with additions that
@@ -13,7 +13,7 @@ On central (deploy/central/nvflare/native/run.sh):
     python -m adapters.nvflare.native prepare --config configs/stage2/e7/s2-e7-nvflare-hub-cnn.yaml --out RUN_DIR
     python -m adapters.nvflare.native submit RUN_DIR --admin-kit KIT [--timeout S]
     python -m adapters.nvflare.native finalize RUN_DIR
-    python -m adapters.nvflare.native compare RUN_DIR HUB_RUN_DIR   (E7 analysis)
+    python -m adapters.nvflare.native compare RUN_DIR HUB_RUN_DIR
 """
 
 from __future__ import annotations
@@ -102,7 +102,7 @@ class NativeFedAvg(FedAvg):
 
 # ---- central side: build, submit, finalize ----------------------------------------------------
 def load_run_config(path: str, name: str | None = None) -> dict:
-    """The native run's settings from a stage-2 hub run config (central's loader, so `extends`,
+    """The native run's settings from a hub run config (the orchestrator's loader, so `extends`,
     dataset/partition, model and seed resolve exactly as for the hub run). The train_config is the
     one the hub dispatches (hub.orchestrator.config.build_train_config); the run name is the hub
     name with "-hub-" replaced by "-native-" (s2-e7-nvflare-hub-cnn -> s2-e7-nvflare-native-cnn)."""

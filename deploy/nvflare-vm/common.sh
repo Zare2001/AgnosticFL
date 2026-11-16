@@ -40,7 +40,7 @@ nvf_watchdog_sync() {  # the cron line exists iff a site of this sites dir is en
   line="* * * * * NVF_SITES_DIR=$NVF_SITES_DIR NVF_VENV=$NVF_VENV FLHUB_DATA_DIR=$FLHUB_DATA_DIR"
   line+=" bash $REPO/deploy/nvflare-vm/start.sh --watchdog >> $NVF_SITES_DIR/watchdog.log 2>&1 $NVF_CRON_TAG"
   cur=$(crontab -l 2>/dev/null || true)
-  # other lines: not ending with this dir's tag, and not the stage-1 form (tag without a directory)
+  # other lines: not ending with this dir's tag, and not the older form (the tag without a directory)
   want=$(awk -v tag="$NVF_CRON_TAG" 'NF && substr($0, length($0) - length(tag) + 1) != tag \
     && $0 !~ /# flhub-nvflare-watchdog$/' <<<"$cur")
   if [ -n "$(nvf_enabled_sites)" ]; then want=$(printf '%s\n%s' "$want" "$line" | sed '/^$/d'); fi
@@ -86,4 +86,4 @@ nvf_install_signed() {
 
 # Data provisioning tool: the repo's flhub_core (not a hospital runtime), with the venv's numpy.
 nvf_data() { PYTHONPATH="$REPO/flhub_core/src" FLHUB_DATA_DIR="$FLHUB_DATA_DIR" "$NVF_VENV/bin/python" -m flhub_core.data "$@"; }
-NVF_EXTRA_SITES="${NVF_EXTRA_SITES-nvf-h7 nvf-h8}"  # E5 extra sites (deploy/nvflare-vm/extra.sh)
+NVF_EXTRA_SITES="${NVF_EXTRA_SITES-nvf-h7 nvf-h8}"  # extra sites of the 12-site run (deploy/nvflare-vm/extra.sh)

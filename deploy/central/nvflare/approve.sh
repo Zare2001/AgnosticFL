@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Central: signs one hospital's NVFlare certificate request (distributed provisioning).
 #   bash deploy/central/nvflare/approve.sh <site>.request.zip --expect-pubkey <sha256> [--reissue]
-# <sha256> is the public key hash the hospital printed with request.sh and sent in its bus message;
+# <sha256> is the public key hash the hospital printed with request.sh and sent with the request;
 # approval is refused unless the CSR in the zip has exactly that key. Also refused: a zip with any
 # private key in it, another project, a type other than client, a name not in $NVF_SITES, an org
 # other than hospital<N>, and a site that already has a valid certificate (unless --reissue).
-# Output: $NVF_SIGNED_OUT/<site>.signed.zip (certificate + rootCA.pem, no secret) to return with
+# Output: $NVF_SIGNED_OUT/<site>.signed.zip (certificate + rootCA.pem, no secret) to return; on the testbed:
 #   tools/bus put $NVF_SIGNED_OUT/<site>.signed.zip --to nvflare
 set -euo pipefail
 . "$(dirname "${BASH_SOURCE[0]}")/common.sh"

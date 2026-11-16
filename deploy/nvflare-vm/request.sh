@@ -3,7 +3,7 @@
 #   bash deploy/nvflare-vm/request.sh <site> [--force]
 # The key stays in $NVF_REQ_DIR/<site>/ (mode 700) and later moves into the site's kit; it never
 # leaves this machine. Send the operator only <site>.request.zip (CSR + metadata, no key), and the
-# public key hash this script prints, in the same bus message:
+# public key hash this script prints, in the same message. On the testbed:
 #   tools/bus put $NVF_REQ_DIR/<site>/<site>.request.zip --to central
 #   tools/bus send --to central --type request --subject "nvflare cert request <site>" --body "pubkey sha256 <hash>"
 # The operator answers with <site>.signed.zip: put it in $NVF_INCOMING and run install.sh.
