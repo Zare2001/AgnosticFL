@@ -4,7 +4,7 @@
 . "$(dirname "$0")/common.sh"
 fail=0
 echo "central VM status ($(date -u +%FT%TZ))"
-if curl -sf "http://127.0.0.1:$AGENTBUS_PORT/health" >/dev/null; then ok "agent bus :$AGENTBUS_PORT"; else bad "agent bus :$AGENTBUS_PORT"; fail=1; fi
+if curl -sf "http://127.0.0.1:$AGENTBUS_PORT/health" >/dev/null; then ok "message bus :$AGENTBUS_PORT"; else bad "message bus :$AGENTBUS_PORT"; fail=1; fi
 if h=$(curl -sf "http://127.0.0.1:$HUB_CORE_PORT/health"); then ok "hub core :$HUB_CORE_PORT" "$h"; else bad "hub core :$HUB_CORE_PORT"; fail=1; fi
 if curl -sf "http://127.0.0.1:$REGISTRY_PORT/v2/" >/dev/null; then
   ok "registry :$REGISTRY_PORT" "$(curl -s "http://127.0.0.1:$REGISTRY_PORT/v2/_catalog")"

@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
-# Egress shaping on the central VM for E4b (stage-2 PLAN.md §8). Shapes only framework traffic
+# Egress shaping on the central VM for E4b (docs/results/stage2.md). Shapes only framework traffic
 # from central to the given peers: source ports 8002 (NVFlare), 7601 (vantage6), 5050 (registry),
-# 9092 (Flower); SSH, the agent bus (7700) and everything else stay untouched.
+# 9092 (Flower); SSH, the message bus (7700) and everything else stay untouched.
 #
 #   bash deploy/central/netem.sh apply <profile> <peer-ip>... --minutes N   (N = planned + 15, <= 180)
 #   bash deploy/central/netem.sh clear
 #   bash deploy/central/netem.sh show
 #
 # Profiles: wan1g (1 Gbit/s, 5 ms), wan100 (100 Mbit/s, 20 ms), wan20 (20 Mbit/s, 40 ms); none = clear.
-# apply first schedules a systemd revert timer (survives an agent crash) and refuses to shape if
+# apply first schedules a systemd revert timer (survives a crash of the caller) and refuses to shape if
 # that fails; then it builds ONE root prio qdisc: band 1 (default) unshaped, one band with a netem
 # leaf (rate + delay) per peer, selected by u32 filters on peer IP + framework source port.
-# Re-running apply replaces the rule (idempotent). Owner escape hatch: sudo tc qdisc del dev ens3 root
+# Re-running apply replaces the rule (idempotent). To remove the rule by hand: sudo tc qdisc del dev ens3 root
 set -euo pipefail
 
 PORTS=(8002 7601 5050 9092)
