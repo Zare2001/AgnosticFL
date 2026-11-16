@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# E6 fault injection on the flower VM (EXPERIMENTS.md E6, PLAN.md §8.5). One-shot: arm, wait for
+# E6 fault injection on the flower VM. One-shot: arm, wait for
 # hub round N to reach one site, wait S seconds, act, log, exit.
 # Trigger: the site's SuperNode log shows "[RUN <id>, ROUND <N>]" followed by "Receiving: train
 # message" (the relay sends hub round N as the Flower message group id).

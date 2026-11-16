@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Continuous system monitoring on the flower VM during stage 2 (PLAN.md §4.3): scripts/sysmon.py
+# Continuous system monitoring on the flower VM during the stage-2 experiments: scripts/sysmon.py
 # with per-site components for the hospital SuperNodes (flower-supernode, flower-superexec and the
 # per-message flwr-clientapp, told apart by their local runtime port), plus the stock components.
 #   bash deploy/flower-vm/sysmon.sh start|stop|status

@@ -34,7 +34,7 @@ if pid_alive "$RUNTIME/run/superlink.pid"; then
   echo "superlink: already running (pid $(cat "$RUNTIME/run/superlink.pid"))"
 else
   # FAB dependencies are preinstalled in $VENV, so runtime dependency installation is off.
-  # Persistent state: SuperNodes keep their node ids across a SuperLink restart (ADR).
+  # Persistent state: SuperNodes keep their node ids across a SuperLink restart (docs/design/decisions.md, ADR-007).
   FLWR_HOME="$FLWR_HOME_DIR" setsid nohup flower-superlink "${link_args[@]}" \
       --fleet-api-address "$FLEET_BIND" --host 127.0.0.1 --port "$CONTROL_PORT" \
       --database "$RUNTIME/superlink.db" --disable-runtime-dependency-installation \

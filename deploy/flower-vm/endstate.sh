@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Stage-2 end state of the flower VM (PLAN.md §9, DoD 8): prints the evidence for 'S2 report-ready
-# flower' and exits 0 only if every item holds.
+# End state of the flower VM after the stage-2 experiments: checks that every experiment tool is
+# reverted and the base hospitals are healthy; exits 0 only if every item holds.
 #   bash deploy/flower-vm/endstate.sh
 set -uo pipefail
 cd "$(dirname "$0")"

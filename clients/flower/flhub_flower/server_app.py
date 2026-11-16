@@ -4,7 +4,7 @@ One long-lived Flower run, started by the Flower adapter service with ``flwr run
 loop long-polls the adapter for the next dispatched round (adapters.common.RelayClient),
 sends standard TRAIN messages with the global weights to the hospital SuperNodes through
 the ``Grid`` and reports every site's reply back as soon as it arrives (flhub/0.2 per-site
-results). Weights move between the relay and the hub core by blob reference (PROTOCOL.md
+results). Weights move between the relay and the hub core by blob reference (docs/protocol.md
 §4); the adapter builds the envelopes.
 
 With SuperNode authentication (FLOWER_TLS=1) a node id belongs to one registered public

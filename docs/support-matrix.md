@@ -12,7 +12,7 @@ What was tested, with which versions, and what is not supported. "Tested" means:
 | Hospital client | Client API script | algorithm image (`@data`, `@metadata`, `wrap_algorithm()`) | ClientApp in the FAB |
 | Rollout of new training code | job custom code; once: remove an installed `flhub_core`, 1 client restart | algorithm image tag; 0 steps | FAB; 0 steps |
 | Conformance suite v2 against the deployment | 13 / 13 | 13 / 13 | 13 / 13 |
-| Transport security on the testbed | mTLS (provisioned kits) | plain HTTP, node API keys | `--insecure` |
+| Transport security on the testbed | mTLS (provisioned kits) | plain HTTP, node API keys | `--insecure` in the two test stages; TLS and SuperNode authentication since ([Flower guide](frameworks/flower.md)) |
 | Sites tested | 2, and 4 in the 12-site test | 2, and 4 | 2, and 4 |
 | Largest model update carried | 512 MiB (1024 MiB on a single-host test) | 128 MiB | 512 MiB |
 
@@ -78,7 +78,7 @@ Details, causes and knobs: each guide's §6 ([NVFlare](frameworks/nvflare.md#6-l
 - Federated evaluation at the sites, personalization, asynchronous rounds.
 - GPUs: training is CPU-only and single-threaded by design (determinism).
 - More than one run at a time on the same sites: an adapter refuses a dispatch for a site that is still busy (`-32015`).
-- Encrypted vantage6 collaborations, and TLS for vantage6 and Flower: not tested (vantage6 encryption needs an adapter change).
+- Encrypted vantage6 collaborations and TLS for vantage6: not tested (vantage6 encryption needs an adapter change).
 - Other framework versions (for example vantage6 5.x), other operating systems, the hub and the framework servers on separate hosts: not tested.
 
 What would lift these limits: [limitations and future work](limitations-and-future-work.md).

@@ -87,7 +87,7 @@ def real(args) -> int:
     if proj.exists():
         need = max(need, 3.0 + float(json.loads(proj.read_text()).get(cfg.name, 0.0)))
     if free_gb() < need:
-        bus("info", f"S2 testbed disk limit: {cfg.name} needs {need:.1f} GB free, have {free_gb():.1f} GB",
+        bus("info", f"testbed disk limit: {cfg.name} needs {need:.1f} GB free, have {free_gb():.1f} GB",
             "Run not started (disk rule).")
         record({"event": "disk_limit", "name": cfg.name, "need_gb": need, "free_gb": free_gb()})
         print(f"testbed disk limit: need {need:.1f} GB, free {free_gb():.1f} GB")

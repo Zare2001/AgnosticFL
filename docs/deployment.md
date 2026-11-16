@@ -41,7 +41,7 @@ These are the testbed's values ([`deploy/topology.env`](../deploy/topology.env))
 |---|---|---|---|
 | NVFlare | the operator's admin kit (controls the NVFlare project) | their startup kits (mTLS certificates) from `nvflare provision` | none |
 | vantage6 | a user password. On the testbed the user came from the entities import, which gives every imported user a role with all rules of the server (vantage6 4.15.2 `controller/fixture.py`), so this password controls the whole vantage6 server; a role limited to the collaboration's tasks was not tested | their node API keys from the server | none |
-| Flower | none on the testbed (`--insecure`) | none on the testbed | none |
+| Flower | none | with TLS and SuperNode authentication ([Flower guide](frameworks/flower.md)): their own key pair, whose public key the operator registers, and the operator's CA certificate. The two test stages ran with `--insecure` and no keys | none |
 
 The hub adds no credentials at the hospitals. Keep the operator's credentials in files readable only by the operator (the testbed uses `~/flhub-runtime/` and `~/.flhub/secrets.env`, mode 600, never the repository). What a production deployment must add (TLS, authentication, image pinning) is in the [trust and security model](architecture.md#trust-and-security-model).
 

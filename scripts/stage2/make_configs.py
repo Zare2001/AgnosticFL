@@ -68,7 +68,7 @@ def make(name: str, exp: str, tuned: dict, **over) -> tuple[str, dict]:
 def configs(tuned: dict) -> dict[str, list[tuple[str, dict]]]:
     out: dict[str, list] = {k: [] for k in ("s2", "s3", "e1", "e2", "e3", "e4a", "e4b", "e5", "e6", "e7")}
     a_star = tuned["a_star"]
-    # S2-mixed acceptance run (not a final run): D, dir0.3, fedadam, 3 rounds, all 6 base sites
+    # s2-mixed acceptance run (not a final run): D, dir0.3, fedadam, 3 rounds, all 6 base sites
     out["s2"].append(make("s2-mixed", "S2", tuned, rounds=3, aggregator=agg("fedadam", tuned),
                           runs_dir="~/flhub-runtime/runs/s2", strict_code_version=True))
     # S3 tuning: sim only, validation split, dir0.3, 30 rounds

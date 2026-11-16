@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# E5 extra hospitals flw-h11 and flw-h12 on the flower VM (EXPERIMENTS.md E5): the same standard
+# E5 extra hospitals flw-h11 and flw-h12 on the flower VM (experiment E5): the same standard
 # flower-supernode, start/stop/status scripts and supervisor as flw-h5/flw-h6, with their own
 # runtime dir, local runtime ports and watchdog cron line. They run only during E5.
 #   bash deploy/flower-vm/extra.sh start|stop|status

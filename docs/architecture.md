@@ -87,7 +87,7 @@ This is a research prototype, tested on a closed testbed. Read this section befo
 |---|---|---|
 | NVFlare hospitals ↔ server | mTLS from NVFlare provisioning | as tested; bind the admin port (8003) to loopback |
 | vantage6 nodes ↔ server, registry | plain HTTP (server API, image registry); node API keys | HTTPS for the server and an authenticated TLS registry; pin the algorithm image by digest |
-| Flower SuperNodes ↔ SuperLink | `--insecure`, no SuperNode authentication | TLS and SuperNode authentication (not tested) |
+| Flower SuperNodes ↔ SuperLink | during the two test stages: `--insecure`, no SuperNode authentication; since then: TLS with the operator's Flower CA, and SuperNode authentication with keys made by the hospitals ([Flower guide](frameworks/flower.md)) | TLS and SuperNode authentication, as now deployed |
 | orchestrator ↔ adapters ↔ hub core | `127.0.0.1`, no authentication | keep on loopback, or add authentication |
 
 The testbed relied on a cloud firewall that admitted only its own machines. vantage6 ran with an unencrypted collaboration, so its server database also stores every task input and result (the model weights) in plaintext; the adapter supports only that mode (limitation in [limitations and future work](limitations-and-future-work.md)).

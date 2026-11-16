@@ -133,7 +133,7 @@ def loop(once: bool) -> None:
             record({"event": f"post-{status}", "name": job["name"], "type": job["type"],
                     "seconds": round(time.time() - t0)})
             if status == "failed":
-                bus("info", f"S2 post-processing FAILED for {job['name']} ({job['type']})",
+                bus("info", f"post-processing FAILED for {job['name']} ({job['type']})",
                     f"log: {LOGS / (job['name'] + '.post.log')} on central; files kept, nothing uploaded",
                     to="central")
             break  # re-read the queue and the ACTIVE marker after every job

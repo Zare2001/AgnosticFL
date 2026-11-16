@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Reclaim the Flower SuperLink's disk between E4a payload runs (PLAN.md §7). With --database the
+# Reclaim the Flower SuperLink's disk between E4a payload runs. With --database the
 # SuperLink keeps message objects (the weights, in 5 MiB chunks) in SQLite; they are deleted once
 # delivered, but SQLite keeps the freed pages and the WAL file, so the DB stays at its peak size
 # (about 3 x payload x sites per round). This script stops the adapter and the SuperLink, checkpoints
