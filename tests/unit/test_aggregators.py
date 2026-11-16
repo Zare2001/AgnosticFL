@@ -1,4 +1,4 @@
-"""hub/aggregators against hand-written formulas (PLAN.md stage 2 §4.1)."""
+"""hub/aggregators against hand-written formulas (docs/aggregators.md)."""
 
 import numpy as np
 import pytest

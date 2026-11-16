@@ -5,7 +5,7 @@
 
 The central check: one dispatched round returns one envelope per site whose weights equal
 flhub_core.train run directly on the same partition with the same config (max abs diff <= 1e-6).
-v2 adds (PLAN.md stage 2 §4.4): subset dispatch; partial collect + per-site cancel, then an
+v2 adds: subset dispatch; partial collect + per-site cancel, then an
 immediate next dispatch; a registered but offline site does not block the others; the adapter
 survives its own restart between rounds (--restart-cmd); one payload-64 echo round and one
 data-variant round (both need flhub_core 0.2 at the sites).
