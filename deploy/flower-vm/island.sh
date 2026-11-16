@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Flower island on the flower VM for S1 tests (never touches the hospital SuperNodes that
+# Flower island on the flower VM for tests without central (never touches the hospital SuperNodes that
 # serve central: separate runtime dir ~/flhub-runtime/island, SuperNode ports 19094/19095).
 #   bash deploy/flower-vm/island.sh up|down|status
 # up:   hub core 127.0.0.1:8800 + SuperLink (fleet 127.0.0.1:9092, HTTP API 9093) + adapter :8813

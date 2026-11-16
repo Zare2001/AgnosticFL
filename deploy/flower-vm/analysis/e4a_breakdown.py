@@ -2,7 +2,7 @@
 
     python3 -I e4a_breakdown.py <dir with s2-e4a-<scope>-<S>mb-* run dirs> [--sites flw-h5 flw-h6]
 
-Per site and round (relay timings in the site metrics, 66e806e): prep (relay: job -> model ready),
+Per site and round (relay timings in the site metrics): prep (relay: job -> model ready),
 push (TRAIN message to the SuperLink), reply (pushed -> reply pulled), store (reply -> hub core);
 flower_s = reply - train - data load = SuperLink -> SuperNode download, ClientApp start, upload, pull;
 rest_s = t_result - prep - push - reply - store = adapter and hub-core side outside the relay.

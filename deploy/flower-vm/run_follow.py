@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Follow central's "RUN start <name> <UTC>" / "RUN end <name> <UTC>" bus messages (stage-2 S4).
+"""Follow central's "RUN start <name> <UTC>" / "RUN end <name> <UTC>" bus messages.
 
 For every final run it
-  - sends the flower VM's sysmon summary of the run window to central (PLAN.md §4.3) with
+  - sends the flower VM's sysmon summary of the run window to central with
     deploy/flower-vm/sysmon.sh summary <name> <start> <end>,
   - scans what the hospital SuperNode logs appended during the run for anomalies (errors,
     tracebacks, reconnects, supervisor restarts) and reports them to central,
@@ -75,7 +75,7 @@ def scan(offsets: dict[str, int]) -> tuple[list[str], dict[str, int], dict[str, 
 
 
 def post_perf(name: str, start: str, end: str) -> None:
-    """One line per performance run: VM memory peak (70 % rule), per-site RSS peaks, bytes on ens3."""
+    """One line per performance run: VM memory peak (limit: 70 % of the VM), per-site RSS peaks, bytes on ens3."""
     try:
         d = json.loads((SUMMARIES / f"sysmon-flower-{name}.json").read_text())
         mem = float(d["system"]["mem_used_mb_peak"])
