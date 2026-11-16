@@ -91,7 +91,7 @@ def post_perf(name: str, start: str, end: str) -> None:
             f"RSS peak MB per site (supernode+superexec+clientapp) {{{', '.join(f'{k}: {v}' for k, v in sites.items() if v)}}}; "
             f"ens3 rx {net.get('rx_bytes', 0) / 1e6:.1f} MB tx {net.get('tx_bytes', 0) / 1e6:.1f} MB")
     subprocess.run([BUS, "send", "--to", "central", "--type", "info", "--subject",
-                    f"S4 flower VM {name}: mem peak {mem / 1024:.1f} GB ({100 * mem / MEM_TOTAL_MB:.0f} %)",
+                    f"flower VM {name}: mem peak {mem / 1024:.1f} GB ({100 * mem / MEM_TOTAL_MB:.0f} %)",
                     "--body", body], capture_output=True, text=True, timeout=60)
 
 
@@ -153,7 +153,7 @@ def main() -> None:
                                   f"SuperNode log lines flagged during {start}..{utc}: {counts}; "
                                   f"reconnect retries {reconnects}"] + hits[:12])
                 subprocess.run([BUS, "send", "--to", "central", "--type", "info", "--subject",
-                                f"S4 flower {name}: flagged SuperNode log lines or health", "--body", body],
+                                f"flower {name}: flagged SuperNode log lines or health", "--body", body],
                                capture_output=True, text=True, timeout=60)
         state_path.write_text(json.dumps(state))
         time.sleep(15)
