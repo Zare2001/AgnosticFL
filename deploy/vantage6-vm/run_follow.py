@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Follow central's "RUN start <name> <UTC>" / "RUN end <name> <UTC>" bus messages (stage-2 S4).
+"""Follow central's "RUN start <name> <UTC>" / "RUN end <name> <UTC>" bus messages (the stage-2 final runs).
 
 For every final run it
-  - sends the vantage6 VM's sysmon summary of the run window to central (PLAN.md §4.3) with
+  - sends the vantage6 VM's sysmon summary of the run window to central with
     deploy/vantage6-vm/sysmon.sh summary <name> <start> <end>,
   - counts the rounds each node trained and scans the node logs of the window (docker logs
     --since/--until) for anomalies (errors, tracebacks, crashed runs, disconnects) and reports
@@ -132,16 +132,16 @@ def main() -> None:
                 f.write(json.dumps(rec) + "\n")
             print(f"{now()} RUN end {name}: sysmon rc={proc.returncode}, rounds {rounds}, anomalies {counts}, "
                   f"{rec['health']}", flush=True)
-            if any(rounds.values()):  # the run used vantage6 sites: report the memory peaks (70 % rule)
+            if any(rounds.values()):  # the run used vantage6 sites: report the memory peaks
                 subprocess.run([BUS, "send", "--to", "central", "--type", "info", "--subject",
-                                f"S4 vantage6 {name}: RAM/disk on the vantage6 VM", "--body",
+                                f"vantage6 {name}: RAM/disk on the vantage6 VM", "--body",
                                 f"{rec['memory']}; rounds trained {rounds}; {rec['health']}"],
                                capture_output=True, text=True, timeout=60)
             if proc.returncode != 0 or any(counts.values()) or rec["health"] != "HEALTHY":
                 body = "\n".join([f"sysmon summary rc={proc.returncode}; {rec['health']}; rounds trained {rounds}",
                                   f"node log lines flagged during {start}..{utc}: {counts}"] + hits[:12])
                 subprocess.run([BUS, "send", "--to", "central", "--type", "info", "--subject",
-                                f"S4 vantage6 {name}: flagged node log lines or health", "--body", body],
+                                f"vantage6 {name}: flagged node log lines or health", "--body", body],
                                capture_output=True, text=True, timeout=60)
         state_path.write_text(json.dumps(state))
         time.sleep(15)

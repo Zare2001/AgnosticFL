@@ -58,7 +58,7 @@ nodes_up() {  # (re)render the island node configs, start missing nodes, wait un
 case "${1:-}" in
   up)
     shift
-    [ -x "$V6_VENV/bin/python" ] || { echo "no island venv $V6_VENV (see docs/agents/worklogs/stage2-vantage6.md)" >&2; exit 1; }
+    [ -x "$V6_VENV/bin/python" ] || { echo "no island venv $V6_VENV; create it first: uv venv --python $PYTHON_VERSION $V6_VENV" >&2; exit 1; }
     mkdir -p "$V6_RT"; chmod 700 "$V6_RT"
     bash "$REPO/deploy/central/vantage6/install.sh" --island "$@"
     hubcore_up

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# E6 fault injection on the vantage6 VM (EXPERIMENTS.md E6, PLAN.md §8.5). One-shot: arm, wait
+# E6 fault injection on the vantage6 VM (docs/results/stage2.md, E6). One-shot: arm, wait
 # for the start of hub round N at one site, wait S seconds, act, log, exit.
 # Trigger: the node log line that the algorithm prints when training starts
 #   "[Task <run_id>]: info > site=<site> org=<id> round=<N> n=<examples>"
@@ -21,7 +21,7 @@ REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 DIR="$HOME/flhub-runtime/vantage6/e6"
 mkdir -p "$DIR"
 now() { date -u +%Y-%m-%dT%H:%M:%S.%3NZ; }
-announce() {  # PLAN.md §8.5: 'E6 inject <what> at <UTC>' to all (best effort)
+announce() {  # 'E6 inject <what> at <UTC>' on the bus, to all (best effort)
   "$REPO/tools/bus" send --to all --type info --subject "E6 inject $1" --body "${2:-vantage6 VM inject.sh}" >/dev/null 2>&1 || true
 }
 

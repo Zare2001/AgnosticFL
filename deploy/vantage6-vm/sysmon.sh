@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Continuous system monitoring on the vantage6 VM during stage 2 (PLAN.md §4.3): scripts/sysmon.py
+# Continuous system monitoring on the vantage6 VM during stage 2: scripts/sysmon.py
 # with one component per hospital node process (vnode-local ... -n <site>) plus the stock components
 # (v6-algorithm = the training containers of all nodes, docker, ...).
 #   bash deploy/vantage6-vm/sysmon.sh start|stop|status

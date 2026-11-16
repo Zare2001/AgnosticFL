@@ -54,8 +54,8 @@ SERVER_URL="$(grep '^V6_SERVER_URL=' "$RT/adapter.env" | cut -d= -f2-)"
 API="$SERVER_URL:$V6_SERVER_PORT/api"
 CONTAINER="$(docker ps -q --filter "label=vantage6-type=server" --filter "label=name=$NAME")"
 [ -n "$CONTAINER" ] || die "the vantage6 server container is not running"
-# the site's old central-made key, for the 401 check (install.sh before this change, add_sites.sh);
-# it belongs to the flhub node only
+# for the 401 check: a key that central generated for this site, if an installation from before
+# hospitals made their own keys left one in $RT; it belongs to the flhub node only
 var="V6_API_KEY_$(echo "$SITE" | tr 'a-z-' 'A-Z_')"
 OLD_KEY=""
 [ "$COLLAB" != flhub ] || OLD_KEY="$(grep -h "^$var=" "$RT/secrets.env" "$RT/v6-nodes-extra.env" 2>/dev/null | head -1 | cut -d= -f2- || true)"
@@ -119,7 +119,7 @@ log "node login with the new key: HTTP 200"
 if [ -n "$OLD_KEY" ] && [ "$OLD_KEY" != "$KEY" ]; then
   code="$(printf '%s' "$OLD_KEY" | node_login)"
   [ "$code" = 401 ] || die "node login with the old central-made key: HTTP $code, expected 401"
-  log "node login with the old central-made key: HTTP 401 (delete it: switch-over step 5)"
+  log "node login with the old central-made key: HTTP 401 (delete it from $RT)"
 fi
 V6_ROOT_PASSWORD="$pw" "$VENV/bin/python" - "$SERVER_URL" "$V6_SERVER_PORT" "$SITE" "$COLLAB" <<'PY'
 import logging, os, sys

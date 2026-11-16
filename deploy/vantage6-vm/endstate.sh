@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# S5 end-state evidence on the vantage6 VM (PLAN.md §9 item 8, VANTAGE6.md S5): prints each check
-# and exits 0 only if all hold. No changes are made.
+# End-state check of the vantage6 VM after the stage-2 experiments: no shaping, injection or
+# throttling left, only the base nodes running. Prints each check and exits 0 only if all hold.
+# No changes are made.
 #   bash deploy/vantage6-vm/endstate.sh
 set -uo pipefail
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"

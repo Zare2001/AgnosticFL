@@ -70,12 +70,12 @@ Polling: every 1 s. In database mode every status call makes the server load the
 
 The adapter serves a fixed list of sites (`--sites`). At login it maps organisation names to ids, and it reads them again while a site is missing, so organisations registered later are picked up. The run metadata gives a vantage6 algorithm only its organisation **id** (`meta.organization_id`); the name would need an extra server call. The task input therefore carries the map `sites: {"<org id>": "<site id>"}`, the algorithm returns `site_id`, and the adapter rejects a result whose `site_id` does not match.
 
-Data variants ([ADR-014](../design/decisions.md)): an algorithm receives its data from the node as a DataFrame of the database the task names, so each data variant is one labelled database in the node configuration (§3.2). The label is `db_label(variant)`: the variant with every character outside `[A-Za-z0-9_]` replaced by `_` (`organamnist-dir0.3` → `organamnist_dir0_3`), because node database labels must be Python identifiers. A label that would still not be an identifier (it starts with a digit) gets the prefix `v_` in the adapter, which the hospital-side helper in `deploy/vantage6-vm/common.sh` does not add; avoid variant names that start with a digit. The adapter takes the variant from the dispatch hint `data_variant` (`train_config` stays opaque); without a hint it uses the label `default`. The hub checks which data each site trained on through the `data_fp` metric.
+Data variants ([ADR-014](../design/decisions.md)): an algorithm receives its data from the node as a DataFrame of the database the task names, so each data variant is one labelled database in the node configuration (§3.2). The label is `db_label(variant)`: the variant with every character outside `[A-Za-z0-9_]` replaced by `_` (`organamnist-dir0.3` becomes `organamnist_dir0_3`), because node database labels must be Python identifiers. A label that would still not be an identifier (it starts with a digit) gets the prefix `v_` in the adapter, which the hospital-side helper in `deploy/vantage6-vm/common.sh` does not add; avoid variant names that start with a digit. The adapter takes the variant from the dispatch hint `data_variant` (`train_config` stays opaque); without a hint it uses the label `default`. The hub checks which data each site trained on through the `data_fp` metric.
 
 New hospital ([ADR-023](../design/decisions.md)): the operator never creates a hospital's node API key.
 1. The hospital makes the key on its own machine: a random UUID4 (vantage6 4.15.2 node keys must be UUIDs), mode 600. On the testbed: [`deploy/vantage6-vm/make_key.sh <site>`](../../deploy/vantage6-vm/make_key.sh), which writes `~/flhub-runtime/vantage6/keys/<site>.key` and sends it once, encrypted, to the operator (`tools/bus put --secret`), with its fingerprint (the first 12 hex characters of its SHA-256). A hospital kit's `./install.sh` makes `credentials/api_key` the same way.
 2. The operator registers it with [`deploy/central/vantage6/register_node.sh <site> <key file> --fingerprint <fp>`](../../deploy/central/vantage6/register_node.sh) on the running server. The script refuses an unknown site, a key that is not a UUID4, and a fingerprint that does not match. As `root` it calls `organization.create` and `collaboration.add_organization` if needed, and backs up the server database. Then, because the REST API cannot register a given key (`POST /node` and the key reset always generate one: `resource/node.py:436`, `resource/recover.py:640`), it runs [`set_node_key.py`](../../deploy/central/vantage6/set_node_key.py) in the server container (`docker exec -i`, the key on stdin). That script is the call of the entities import (`controller/fixture.py`): `db.Node(..., api_key=key)`, which stores only the bcrypt hash. An existing node only gets the new key (rotation; tasks and history stay), and a key that another node already has is refused. Then it checks: a node login with the new key gives HTTP 200, a login with the site's old operator-made key (if the operator still has one) gives 401. It deletes the key file (`shred -u`), also on failure.
-   Testbed limitation (accepted by the owner for the testbed): `tools/bus put --secret` encrypts with the bus token that all agents share, and that token is also sent over plain HTTP to the bus. So on the testbed, every agent, and anyone who captures a bus request, can decrypt a node key that went over the bus. A real hospital sends its key over a channel that only the operator can read (for example, encrypted to the operator's public key, or handed over in person). Only the fingerprint goes along in the clear, so the operator can check that it is the right key.
+   Testbed limitation: `tools/bus put --secret` encrypts with the bus token that all four VMs share, and that token is also sent over plain HTTP to the bus. So on the testbed, every VM's operator, and anyone who captures a bus request, can decrypt a node key that went over the bus. A real hospital sends its key over a channel that only the operator can read (for example, encrypted to the operator's public key, or handed over in person). Only the fingerprint goes along in the clear, so the operator can check that it is the right key.
 3. The hospital confirms: `make_key.sh <site> --confirm <fp>` with the fingerprint central reported. Only a confirmed key is used by `install.sh` and `extra.sh`, so a key that central has not registered yet never replaces a working one. Then `install.sh` and a node restart.
 4. Add the site to `V6_SITES` and restart the adapter.
 
@@ -134,15 +134,15 @@ from vantage6.algorithm.tools.util import info
 def train(df, meta, weights_b64: str, train_config: dict, sites: dict | None = None) -> dict:
 ```
 
-- **vantage6 standard.** `@data(1)` passes the task's database as a pandas DataFrame (for CSV: `pd.read_csv(uri)` with default arguments, exact for integer pixels). `@metadata` passes a `RunMetaData` record (`task_id`, `node_id`, `collaboration_id`, `organization_id` and the run's file paths). The other arguments are the `kwargs` of the task input; `wrap_algorithm()` calls the function named by the input's `method`.
-- **flhub.** The three keyword arguments: `weights_b64` (the global model, base64 safetensors), `train_config` (the hub's training configuration plus `round`) and `sites` (organisation id → site id).
+- vantage6 standard: `@data(1)` passes the task's database as a pandas DataFrame (for CSV: `pd.read_csv(uri)` with default arguments, exact for integer pixels). `@metadata` passes a `RunMetaData` record (`task_id`, `node_id`, `collaboration_id`, `organization_id` and the run's file paths). The other arguments are the `kwargs` of the task input; `wrap_algorithm()` calls the function named by the input's `method`.
+- flhub: the three keyword arguments are `weights_b64` (the global model, base64 safetensors), `train_config` (the hub's training configuration plus `round`) and `sites` (organisation id to site id).
 
 ```python
     org_id = int(meta.organization_id)
     site_id = (sites or {}).get(str(org_id))
 ```
 
-- **flhub.** The run metadata holds the organisation id, not its name; the site id comes from the map the adapter sends.
+- flhub: the run metadata holds the organisation id, not its name; the site id comes from the map the adapter sends.
 
 ```python
     raw = base64.b64decode(weights_b64)
@@ -151,8 +151,8 @@ def train(df, meta, weights_b64: str, train_config: dict, sites: dict | None = N
     new_weights, num_examples, metrics = ftrain.train(fweights.from_safetensors(raw), site_data, train_config)
 ```
 
-- **flhub.** The algorithm does no training of its own: `flhub_core.data.load_site(df)` turns the DataFrame into the site's data, and `flhub_core.train.train()` runs exactly one deterministic local round with the hub's `train_config`.
-- **vantage6 standard.** `info()` writes to the run log, which the node streams to the server line by line.
+- flhub: the algorithm does no training of its own; `flhub_core.data.load_site(df)` turns the DataFrame into the site's data, and `flhub_core.train.train()` runs exactly one deterministic local round with the hub's `train_config`.
+- vantage6 standard: `info()` writes to the run log, which the node streams to the server line by line.
 
 ```python
     return {
@@ -166,8 +166,8 @@ def train(df, meta, weights_b64: str, train_config: dict, sites: dict | None = N
     }
 ```
 
-- **vantage6 standard.** The return value must be plain JSON (`wrap_algorithm()` writes it with `json.dumps`), so the weights are base64 and the metrics plain floats.
-- **flhub.** The reply fields: `num_examples` (the FedAvg weight); every `flhub_core` metric (`train_loss`, `train_acc`, `train_time_s`, `data_load_s`, `peak_rss_mb`, `data_fp`); `site_id`; `base_model`, the sha256 reference of the bytes the site trained from (the adapter rejects a result trained from another model); and `client_code_version`, the `flhub_core` version plus a 12-hex content hash of its source files (for example `0.2.0+fe357a1dbec1`).
+- vantage6 standard: the return value must be plain JSON (`wrap_algorithm()` writes it with `json.dumps`), so the weights are base64 and the metrics plain floats.
+- flhub: the reply fields are `num_examples` (the FedAvg weight); every `flhub_core` metric (`train_loss`, `train_acc`, `train_time_s`, `data_load_s`, `peak_rss_mb`, `data_fp`); `site_id`; `base_model`, the sha256 reference of the bytes the site trained from (the adapter rejects a result trained from another model); and `client_code_version`, the `flhub_core` version plus a 12-hex content hash of its source files (for example `0.2.0+fe357a1dbec1`).
 
 The image ([ADR-004](../design/decisions.md)):
 
@@ -186,9 +186,9 @@ ENV PKG_NAME=v6_flhub
 CMD ["python", "-c", "from vantage6.algorithm.tools.wrap import wrap_algorithm; wrap_algorithm()"]
 ```
 
-- **vantage6 standard.** `PKG_NAME` plus `wrap_algorithm()` is the entry point of the official `algorithm-base` image, so nodes need no change.
-- **Deviation.** The official `algorithm-base:4.15` is Python 3.10. This image starts from `python:3.11.17-slim-bookworm` and installs what the base image adds (`vantage6-algorithm-tools` 4.15.2, pandas 2.3.3), so that torch, numpy and safetensors are identical at every site. `python -m flhub_core.selfcheck` inside the image prints the same digest as the hub.
-- **flhub.** `flhub_core` and the pinned numeric stack. The build context is the repository root; `Dockerfile.dockerignore` limits it to the two packages.
+- vantage6 standard: `PKG_NAME` plus `wrap_algorithm()` is the entry point of the official `algorithm-base` image, so nodes need no change.
+- Deviation: the official `algorithm-base:4.15` is Python 3.10. This image starts from `python:3.11.17-slim-bookworm` and installs what the base image adds (`vantage6-algorithm-tools` 4.15.2, pandas 2.3.3), so that torch, numpy and safetensors are identical at every site. `python -m flhub_core.selfcheck` inside the image prints the same digest as the hub.
+- flhub: `flhub_core` and the pinned numeric stack. The build context is the repository root; `Dockerfile.dockerignore` limits it to the two packages.
 
 ### 3.2 Data and data variants at the hospital
 
@@ -226,7 +226,7 @@ docker push <registry-host>:5050/flhub/v6-train:<tag>
 
 `deploy/central/vantage6/install.sh` does this with the pins of `deploy/versions.env`; the tag is the 12-character git SHA (with `-dirty` when `flhub_core` or `clients/vantage6` has uncommitted changes). The adapter names the image in every task (`V6_ALGO_IMAGE`), and `start.sh` restarts the adapter when the tag changed. Each node pulls the new tag at its first task with it ([ADR-021](../design/decisions.md)). Rollback (not tested): set `V6_ALGO_IMAGE` in `adapter.env` back to the previous tag and run `restart_adapter.sh`; the nodes pull that tag at their next task.
 
-Measured for the `flhub_core` 0.1 → 0.2 update in stage 2 (stage-2 report §4 and stage-2 vantage6 section §3, at the tag):
+Measured for the `flhub_core` update from 0.1 to 0.2 in stage 2 (stage-2 report §4 and stage-2 vantage6 section §3, at the tag):
 
 | Step | Who | Time |
 |---|---|---|
@@ -264,12 +264,12 @@ Selfcheck v2 inside the pulled image, run with `--network none`, printed the hub
 
 The adapter is a vantage6 user, so an existing vantage6 4.15 server and its nodes need no new software.
 
-1. **Organisation and user for the hub.** Create or choose an organisation for the hub operator and make it a participant of the collaboration the hub will use; only participants can create tasks. Create a user for the adapter in it. In the reference deployment the users come from the entities import, which gives every imported user a role with all rules of the server (`server/controller/fixture.py:81-91`), so the adapter's password controls the whole vantage6 server. The adapter needs much less (§2.2): view collaborations, organisations and nodes; create, view and delete tasks; view their runs and results; and send events in the collaboration, because vantage6 checks `task.kill` (`/kill/task`) against the `event` resource's send rule (`server/resource/event.py:175-180`). A role limited to that was not tested.
-2. **Collaboration.** It must be unencrypted (`encrypted: false`), because the adapter calls `setup_encryption(None)`; an encrypted collaboration needs adapter support (§8). Each node's `encryption.enabled` must equal the collaboration's `encrypted`.
-3. **Algorithm image.** Build and push the image (§3.3) to a registry the nodes can reach. A plain-HTTP registry needs an `insecure-registries` entry in each hospital's Docker daemon, because the node pulls through the host's Docker socket. The node also supports registry logins (`docker_registries` in its configuration); this was not tested.
-4. **Hospitals.** Each hospital adds the image to its `allowed_algorithms` policy and, for data variants, one database per variant (§3.2), then restarts its node once. Recommended: `share_config: false`.
-5. **Adapter.** Start it next to the server with the settings of §2.4, with the password in `V6_ADAPTER_PASSWORD`. `discover` should list every site as `online` (`deploy/central/vantage6/status.sh` does this on the testbed). Then run a few rounds and check each site's `client_code_version` in the round records of the run directory (`rounds/rNNNN.json`); the orchestrator also logs a warning when a site runs other `flhub_core` code than the hub, and with `strict_code_version: true` in the run configuration it rejects such updates.
-6. **Admission test.** The conformance suite compares every returned update with local training on the same data, so it accepts only the project's benchmark sites. For vantage6 these are two test organisations named `v6-h3` and `v6-h4` whose nodes serve, as database `default`, the files that `python -m flhub_core.data materialize --sites v6-h3 v6-h4` writes. Then run `pytest tests/conformance --adapter http://127.0.0.1:8812 --sites v6-h3 v6-h4`. `--restart-cmd "<command that restarts the adapter>"` adds the restart test, and `--variant <variant>` the data-variant test, for which the test nodes also need that variant's database (§3.2; files from `python -m flhub_core.data materialize --variants <variant> --sites v6-h3 v6-h4 --manifests configs/stage2/partitions`). See [adding a framework](../adding-a-framework.md). The suite tests the adapter and the algorithm image, not the real hospitals.
+1. Organisation and user for the hub. Create or choose an organisation for the hub operator and make it a participant of the collaboration the hub will use; only participants can create tasks. Create a user for the adapter in it. In the reference deployment the users come from the entities import, which gives every imported user a role with all rules of the server (`server/controller/fixture.py:81-91`), so the adapter's password controls the whole vantage6 server. The adapter needs much less (§2.2): view collaborations, organisations and nodes; create, view and delete tasks; view their runs and results; and send events in the collaboration, because vantage6 checks `task.kill` (`/kill/task`) against the `event` resource's send rule (`server/resource/event.py:175-180`). A role limited to that was not tested.
+2. Collaboration. It must be unencrypted (`encrypted: false`), because the adapter calls `setup_encryption(None)`; an encrypted collaboration needs adapter support (§8). Each node's `encryption.enabled` must equal the collaboration's `encrypted`.
+3. Algorithm image. Build and push the image (§3.3) to a registry the nodes can reach. A plain-HTTP registry needs an `insecure-registries` entry in each hospital's Docker daemon, because the node pulls through the host's Docker socket. The node also supports registry logins (`docker_registries` in its configuration); this was not tested.
+4. Hospitals. Each hospital adds the image to its `allowed_algorithms` policy and, for data variants, one database per variant (§3.2), then restarts its node once. Recommended: `share_config: false`.
+5. Adapter. Start it next to the server with the settings of §2.4, with the password in `V6_ADAPTER_PASSWORD`. `discover` should list every site as `online` (`deploy/central/vantage6/status.sh` does this on the testbed). Then run a few rounds and check each site's `client_code_version` in the round records of the run directory (`rounds/rNNNN.json`); the orchestrator also logs a warning when a site runs other `flhub_core` code than the hub, and with `strict_code_version: true` in the run configuration it rejects such updates.
+6. Admission test. The conformance suite compares every returned update with local training on the same data, so it accepts only the project's benchmark sites. For vantage6 these are two test organisations named `v6-h3` and `v6-h4` whose nodes serve, as database `default`, the files that `python -m flhub_core.data materialize --sites v6-h3 v6-h4` writes. Then run `pytest tests/conformance --adapter http://127.0.0.1:8812 --sites v6-h3 v6-h4`. `--restart-cmd "<command that restarts the adapter>"` adds the restart test, and `--variant <variant>` the data-variant test, for which the test nodes also need that variant's database (§3.2; files from `python -m flhub_core.data materialize --variants <variant> --sites v6-h3 v6-h4 --manifests configs/stage2/partitions`). See [adding a framework](../adding-a-framework.md). The suite tests the adapter and the algorithm image, not the real hospitals.
 
 | Credential | Created by | Kept in |
 |---|---|---|
@@ -309,7 +309,7 @@ Comparison with the other frameworks: [`cost-and-efficiency.md`](../cost-and-eff
 | bytes on the wire ÷ payload | 4.97–5.53 up to 64 MiB (design 5.34: five input copies down, one result up); 9.08 at 128 MiB | [bytes on wire](../results/evidence/stage2/e4_bytes.md), §5.4 |
 | bandwidth efficiency at 20 Mbit/s | 0.16 against the 4·P bound; 0.87 against vantage6's own volume of 21.36·P (both directions) | [cost model](../results/evidence/stage2/cost_model.md), §5.4 |
 | largest model delivered | 128 MiB (468.2 s per round); 256 MiB never delivered | §6.1 |
-| 6 → 12 sites (E5) | fan-out 9.1 → 10.4 s | [tables](../results/evidence/stage2/tables.md) |
+| from 6 to 12 sites (E5) | fan-out from 9.1 to 10.4 s | [tables](../results/evidence/stage2/tables.md) |
 | killed training container (E6a) | detected after 2.1 s, round done 15.2 s after the kill | [robustness](../results/evidence/stage2/e6.md) |
 
 ### 5.2 Implementation and integration cost
@@ -413,7 +413,7 @@ Disk: a 4.15.2 node never deletes its per-run folders `task-<run id>` (input and
 
 ### 5.6 Scaling and robustness
 
-**Scaling (E5).** Six sites against twelve (four per framework; in `iid12` every site holds half as much data as in `iid`, 2,880 instead of 5,760 examples, so the total stays the same; `configs/stage2/partitions/`): vantage6 fan-out 9.1 → 10.4 s ([tables](../results/evidence/stage2/tables.md)), overhead per site 6.7 → 8.2 s, hospital-VM CPU mean 26.7 → 42.0 % with four training containers on 4 vCPUs (stage-2 report §6.4). The two extra nodes were online 16 s after the request; registered but offline, they never blocked a run.
+**Scaling (E5).** Six sites against twelve (four per framework; in `iid12` every site holds half as much data as in `iid`, 2,880 instead of 5,760 examples, so the total stays the same; `configs/stage2/partitions/`): vantage6 fan-out from 9.1 to 10.4 s ([tables](../results/evidence/stage2/tables.md)), overhead per site from 6.7 to 8.2 s, hospital-VM CPU mean from 26.7 to 42.0 % with four training containers on 4 vCPUs (stage-2 report §6.4). The two extra nodes were online 16 s after the request; registered but offline, they never blocked a run.
 
 ![E5: scaling](../results/figures/e5_scaling.png)
 
@@ -439,21 +439,21 @@ vantage6 reports a killed algorithm container at once (the run becomes `crashed`
 | largest model delivered | 128 MiB, 468.2 s per round | per-log-line row rewrites (§6.2) | [tables](../results/evidence/stage2/tables.md) |
 | 256 MiB | never delivered: each node trained round 1 six times in 32 min and every result was dropped, until the round was cancelled | for every streamed log line the server rewrites the run row (its input alone is 1.78 × 256 MiB ≈ 456 MiB), the node's websocket times out, and the node drops the result (§6.2) | [node logs](../results/evidence/stage2/vantage6/e4a-256mb-node-logs.txt) |
 | largest storable model | about 536 MiB; 1024 MiB cannot be stored | SQLite rejects a value > 10⁹ bytes (999,999,000 bytes accepted, 1,000,000,001 rejected), and a run's input is 1.78× the model | [ADR-020](../design/decisions.md); stage-2 vantage6 section §4 |
-| growth with model size | superlinear: 64 → 128 MiB costs 4.1× the time | per-log-line row rewrites | [tables](../results/evidence/stage2/tables.md) |
+| growth with model size | superlinear: 128 MiB costs 4.1× the time of 64 MiB | per-log-line row rewrites | [tables](../results/evidence/stage2/tables.md) |
 | bytes on the wire | 5–9× the payload | five input copies per site and round, 1.78× encoding; retries at 128 MiB | §5.4 |
 | fixed cost per round | about 6.3 s | image check, container start, task and result round trips | §5.3 |
 
 ### 6.2 Known issues
 
-- **A result is dropped when the websocket is down.** After training, the node takes the result from its queue and first sends a status event over the websocket (`node/__init__.py:575-579`). If the socket is disconnected, the emit fails, the exception is caught ("Speaking thread had an exception") and the result is lost. When the node reconnects, the server hands the still-open run back and the node trains again. This is the 256 MiB failure.
-- **Run rows are rewritten per log line.** The server's `on_algorithm_log` loads the run, appends the line and saves the whole row (`server/websockets.py:442-444`); with SQLite this rewrites the row including its input. About 24 log lines per round blocked the single server worker for about 60 s at 64 MiB.
-- **Overhead grows with the stored runs.** `input` is the first column of the run table (`server/model/run.py:58-68`), so in SQLite every later column of a row sits behind its input, and listings filtered on those columns walk all stored inputs.
-- **Task listings load all stored data.** `GET /task` computes each task's status from its runs, including their input and result. With 100 stored `cnn-medium` tasks the listing held the single server worker for 12 min. Delete tasks by id instead.
-- **Deleting a task with subtasks orphans the subtasks' runs** (`server/resource/task.py:1289-1301`). Their input and result stay in the database, unreachable through the API; after the E7 native runs these were 50 rows, and the database file stayed at 1.6 GiB after deleting every task and a VACUUM (`du -h` in `purge.sh`).
-- **Nodes never delete task folders** (`node/docker/task_manager.py:450-452`). A clean-up next to the node must age a folder by its newest file, because run ids are reused after task deletes and a reused folder keeps its old modification time ([`deploy/vantage6-vm/taskdir_gc.sh`](../../deploy/vantage6-vm/taskdir_gc.sh)).
-- **The large result store is not usable in 4.15.2.** The client uploads blobs in chunks of exactly 1 MiB, which the server's uWSGI rejects at its default 1 MiB chunked-input limit; with the limit raised, the SQLite-backed server deadlocked while streaming blobs ([ADR-020](../design/decisions.md)).
-- **Only unencrypted collaborations.** The adapter calls `setup_encryption(None)`.
-- **Transport and storage in the reference deployment.** The vantage6 API and the registry are plain HTTP, limited by the cloud firewall, and the collaboration is unencrypted, so the server stores task inputs and results (the weights) in plaintext.
+- A result is dropped when the websocket is down. After training, the node takes the result from its queue and first sends a status event over the websocket (`node/__init__.py:575-579`). If the socket is disconnected, the emit fails, the exception is caught ("Speaking thread had an exception") and the result is lost. When the node reconnects, the server hands the still-open run back and the node trains again. This is the 256 MiB failure.
+- Run rows are rewritten per log line. The server's `on_algorithm_log` loads the run, appends the line and saves the whole row (`server/websockets.py:442-444`); with SQLite this rewrites the row including its input. About 24 log lines per round blocked the single server worker for about 60 s at 64 MiB.
+- Overhead grows with the stored runs. `input` is the first column of the run table (`server/model/run.py:58-68`), so in SQLite every later column of a row sits behind its input, and listings filtered on those columns walk all stored inputs.
+- Task listings load all stored data. `GET /task` computes each task's status from its runs, including their input and result. With 100 stored `cnn-medium` tasks the listing held the single server worker for 12 min. Delete tasks by id instead.
+- Deleting a task with subtasks orphans the subtasks' runs (`server/resource/task.py:1289-1301`). Their input and result stay in the database, unreachable through the API; after the E7 native runs these were 50 rows, and the database file stayed at 1.6 GiB after deleting every task and a VACUUM (`du -h` in `purge.sh`).
+- Nodes never delete task folders (`node/docker/task_manager.py:450-452`). A clean-up next to the node must age a folder by its newest file, because run ids are reused after task deletes and a reused folder keeps its old modification time ([`deploy/vantage6-vm/taskdir_gc.sh`](../../deploy/vantage6-vm/taskdir_gc.sh)).
+- The large result store is not usable in 4.15.2. The client uploads blobs in chunks of exactly 1 MiB, which the server's uWSGI rejects at its default 1 MiB chunked-input limit; with the limit raised, the SQLite-backed server deadlocked while streaming blobs ([ADR-020](../design/decisions.md)).
+- Only unencrypted collaborations. The adapter calls `setup_encryption(None)`.
+- Transport and storage in the reference deployment. The vantage6 API and the registry are plain HTTP, limited by the cloud firewall, and the collaboration is unencrypted, so the server stores task inputs and results (the weights) in plaintext.
 
 ### 6.3 Knobs
 
@@ -470,23 +470,23 @@ vantage6 reports a killed algorithm container at once (the run becomes `crashed`
 
 ## 7. Troubleshooting
 
-- **`v6 server import` reports success, but logins fail; the server logs "No root user found! Is this the first run?"** → On Python 3.11 the 4.15 CLI formats a str-Enum used as an environment-variable name as `ServerGlobals.DB_URI_ENV_VAR` instead of `VANTAGE6_DB_URI`, so the import writes into a throw-away database → run the server image's own `vserver-local import` with `VANTAGE6_DB_URI` set, as `install.sh` does ([ADR-005](../design/decisions.md)).
-- **`v6 server stop` answers "flhub is not running!"** → the same Enum bug names the container `…-ServerType.V6SERVER` → stop the server container by its Docker labels (`stop.sh`).
-- **A fresh server has the superuser `root`/`root`** → the server creates it when no user `root` exists → import `root` with a generated password.
-- **`v6 node stop` and other CLI calls exit with "Can't write to log dir"** → server and node containers write the CLI's log directory as root → start the server with `-c <config>` (no CLI file log) and stop a node with `docker stop vantage6-<site>-user`.
-- **The adapter's own log lines disappear** → `UserClient()` replaces the root logger's handlers and level → the adapter restores them under a lock.
-- **The server is busy for minutes after a node (re)connects** → the node publishes every CSV column as a configuration row (785 per file), and the server deletes them one commit at a time → `share_config: false` in the node configuration.
-- **`v6 node start` exits with "Database label … contains invalid characters"** → labels must be Python identifiers (letters, digits and underscores, not starting with a digit) → use `db_label(variant)`.
-- **A run fails because a database is missing** → the task names a label the node does not have → add the variant's database to the node configuration and restart the node.
-- **Runs end as `not allowed` (node log "Docker image … is not allowed on this Node!") or as `non-existing Docker image` (node log "Failed to pull image!")** → the image does not match the node's `allowed_algorithms`, or the node cannot pull it, for example from a plain-HTTP registry that is missing in `insecure-registries` (with the default `require_algorithm_pull` a local copy is not used) → fix the regular expression or the Docker daemon configuration.
-- **Rounds take about 2 min at 64 MiB, the server runs at 100 % CPU, and nodes log "Connection error... Retrying"** → per-log-line row rewrites in SQLite (§6.2) → expected in database mode; the client retries and the rounds complete. Use smaller models or the untested knobs of §6.3.
-- **A node logs `IncompleteRead` after a status update** → uWSGI cut the response (the whole run with its input) while the worker was busy; the update itself reached the server → harmless.
-- **At 256 MiB the nodes train the same round again and again; their logs show "Speaking thread had an exception" and `BadNamespaceError: /tasks is not a connected namespace`** → the result is dropped while the websocket is down (§6.2) → no fix in 4.15.2 with SQLite; stay at or below 128 MiB.
-- **A run stays `active`; the node logs `FileNotFoundError .../task-000000001/output`** → a task-folder clean-up deleted a fresh output: run ids are reused after deletes and the reused folder kept an old modification time → age folders by their newest file and skip folders whose container is running; the hub's deadline and retry recover the round.
-- **The hospital disk fills up** → nodes never delete `task-<run id>` folders (about 2.7× the model per site and round) → a periodic clean-up such as `taskdir_gc.sh`.
-- **Blob uploads fail with HTTP 500, then the server hangs** (`large_result_store` configured) → 1 MiB upload chunks against uWSGI's 1 MiB chunked-input limit, then a deadlock in the SQLite-backed server → do not use the large result store with 4.15.2.
-- **Listing tasks takes minutes and the server needs GBs of memory** → `GET /task` loads every run's input and result → delete tasks by id; `purge.sh --vacuum` between runs.
-- **The server database keeps growing after central-function tasks were deleted** → subtask runs are not deleted with their tasks → remove the orphaned rows while the server is stopped ([`scripts/stage2/v6_orphan_cleanup.sh`](../../scripts/stage2/v6_orphan_cleanup.sh)).
+- **`v6 server import` reports success, but logins fail; the server logs "No root user found! Is this the first run?"** Cause: On Python 3.11 the 4.15 CLI formats a str-Enum used as an environment-variable name as `ServerGlobals.DB_URI_ENV_VAR` instead of `VANTAGE6_DB_URI`, so the import writes into a throw-away database. Fix: Run the server image's own `vserver-local import` with `VANTAGE6_DB_URI` set, as `install.sh` does ([ADR-005](../design/decisions.md)).
+- **`v6 server stop` answers "flhub is not running!"** Cause: The same Enum bug names the container `…-ServerType.V6SERVER`. Fix: Stop the server container by its Docker labels (`stop.sh`).
+- **A fresh server has the superuser `root`/`root`** Cause: The server creates it when no user `root` exists. Fix: Import `root` with a generated password.
+- **`v6 node stop` and other CLI calls exit with "Can't write to log dir"** Cause: Server and node containers write the CLI's log directory as root. Fix: Start the server with `-c <config>` (no CLI file log) and stop a node with `docker stop vantage6-<site>-user`.
+- **The adapter's own log lines disappear** Cause: `UserClient()` replaces the root logger's handlers and level. Fix: The adapter restores them under a lock.
+- **The server is busy for minutes after a node (re)connects** Cause: The node publishes every CSV column as a configuration row (785 per file), and the server deletes them one commit at a time. Fix: `share_config: false` in the node configuration.
+- **`v6 node start` exits with "Database label … contains invalid characters"** Cause: Labels must be Python identifiers (letters, digits and underscores, not starting with a digit). Fix: Use `db_label(variant)`.
+- **A run fails because a database is missing** Cause: The task names a label the node does not have. Fix: Add the variant's database to the node configuration and restart the node.
+- **Runs end as `not allowed` (node log "Docker image … is not allowed on this Node!") or as `non-existing Docker image` (node log "Failed to pull image!")** Cause: The image does not match the node's `allowed_algorithms`, or the node cannot pull it, for example from a plain-HTTP registry that is missing in `insecure-registries` (with the default `require_algorithm_pull` a local copy is not used). Fix: Fix the regular expression or the Docker daemon configuration.
+- **Rounds take about 2 min at 64 MiB, the server runs at 100 % CPU, and nodes log "Connection error... Retrying"** Cause: Per-log-line row rewrites in SQLite (§6.2). Fix: Expected in database mode; the client retries and the rounds complete. Use smaller models or the untested knobs of §6.3.
+- **A node logs `IncompleteRead` after a status update** Cause: uWSGI cut the response (the whole run with its input) while the worker was busy; the update itself reached the server. Fix: none needed, it is harmless.
+- **At 256 MiB the nodes train the same round again and again; their logs show "Speaking thread had an exception" and `BadNamespaceError: /tasks is not a connected namespace`** Cause: The result is dropped while the websocket is down (§6.2). Fix: None in 4.15.2 with SQLite; stay at or below 128 MiB.
+- **A run stays `active`; the node logs `FileNotFoundError .../task-000000001/output`** Cause: A task-folder clean-up deleted a fresh output: run ids are reused after deletes and the reused folder kept an old modification time. Fix: Age folders by their newest file and skip folders whose container is running; the hub's deadline and retry recover the round.
+- **The hospital disk fills up** Cause: Nodes never delete `task-<run id>` folders (about 2.7× the model per site and round). Fix: A periodic clean-up such as `taskdir_gc.sh`.
+- **Blob uploads fail with HTTP 500, then the server hangs** (`large_result_store` configured). Cause: 1 MiB upload chunks against uWSGI's 1 MiB chunked-input limit, then a deadlock in the SQLite-backed server. Fix: Do not use the large result store with 4.15.2.
+- **Listing tasks takes minutes and the server needs GBs of memory** Cause: `GET /task` loads every run's input and result. Fix: Delete tasks by id; `purge.sh --vacuum` between runs.
+- **The server database keeps growing after central-function tasks were deleted** Cause: Subtask runs are not deleted with their tasks. Fix: Remove the orphaned rows while the server is stopped ([`scripts/stage2/v6_orphan_cleanup.sh`](../../scripts/stage2/v6_orphan_cleanup.sh)).
 
 ## 8. Future work and upstream reports
 

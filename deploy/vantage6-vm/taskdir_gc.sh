@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Hospital housekeeping (ops, ledger): vantage6 4.15.2 nodes never delete their per-run folders
+# Hospital housekeeping: vantage6 4.15.2 nodes never delete their per-run folders
 # task-<run_id> (input + output, ~2.7x the model per site and round) in the node's data volume.
 # Removes a node's task folders whose NEWEST FILE is older than MIN_AGE minutes and whose algorithm
 # container is not running. The age is taken from the files, not from the folder: run ids are reused
 # when tasks are deleted (sqlite), and a reused folder keeps its old mtime while the node overwrites
-# input/output in place (2026-10-14 incident: a fresh output was removed before the node read it).
+# input/output in place (a clean-up by folder age removed a fresh output before the node read it).
 # Run every minute by the cron entry of install.sh; logs to ~/flhub-runtime/vantage6/taskdir_gc.log.
 # Usage: [V6_TASKDIR_DRY=1] bash deploy/vantage6-vm/taskdir_gc.sh [node ...]   (default: every node volume)
 set -euo pipefail

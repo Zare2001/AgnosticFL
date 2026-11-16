@@ -1,4 +1,4 @@
-"""E7 native baseline: FedAvg the vantage6 way, without the hub (EXPERIMENTS.md E7).
+"""E7 native baseline: FedAvg the vantage6 way, without the hub (docs/results/stage2.md, E7).
 
 A vantage6 algorithm has a central function, run by the node of the organisation that receives
 the task, which creates subtasks for the data organisations and aggregates their results. Here:

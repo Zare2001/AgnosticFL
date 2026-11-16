@@ -35,7 +35,7 @@ def utc() -> str:
 
 
 def load_run_config(path: str, name: str | None = None) -> dict:
-    """The native run's settings from the E7 hub run config, through central's loader (so extends,
+    """The native run's settings from the E7 hub run config, through the orchestrator's loader (so extends,
     partition, model and seed resolve as for the hub run); name s2-e7-vantage6-hub-X -> -native-X."""
     from hub.orchestrator.config import build_train_config, load_config
 
