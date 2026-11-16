@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# End-state evidence for the stage-2 Definition of Done (PLAN.md §9 item 8) on the NVFlare VM.
+# Checks that the experiment tooling left nothing behind on the NVFlare VM: no shaping rule, no armed
+# injection, no throttled site, extra sites stopped, base hospitals connected, free disk.
 # Prints each check with its command output; exit 0 only when all pass.
 set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

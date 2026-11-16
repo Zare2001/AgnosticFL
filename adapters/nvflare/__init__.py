@@ -1,1 +1,1 @@
-"""NVFlare adapter: flhub/0.1 service, FLARE API wrapper, relay controller and relay job."""
+"""NVFlare adapter: flhub service, FLARE API wrapper, relay controller and relay job."""

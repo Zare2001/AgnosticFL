@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# E7 native baseline on central: NVFlare's built-in FedAvg on the run's NVFlare hospitals, no hub.
+# Native baseline (experiment E7) on central: NVFlare's built-in FedAvg on the run's NVFlare hospitals, no hub.
 #   bash deploy/central/nvflare/native/run.sh configs/stage2/e7/s2-e7-nvflare-hub-<cnn|payload>.yaml <out_dir>
 # The hub config of the matching E7 hub run; the native run is named s2-e7-nvflare-native-<cnn|payload>.
 # Runs next to the (idle) relay job: the NVFlare server schedules up to 4 jobs and the hospitals

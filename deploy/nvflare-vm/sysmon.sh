@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Runs scripts/sysmon.py on the NVFlare VM through S4: sysmon.sh {start|stop|status|send <run> <from> <to>}
+# Runs scripts/sysmon.py on the NVFlare VM during the final runs: sysmon.sh {start|stop|status|send <run> <from> <to>}
 # Per-site components (client process, job process) for the real hospitals; island processes
 # (~/flhub-island) are kept apart so they never count as NVFlare hospitals.
 set -euo pipefail

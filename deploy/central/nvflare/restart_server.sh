@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# E6e: restarts ONLY the NVFlare server on central (not the adapter) with the kit's own mechanism
+# Restarts only the NVFlare server on central (not the adapter) with the kit's own mechanism
 # (shutdown.fl, then the kit's start.sh), and returns once the server ports accept connections again.
 # No manual step afterwards: the hospitals reconnect by themselves and the adapter's keeper submits a
-# new relay job once they are back (ADR-011). Prints the timeline.
+# new relay job once they are back. Prints the timeline. Used by the server-restart test (E6e).
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$HERE/common.sh"

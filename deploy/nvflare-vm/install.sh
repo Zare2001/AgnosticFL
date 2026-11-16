@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Installs the NVFlare hospitals on this VM (idempotent):
 #  1. venv with the standard NVFlare client + torch, numpy, safetensors. NO flhub_core: the training
-#     code (client.py + flhub_core) comes with each NVFlare job as custom code (ADR-018); NVFlare
+#     code (client.py + flhub_core) comes with each NVFlare job as custom code; NVFlare
 #     appends a job's custom/ to sys.path, so an installed flhub_core would shadow the job's copy.
-#  2. data, sha256-verified: the stage-1 file <site>.csv and the stage-2 variant files
+#  2. data, sha256-verified: the file <site>.csv and the data variant files
 #     <variant>-<site>.csv next to it (configs/stage2/partitions manifests), made with this checkout's
 #     flhub_core as a provisioning tool.
 #  3. startup kits: install.sh [<site>.signed.zip ...]  (default: $NVF_INCOMING/*.signed.zip). A signed
@@ -35,7 +35,7 @@ fi
 for kit in "${kits[@]}"; do
   case "$kit" in
     *.signed.zip) nvf_install_signed "$kit" "$NVF_SITES" ;;
-    *) echo "install: $kit is not a <site>.signed.zip (operator-made kits are no longer accepted)" >&2; exit 1 ;;
+    *) echo "install: $kit is not a <site>.signed.zip" >&2; exit 1 ;;
   esac
 done
 for site in $NVF_SITES; do

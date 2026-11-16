@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# E6b straggler: throttle the CPU of one NVFlare hospital on this VM (EXPERIMENTS.md E6b).
+# Straggler (experiment E6b): throttle the CPU of one NVFlare hospital on this VM.
 #   straggler.sh on <site> <cpu%>     e.g. straggler.sh on nvf-h1 10  (% of one CPU)
 #   straggler.sh off <site>
 #   straggler.sh status [<site>]

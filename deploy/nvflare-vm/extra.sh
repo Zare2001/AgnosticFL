@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# E5 extra NVFlare hospitals ($NVF_EXTRA_SITES, default nvf-h7 nvf-h8) on this VM:
+# Extra NVFlare hospitals of the 12-site run E5 ($NVF_EXTRA_SITES, default nvf-h7 nvf-h8) on this VM:
 #   extra.sh install [<site>.signed.zip ...]   kits (default $NVF_INCOMING/nvf-h{7,8}.signed.zip) + data;
 #                                    a signed zip answers this site's request.sh
 #   extra.sh start | stop | status

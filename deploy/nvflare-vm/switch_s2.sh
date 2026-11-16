@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# One-time switch of the NVFlare hospitals to job-shipped flhub_core (ADR-018). Run it AFTER central
+# One-time switch of the NVFlare hospitals to job-shipped flhub_core. Run it AFTER central
 # deployed a relay job whose custom/ carries flhub_core, and after the data variants are provisioned.
-#   1. check the stage-2 data files against the manifests (no downtime)
+#   1. check the data variant files against the manifests (no downtime)
 #   2. remove flhub_core from the hospital venv
-#   3. restart the clients: stop.sh + start.sh (the running clients still carry the stage-1 editable
-#      path in sys.path, which would shadow the job's copy)
+#   3. restart the clients: stop.sh + start.sh (the running clients still carry the editable
+#      install's path in sys.path, which would shadow the job's copy)
 #   4. wait until every site's job process reports the job's flhub_core version
-# Prints a timeline (steps, wall time, downtime per site) for the RQ2 ledger.
+# Prints a timeline (steps, wall time, downtime per site) for docs/results/evidence/hospital-ledger.md.
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$HERE/common.sh"
