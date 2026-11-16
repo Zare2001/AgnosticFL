@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# E7 native FedAvg for vantage6 on central (EXPERIMENTS.md E7):
+# E7 native FedAvg for vantage6 on central (docs/results/stage2.md, E7):
 #  1. native image = the hub's algorithm image (adapter.env) + v6_native, tagged <hub tag>-native
 #     in the same repository (the hospitals' image policy admits it) and pushed to the registry;
 #  2. the node of organisation hub-operator (the hub's own collaboration member) is started next to

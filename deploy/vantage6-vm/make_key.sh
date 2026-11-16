@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # The HOSPITAL makes its own vantage6 node API key (vantage6 VM). The key is a random UUID4
 # (vantage6 4.15.2 node keys must be UUIDs); it is written to ~/flhub-runtime/vantage6/keys/<site>.key
-# (test collaboration: keys/<site>@<collab>.key) (mode 600) on this VM and sent once, encrypted, to central (tools/bus put --secret), which
-# registers it with deploy/central/vantage6/register_node.sh. Central never generates node keys.
+# (test collaboration: keys/<site>@<collab>.key), mode 600, on this VM and sent once, encrypted,
+# to central (tools/bus put --secret), which registers it with
+# deploy/central/vantage6/register_node.sh. Central never generates node keys.
 # install.sh / extra.sh / keytest.sh render the node config from this file.
 # Usage: bash deploy/vantage6-vm/make_key.sh SITE [--rotate] [--no-send] [--collab NAME]
 #   --rotate   replace an existing key (the old one is kept as <site>.key.old until install.sh

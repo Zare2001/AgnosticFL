@@ -1,4 +1,4 @@
-"""vantage6 adapter: flhub/0.2 on top of a vantage6 4.15 server (PROTOCOL.md §5, §7).
+"""vantage6 adapter: flhub/0.2 on top of a vantage6 4.15 server (docs/protocol.md §5, §7).
 
     python -m adapters.vantage6 [--port 8812] [--sites v6-h3 v6-h4] [--image REGISTRY/flhub/v6-train:TAG]
 
@@ -9,7 +9,7 @@ flhub/0.2 one to one onto vantage6: the cheap `task/<id>/status` gives each site
 listing would carry every run's input), a site's result is fetched and reported as soon as its
 task completes, `task.kill` cancels exactly that site (pending runs included), and a failed site
 leaves the other sites' tasks untouched. The node picks the data by database label: the label of
-the dispatch's `data_variant` (`db_label`), else `default` (docs/DECISIONS.md).
+the dispatch's `data_variant` (`db_label`), else `default` (docs/design/decisions.md, ADR-014).
 Site id = organisation name. Password from $V6_ADAPTER_PASSWORD (never on the command line).
 """
 
@@ -39,7 +39,7 @@ POLL_S = 1.0
 POLL_MB_PER_S = 16.0
 POLL_MAX_S = 30.0
 # delete a round's vantage6 tasks (input and results live in the server DB) once the round is
-# settled if the model is at least this large: keeps the server DB at one round for E3/E4/E7
+# settled if the model is at least this large: keeps the server DB at one round
 PURGE_MIN_MB = float(os.environ.get("V6_PURGE_MIN_MB", "16"))
 CTL_ATTEMPTS = 2  # control calls give up after this many connection errors (the client retries forever)
 _ROOT_LOGGER_LOCK = threading.Lock()  # UserClient() replaces the root handlers; sessions log in in parallel
@@ -97,7 +97,7 @@ class Vantage6Adapter(BaseAdapter):
             raise FrameworkError(f"vantage6 collaboration {self.collaboration!r} not found")
         orgs = {o["name"]: o["id"] for o in client.organization.list(per_page=100)["data"]}
         missing = [s for s in self.sites if s not in orgs]
-        if missing:  # e.g. E5 extra sites before they are registered: offline, the others still work
+        if missing:  # e.g. sites that are not registered yet: offline, the others still work
             log.warning("no vantage6 organisation named %s; reported offline", missing)
         self.collab_id = cols[0]["id"]
         self.org_ids = {s: orgs[s] for s in self.sites if s in orgs}
@@ -132,7 +132,7 @@ class Vantage6Adapter(BaseAdapter):
     # ---- BaseAdapter hooks -----------------------------------------------------------------
     def site_status(self) -> dict[str, str]:
         def nodes(c):
-            if len(self.org_ids) < len(self.sites):  # sites registered after login (E5 add_sites.sh)
+            if len(self.org_ids) < len(self.sites):  # sites registered after login (register_node.sh)
                 orgs = {o["name"]: o["id"] for o in c.organization.list(per_page=100)["data"]}
                 self.org_ids = {s: orgs[s] for s in self.sites if s in orgs}
             res = c.request("node", params={"collaboration_id": self.collab_id, "per_page": 100},
@@ -158,7 +158,7 @@ class Vantage6Adapter(BaseAdapter):
 
     def run_round(self, task, weights, client_config):
         model = self.hub.get_blob(task.model_ref)  # exact bytes of the round model
-        self.blob_store = bool(self._call(lambda c: c.check_if_blob_store_enabled()))  # may change (E4a knob)
+        self.blob_store = bool(self._call(lambda c: c.check_if_blob_store_enabled()))  # can change between rounds
         b64 = base64.b64encode(model).decode("ascii")
         ids = self.v6_tasks.setdefault(task.task_id, {})
         workers = [threading.Thread(target=self._create, args=(task, site, b64, client_config, ids), daemon=True)
@@ -208,7 +208,7 @@ class Vantage6Adapter(BaseAdapter):
 
     def _follow(self, task, ids: dict[str, int], interval: float) -> None:
         """Poll every active site's vantage6 task every `interval` s; report each result or failure as
-        it happens. A vantage6 server outage (E6e restart) only delays this: the deadline still applies."""
+        it happens. A vantage6 server outage (e.g. a restart) only delays this: the deadline still applies."""
         fetching: dict[str, threading.Thread] = {}
         outage = None
         while not task.cancelled:

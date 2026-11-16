@@ -7,7 +7,7 @@
 # (deploy/central/vantage6/register_node.sh); then make_key.sh <site> --confirm <fp>. Only a
 # confirmed key is used.
 # Usage: bash deploy/vantage6-vm/install.sh [--island]
-#   --island     P1 island: server on this VM (host.docker.internal:7601), image from localhost:5050
+#   --island     development setup: server on this VM (host.docker.internal:7601), image from localhost:5050
 set -euo pipefail
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 . "$REPO/deploy/topology.env"

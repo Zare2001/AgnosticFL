@@ -2,7 +2,8 @@
 V6_DATA_DIR="${V6_DATA_DIR:-$HOME/flhub-data}"
 V6_NODE_IMAGE="${V6_NODE_IMAGE:-ghcr.io/vantage6/infrastructure/node:$VANTAGE6_VERSION}"
 
-# vantage6 database label of a data variant; must equal adapters.vantage6.service.db_label (ADR-014)
+# vantage6 database label of a data variant; must equal adapters.vantage6.service.db_label
+# (docs/design/decisions.md, ADR-014)
 db_label() { echo "$1" | sed 's/[^A-Za-z0-9_]/_/g'; }
 
 # node `databases:` entries of one site: the stage-1 file as `default` (if present) and one entry

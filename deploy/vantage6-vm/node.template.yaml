@@ -1,16 +1,17 @@
 # vantage6 node config for one hospital (rendered by install.sh into ~/.config/vantage6/node/<site>.yaml).
 # Standard vantage6 4.15 node; the only hub-specific items are the server address, the API key
-# (received from the operator) and the allowed algorithm image.
+# (made by the hospital, make_key.sh) and the allowed algorithm image.
 api_key: ${V6_API_KEY}
 api_path: /api
 server_url: ${V6_SERVER_URL}
 port: ${V6_SERVER_PORT}
 task_dir: ${V6_TASK_DIR}
-# one database per data variant (label = variant with non-identifier characters -> '_', ADR-014)
+# one database per data variant; its label is the variant with every non-identifier character
+# replaced by '_' (docs/design/decisions.md, ADR-014)
 databases:
 ${V6_DATABASES}
 # do not publish the node config: for CSV databases it lists every column name (785 per file),
-# which the 4.15.2 server deletes row by row on every node (re)connect (ADR-014)
+# which the 4.15.2 server deletes row by row on every node (re)connect
 share_config: false
 encryption:
   enabled: false

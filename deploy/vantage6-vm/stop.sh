@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Stop the vantage6 nodes (idempotent). `v6 node stop` exits 1 on the root-owned log file
-# (ADR-005), so the node containers are stopped directly; they are started with auto-remove.
+# (docs/design/decisions.md, ADR-005), so the node containers are stopped directly; they are
+# started with auto-remove.
 set -euo pipefail
 rm -f "$HOME/flhub-runtime/vantage6/nodes.enabled"   # keeps the watchdog from restarting them
 for s in v6-h3 v6-h4; do

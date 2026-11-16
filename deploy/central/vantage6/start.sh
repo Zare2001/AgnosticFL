@@ -14,7 +14,7 @@ VENV="${V6_VENV:-$HOME/venvs/v6}"
 [ -f "$RT/adapter.env" ] && [ -f "$CFG" ] || { echo "run deploy/central/vantage6/install.sh first" >&2; exit 1; }
 log() { echo "[v6-start] $*"; }
 
-# server: started with -c (no CLI file logging, ADR-005); stopped by Docker label in stop.sh
+# server: started with -c (no CLI file logging; docs/design/decisions.md, ADR-005); stopped by Docker label in stop.sh
 if [ -z "$(docker ps -q --filter "label=vantage6-type=server" --filter "label=name=$NAME")" ]; then
   (cd "$HOME" && "$VENV/bin/v6" server start -c "$CFG" --user --image "$V6_SERVER_IMAGE" >"$RT/server-start.log" 2>&1) \
     || { tail -20 "$RT/server-start.log" >&2; exit 1; }

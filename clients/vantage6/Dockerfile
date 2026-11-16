@@ -1,7 +1,7 @@
 # AgnosticFL vantage6 algorithm image (build context = repo root):
 #   docker build -f clients/vantage6/Dockerfile --build-arg TORCH_VERSION=... -t <registry>/flhub/v6-train:<tag> .
 # Same as the official algorithm-base:4.15 (python slim + vantage6-algorithm-tools) but on
-# Python 3.11 with the project's torch/numpy pins (docs/DECISIONS.md ADR-004).
+# Python 3.11 with the project's torch/numpy pins (docs/design/decisions.md, ADR-004).
 ARG BASE_IMAGE=python:3.11.17-slim-bookworm
 FROM ${BASE_IMAGE}
 ARG TORCH_VERSION

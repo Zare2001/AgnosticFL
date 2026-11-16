@@ -1,4 +1,4 @@
-# vantage6 island (P1, vantage6 VM): hub core + vantage6 server/adapter + 2 nodes on this VM, 3 rounds, W&B offline.
+# vantage6 island (development setup on the vantage6 VM): hub core + vantage6 server/adapter + 2 nodes on this VM, 3 rounds, W&B offline.
 #   python -m hub.orchestrator run --config deploy/central/vantage6/island-3r.yaml --wandb offline
 #   python -m hub.sim --config deploy/central/vantage6/island-3r.yaml --wandb offline   (reference)
 name: vantage6-island-3r

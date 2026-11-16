@@ -7,7 +7,7 @@
 # membership of flhub, node). The import holds only hub-operator (users root, hub-adapter) and its
 # node record (never started).
 # Usage: bash deploy/central/vantage6/install.sh [--island] [--reimport] [--skip-image]
-#   --island      P1 island on a framework VM: run a local registry on 127.0.0.1:5050 and
+#   --island      development setup on a framework VM: run a local registry on 127.0.0.1:5050 and
 #                 let the nodes pull localhost:5050/... (central: the registry is run by central)
 #   --reimport    wipe the vantage6 server database and import the entities again
 #   --skip-image  do not build/push the algorithm image
@@ -31,7 +31,7 @@ DB_DIR="$HOME/.local/share/vantage6/server/$NAME"
 . "$REPO/deploy/central/vantage6/common.sh"
 SERVER_HOST="$([ "$V6_SERVER_BIND" = 0.0.0.0 ] && echo 127.0.0.1 || echo "$V6_SERVER_BIND")"
 V6_BASE_SITES="v6-h3 v6-h4"
-V6_EXTRA_SITES="${V6_EXTRA_SITES-v6-h9 v6-h10}"   # E5 sites: registered (register_node.sh), offline outside E5
+V6_EXTRA_SITES="${V6_EXTRA_SITES-v6-h9 v6-h10}"   # the extra sites of the 12-site run (E5): registered (register_node.sh), offline otherwise
 log() { echo "[v6-install] $*"; }
 command -v envsubst >/dev/null || sudo apt-get install -y -q gettext-base >/dev/null
 
@@ -64,7 +64,7 @@ render_server_config
 docker pull -q "$V6_SERVER_IMAGE" >/dev/null
 log "server config $CFG (image $V6_SERVER_IMAGE)"
 
-# --- 4. entities import (once). `v6 server import` loses the DB on Python 3.11 (ADR-005),
+# --- 4. entities import (once). `v6 server import` loses the DB on Python 3.11 (docs/design/decisions.md, ADR-005),
 #        so run the server image's own import command with VANTAGE6_DB_URI set. ---
 server_container() { docker ps -q --filter "label=vantage6-type=server" --filter "label=name=$NAME"; }
 if [ "$REIMPORT" = 1 ] || [ ! -f "$RT/.imported" ]; then

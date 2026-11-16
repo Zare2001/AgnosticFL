@@ -9,7 +9,7 @@ NODE_CFG="$HOME/.config/vantage6/node/$SITE.yaml"
 CONTAINER="vantage6-$SITE-user"
 REGISTRY="$CENTRAL_IP:$REGISTRY_PORT"
 
-db_label() { echo "$1" | sed 's/[^A-Za-z0-9_]/_/g'; }  # = adapters.vantage6 db_label (ADR-014)
+db_label() { echo "$1" | sed 's/[^A-Za-z0-9_]/_/g'; }  # = adapters.vantage6 db_label (docs/design/decisions.md, ADR-014)
 
 node_databases() {  # one CSV database per data file: <site>.csv as `default`, <variant>-<site>.csv by variant
   local f v
@@ -97,7 +97,8 @@ fw_start() {
 }
 
 fw_stop() {
-  # `v6 node stop` fails on the root-owned log file (ADR-005); the container is started with auto-remove
+  # `v6 node stop` fails on the root-owned log file (docs/design/decisions.md, ADR-005);
+  # the container is started with auto-remove
   local ids
   ids="$(docker ps -q --filter "name=^$CONTAINER$")"
   if [ -n "$ids" ]; then docker stop "$ids" >/dev/null; log "stopped"; else log "not running"; fi
